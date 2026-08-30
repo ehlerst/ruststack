@@ -43,6 +43,10 @@ fn setup_test_app() -> axum::Router {
         account_id.clone(),
         region.clone(),
     ));
+    let kms_state = Arc::new(ruststack_kms::KmsState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
 
     let app_state = AppState {
         s3_storage,
@@ -53,6 +57,7 @@ fn setup_test_app() -> axum::Router {
         secretsmanager_engine,
         sts_engine,
         dynamodb_engine,
+        kms_state,
         chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region,
         account_id,

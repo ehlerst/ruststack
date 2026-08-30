@@ -818,6 +818,126 @@ pub fn run_dynamodb_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     results
 }
 
+fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    use ruststack_kms::{
+        CreateKeyRequest, DecryptRequest, EncryptRequest, GenerateDataKeyRequest, KmsState,
+    };
+    use base64::Engine;
+
+    let mut results = Vec::new();
+    let kms = KmsState::new("000000000000".to_string(), "us-east-1".to_string());
+
+    // 1. CreateKey
+    let iters_create = iterations.min(500);
+    let mut latencies = Vec::with_capacity(iters_create);
+    let start_total = Instant::now();
+    for i in 0..iters_create {
+        let start = Instant::now();
+        let _ = kms.create_key(CreateKeyRequest {
+            description: Some(format!("Bench Key {}", i)),
+            key_usage: "ENCRYPT_DECRYPT".to_string(),
+            key_spec: "SYMMETRIC_DEFAULT".to_string(),
+            customer_master_key_spec: "SYMMETRIC_DEFAULT".to_string(),
+            tags: None,
+        }).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_create,
+        None,
+        "KMS",
+        "CreateKey",
+        None,
+    ));
+
+    // Master key for crypto benchmarks
+    let master_key = kms.create_key(CreateKeyRequest {
+        description: Some("Master Bench Key".to_string()),
+        key_usage: "ENCRYPT_DECRYPT".to_string(),
+        key_spec: "SYMMETRIC_DEFAULT".to_string(),
+        customer_master_key_spec: "SYMMETRIC_DEFAULT".to_string(),
+        tags: None,
+    }).unwrap();
+
+    let raw_payload = vec![0x42u8; 1024]; // 1KB
+    let plain_b64 = base64::engine::general_purpose::STANDARD.encode(&raw_payload);
+
+    // 2. Encrypt
+    let mut ciphertexts = Vec::with_capacity(iterations);
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for _ in 0..iterations {
+        let start = Instant::now();
+        let (cipher, _) = kms.encrypt(EncryptRequest {
+            key_id: master_key.key_id.clone(),
+            plaintext: plain_b64.clone(),
+            encryption_algorithm: "SYMMETRIC_DEFAULT".to_string(),
+            encryption_context: None,
+        }).unwrap();
+        latencies.push(start.elapsed());
+        ciphertexts.push(cipher);
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        Some(1024),
+        "KMS",
+        "Encrypt",
+        Some("1 KB Payload"),
+    ));
+
+    // 3. Decrypt
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let start = Instant::now();
+        let _ = kms.decrypt(DecryptRequest {
+            ciphertext_blob: ciphertexts[i].clone(),
+            key_id: None,
+            encryption_algorithm: "SYMMETRIC_DEFAULT".to_string(),
+            encryption_context: None,
+        }).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        Some(1024),
+        "KMS",
+        "Decrypt",
+        Some("1 KB Payload"),
+    ));
+
+    // 4. GenerateDataKey
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for _ in 0..iterations {
+        let start = Instant::now();
+        let _ = kms.generate_data_key(GenerateDataKeyRequest {
+            key_id: master_key.key_id.clone(),
+            key_spec: "AES_256".to_string(),
+            number_of_bytes: Some(32),
+            encryption_context: None,
+        }).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        Some(32),
+        "KMS",
+        "GenerateDataKey",
+        Some("AES-256 (32B)"),
+    ));
+
+    results
+}
+
 fn format_markdown(results: &[BenchmarkResult]) -> String {
     let mut md = String::new();
     md.push_str("# 🚀 RustStack Performance Benchmark Report\n\n");
@@ -929,6 +1049,15 @@ fn main() -> anyhow::Result<()> {
         );
         let ddb_res = run_dynamodb_benchmarks(opts.iterations);
         all_results.extend(ddb_res);
+    }
+
+    if opts.service == "kms" || opts.service == "all" {
+        eprintln!(
+            "Running KMS performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let kms_res = run_kms_benchmarks(opts.iterations);
+        all_results.extend(kms_res);
     }
 
     let output_str = if opts.format == "json" {

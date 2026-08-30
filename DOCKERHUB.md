@@ -42,10 +42,13 @@ services:
     container_name: ruststack
     ports:
       - "4566:4566"
+    volumes:
+      - ./ruststack-data:/data
     environment:
-      - SERVICES=s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb
+      - SERVICES=s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms
       - DEFAULT_REGION=us-east-1
       - ACCOUNT_ID=000000000000
+      - RUSTSTACK_DATA_DIR=/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4566/_ruststack/health"]
       interval: 5s
@@ -65,6 +68,7 @@ RustStack includes a zero-dependency, dark-mode visual administration dashboard 
 - View **SQS Queues, Messages & DLQ Redrive Policies**
 - Explore **SNS Topics & Subscriptions**
 - Inspect **SSM Parameters & Secrets Manager Secrets**
+- Manage **KMS Customer & AWS Managed Master Keys & Aliases**
 - Interactively build **Chaos Engineering** rules & manage **State Snapshots**
 
 ---
@@ -120,6 +124,7 @@ All services multiplex across the single port `4566`:
 | **Amazon SSM** | AWS JSON 1.1 | Parameter Store (String, StringList, SecureString), Automatic Versioning, `GetParametersByPath` Recursive Trees |
 | **Secrets Manager** | AWS JSON 1.1 | Secret Lifecycle, Version Staging (`AWSCURRENT`, `AWSPREVIOUS`), GetSecretValue |
 | **Amazon STS** | Query & JSON 1.1 | `GetCallerIdentity`, `AssumeRole`, `GetSessionToken` |
+| **AWS KMS** | AWS JSON 1.1 | `CreateKey`, `DescribeKey`, `ListKeys`, `CreateAlias`, `ListAliases`, `Encrypt`, `Decrypt`, `GenerateDataKey` (AES-128/256) |
 
 ---
 
@@ -154,7 +159,7 @@ curl -X POST http://localhost:4566/_ruststack/chaos/reset
 
 ---
 
-## 💾 State Snapshots & Reset
+## 💾 State Snapshots, Reset & Auto-Disk Persistence
 
 ```bash
 # Export cluster snapshot JSON
@@ -169,6 +174,15 @@ curl -X POST http://localhost:4566/_ruststack/state/load \
 curl -X POST http://localhost:4566/_ruststack/state/reset
 ```
 
+### Auto-Disk Persistence
+Mount a local directory to preserve cluster state across container restarts:
+```bash
+docker run -d -p 4566:4566 \
+  -v $(pwd)/ruststack-data:/data \
+  -e RUSTSTACK_DATA_DIR=/data \
+  ehlers320/ruststack:latest
+```
+
 ---
 
 ## ⚙️ Environment Variables
@@ -177,9 +191,11 @@ curl -X POST http://localhost:4566/_ruststack/state/reset
 |:---|:---|:---|
 | `PORT` | `4566` | Listening HTTP port |
 | `HOST` | `0.0.0.0` | Bind host address |
-| `SERVICES` | `s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb` | Comma-separated list of enabled services |
+| `SERVICES` | `s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms` | Comma-separated list of enabled services |
 | `DEFAULT_REGION` | `us-east-1` | Default AWS region |
 | `ACCOUNT_ID` | `000000000000` | Default AWS Account ID |
+| `RUSTSTACK_DATA_DIR` | `None` | Directory path for auto-saving & auto-loading cluster state |
+| `PERSISTENCE` | `false` | Enable automatic disk persistence |
 
 ---
 

@@ -48,6 +48,10 @@ async fn test_server_unified_routing() {
         "000000000000".to_string(),
         "us-east-1".to_string(),
     ));
+    let kms_state = Arc::new(ruststack_kms::KmsState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
 
     let state = AppState {
         s3_storage,
@@ -58,6 +62,7 @@ async fn test_server_unified_routing() {
         secretsmanager_engine,
         sts_engine,
         dynamodb_engine,
+        kms_state,
         chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region: "us-east-1".to_string(),
         account_id: "000000000000".to_string(),

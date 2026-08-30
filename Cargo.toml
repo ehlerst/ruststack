@@ -10,6 +10,7 @@ members = [
     "crates/ruststack-secretsmanager",
     "crates/ruststack-sts",
     "crates/ruststack-dynamodb",
+    "crates/ruststack-kms",
     "crates/ruststack-server",
     "crates/ruststack-benchmarks",
     "crates/ruststack-compat-tests",
@@ -34,6 +35,7 @@ ruststack-ssm = { path = "crates/ruststack-ssm" }
 ruststack-secretsmanager = { path = "crates/ruststack-secretsmanager" }
 ruststack-sts = { path = "crates/ruststack-sts" }
 ruststack-dynamodb = { path = "crates/ruststack-dynamodb" }
+ruststack-kms = { path = "crates/ruststack-kms" }
 ruststack-server = { path = "crates/ruststack-server" }
 
 # Async & HTTP runtime

@@ -41,11 +41,15 @@ Automated in-memory performance rating on standard developer hardware:
 | **STS** | `GetCallerIdentity` | Root Identity | **421,000+ ops/s** | **1.0 µs** | 1.5 µs | **A+ (Ultra Fast)** |
 | **DynamoDB** | `GetItem` | Point Read PK+SK | **389,000+ ops/s** | **1.4 µs** | 1.9 µs | **A+ (Ultra Fast)** |
 | **DynamoDB** | `PutItem` | Single Item | **364,000+ ops/s** | **1.4 µs** | 2.0 µs | **A+ (Ultra Fast)** |
+| **KMS** | `GenerateDataKey` | AES-256 (32B) | **353,000+ ops/s** | **1.8 µs** | 2.0 µs | **A+ (Ultra Fast)** |
 | **SecretsManager** | `GetSecretValue` | JSON Payload | **293,000+ ops/s** | **2.4 µs** | 2.8 µs | **A+ (Ultra Fast)** |
 | **SNS** | `Publish` | Single Topic | **227,000+ ops/s** | **3.4 µs** | 3.8 µs | **A+ (Ultra Fast)** |
 | **STS** | `AssumeRole` | Temporary Creds | **223,000+ ops/s** | **3.4 µs** | 3.8 µs | **A+ (Ultra Fast)** |
 | **SQS** | `SendMessageBatch` | 10 msgs/batch | **211,000+ msgs/s** | **42.8 µs** | 55.4 µs | **A (Excellent)** |
+| **KMS** | `CreateKey` | Customer Key | **205,000+ ops/s** | **3.4 µs** | 5.3 µs | **A+ (Ultra Fast)** |
+| **KMS** | `Decrypt` | 1 KB Payload | **201,000+ ops/s** | **3.8 µs** | 4.3 µs | **A+ (Ultra Fast)** |
 | **S3** | `PutObject` | 1 KB | **175,000+ ops/s** | **4.3 µs** | 5.7 µs | **A+ (Ultra Fast)** |
+| **KMS** | `Encrypt` | 1 KB Payload | **165,000+ ops/s** | **4.3 µs** | 8.0 µs | **A+ (Ultra Fast)** |
 | **SQS** | `SendMessage` | Single | **156,000+ ops/s** | **5.2 µs** | 5.7 µs | **A+ (Ultra Fast)** |
 | **SNS** | `PublishWithFanout` | 5 SQS Queues | **122,000+ msgs/s** | **39.1 µs** | 44.6 µs | **A (Excellent)** |
 | **SSM** | `GetParametersByPath` | 50 Keys Recursive | **99,000+ ops/s** | **9.0 µs** | 9.2 µs | **A+ (Ultra Fast)** |
@@ -102,6 +106,13 @@ Automated in-memory performance rating on standard developer hardware:
 ### 8. Amazon Security Token Service Mock (`ruststack-sts`)
 - **Protocols**: Query / Form-urlencoded and JSON 1.1 protocols (`x-amz-target: AWSSecurityTokenServiceV20110615.*`).
 - **Operations**: `GetCallerIdentity` (essential for Terraform & AWS SDK init), `AssumeRole`, `GetSessionToken`.
+
+### 9. AWS Key Management Service (`ruststack-kms`)
+- **Protocols**: AWS JSON 1.1 protocol (`x-amz-target: TrentService.*`).
+- **Key Operations**: `CreateKey`, `DescribeKey`, `ListKeys`, `EnableKey`, `DisableKey`, `ScheduleKeyDeletion`.
+- **Alias Operations**: `CreateAlias`, `DeleteAlias`, `ListAliases` with automatic identifier resolution (`key-id`, `arn:aws:kms:...`, `alias/name`).
+- **Cryptographic Operations**: `Encrypt`, `Decrypt` with authenticated self-describing ciphertext envelopes, and `GenerateDataKey` (AES-128 & AES-256).
+- **Default Keys**: Pre-configured default managed keys (`alias/aws/s3`, `alias/aws/dynamodb`).
 
 ---
 
@@ -201,6 +212,20 @@ curl -X POST http://localhost:4566/_ruststack/state/load \
   -H "Content-Type: application/json" \
   -d '{"file_path": "/tmp/cluster-state.json"}'
 ```
+
+### 4. Auto-Disk Persistence (`RUSTSTACK_DATA_DIR` / `--data-dir`)
+RustStack supports automatic state restoration and persistence between container restarts:
+```bash
+# Docker volume mount for automatic state persistence
+docker run -d -p 4566:4566 \
+  -v $(pwd)/ruststack-data:/data \
+  -e RUSTSTACK_DATA_DIR=/data \
+  ehlers320/ruststack:latest
+
+# Or with CLI binary
+ruststack start --data-dir ./data
+```
+When `--data-dir` is configured, RustStack automatically loads `<data-dir>/state.json` on startup and saves cluster state to disk on graceful shutdown.
 
 ---
 

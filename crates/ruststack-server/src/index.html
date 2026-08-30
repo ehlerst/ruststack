@@ -211,13 +211,14 @@
       <button class="tab-btn" onclick="switchTab('s3')">🪣 S3</button>
       <button class="tab-btn" onclick="switchTab('sqs')">📬 SQS & SNS</button>
       <button class="tab-btn" onclick="switchTab('ssm')">🔐 SSM & Secrets</button>
+      <button class="tab-btn" onclick="switchTab('kms')">🔑 KMS</button>
       <button class="tab-btn" onclick="switchTab('chaos')">🌪️ Chaos Studio</button>
       <button class="tab-btn" onclick="switchTab('snapshots')">💾 Snapshots</button>
     </div>
 
     <!-- OVERVIEW TAB -->
     <div id="tab-overview" class="tab-content active">
-      <div class="grid">
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
         <div class="card">
           <div class="card-title">S3 Buckets & Objects</div>
           <div class="card-value" id="card-s3-count">0 / 0</div>
@@ -231,8 +232,12 @@
           <div class="card-value" id="card-sqs-count">0 / 0</div>
         </div>
         <div class="card">
-          <div class="card-title">SSM Parameters & Secrets</div>
+          <div class="card-title">SSM & Secrets</div>
           <div class="card-value" id="card-ssm-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">KMS Keys & Aliases</div>
+          <div class="card-value" id="card-kms-count">0 / 0</div>
         </div>
       </div>
 
@@ -378,6 +383,43 @@
       </div>
     </div>
 
+    <!-- KMS TAB -->
+    <div id="tab-kms" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title"><span>AWS Key Management Service (KMS) Keys</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Key ID / ARN</th>
+              <th>Status</th>
+              <th>Key Spec</th>
+              <th>Usage</th>
+              <th>Manager</th>
+              <th>Description</th>
+            </tr>
+          </thead>
+          <tbody id="table-kms-rows">
+            <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No keys created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="section-title"><span>KMS Aliases</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Alias Name</th>
+              <th>Target Key ID</th>
+              <th>Alias ARN</th>
+            </tr>
+          </thead>
+          <tbody id="table-kms-alias-rows">
+            <tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No aliases created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- CHAOS TAB -->
     <div id="tab-chaos" class="tab-content">
       <div class="grid" style="grid-template-columns: 1fr 2fr;">
@@ -393,6 +435,7 @@
               <option value="sns">SNS</option>
               <option value="ssm">SSM</option>
               <option value="secretsmanager">Secrets Manager</option>
+              <option value="kms">KMS</option>
             </select>
           </div>
           <div class="form-group">
@@ -507,6 +550,7 @@
         const totalMsgs = (dump.sqs.queues || []).reduce((acc, q) => acc + (q.messages || []).length, 0);
         document.getElementById('card-sqs-count').innerText = `${(dump.sqs.queues || []).length} / ${totalMsgs}`;
         document.getElementById('card-ssm-count').innerText = `${(dump.ssm.parameters || []).length} / ${(dump.secretsmanager.secrets || []).length}`;
+        document.getElementById('card-kms-count').innerText = `${(dump.kms?.keys || []).length} / ${(dump.kms?.aliases || []).length}`;
 
         // Populate Tables
         renderDynamoTables(dump.dynamodb.tables || []);
@@ -515,8 +559,36 @@
         renderSns(dump.sns.topics || []);
         renderSsm(dump.ssm.parameters || []);
         renderSecrets(dump.secretsmanager.secrets || []);
+        renderKms(dump.kms?.keys || [], dump.kms?.aliases || []);
       } catch (err) {
         console.error("Failed to load state", err);
+      }
+    }
+
+    function renderKms(keys, aliases) {
+      const tbodyKeys = document.getElementById('table-kms-rows');
+      if (!keys.length) {
+        tbodyKeys.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No keys created yet</td></tr>';
+      } else {
+        tbodyKeys.innerHTML = keys.map(k => `<tr>
+          <td><strong>${k.metadata.key_id}</strong><br><small style="color: var(--text-muted);">${k.metadata.arn}</small></td>
+          <td><span class="badge ${k.metadata.enabled ? 'badge-success' : 'badge-danger'}">${k.metadata.key_state}</span></td>
+          <td><code>${k.metadata.key_spec}</code></td>
+          <td>${k.metadata.key_usage}</td>
+          <td><span class="badge badge-primary">${k.metadata.key_manager}</span></td>
+          <td>${k.metadata.description || '-'}</td>
+        </tr>`).join('');
+      }
+
+      const tbodyAliases = document.getElementById('table-kms-alias-rows');
+      if (!aliases.length) {
+        tbodyAliases.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No aliases created yet</td></tr>';
+      } else {
+        tbodyAliases.innerHTML = aliases.map(a => `<tr>
+          <td><strong>${a.alias_name}</strong></td>
+          <td><code>${a.target_key_id}</code></td>
+          <td><small style="color: var(--text-muted);">${a.alias_arn}</small></td>
+        </tr>`).join('');
       }
     }
 

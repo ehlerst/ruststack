@@ -48,6 +48,7 @@ impl RustStackTestClient {
         ));
         let sts_engine = Arc::new(StsEngine::new(account_id.clone(), region.clone()));
         let dynamodb_engine = Arc::new(DynamoDbEngine::new(account_id.clone(), region.clone()));
+        let kms_state = Arc::new(ruststack_kms::KmsState::new(account_id.clone(), region.clone()));
 
         let state = AppState {
             s3_storage,
@@ -58,6 +59,7 @@ impl RustStackTestClient {
             secretsmanager_engine,
             sts_engine,
             dynamodb_engine,
+            kms_state,
             chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
             region: region.clone(),
             account_id: account_id.clone(),

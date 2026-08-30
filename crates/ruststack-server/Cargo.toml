@@ -19,6 +19,7 @@ ruststack-ssm.workspace = true
 ruststack-secretsmanager.workspace = true
 ruststack-sts.workspace = true
 ruststack-dynamodb.workspace = true
+ruststack-kms.workspace = true
 tokio.workspace = true
 axum.workspace = true
 tower.workspace = true

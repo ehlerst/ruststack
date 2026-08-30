@@ -18,15 +18,17 @@
 6. **Amazon SSM Parameter Store (`ssm`)**: String, StringList, SecureString, hierarchical paths (`GetParametersByPath`), versioning.
 7. **Amazon Secrets Manager (`secretsmanager`)**: Secret creation, version staging (`AWSCURRENT`, `AWSPREVIOUS`), GetSecretValue.
 8. **Amazon STS Mock (`sts`)**: `GetCallerIdentity`, `AssumeRole`, `GetSessionToken`.
+9. **AWS Key Management Service (`kms`)**: `CreateKey`, `DescribeKey`, `ListKeys`, `CreateAlias`, `ListAliases`, `Encrypt`, `Decrypt`, `GenerateDataKey` (AES-128 & AES-256).
 
 ## Control Plane & Extensions
 - **Web Admin UI**: `GET /_ruststack/ui/` (Zero-dependency embedded dark-mode console)
 - **Health Check**: `GET /_ruststack/health` or `GET /health` -> `{"status": "running", "engine": "ruststack"}`
 - **Cluster Info**: `GET /_ruststack/info`
+- **Auto-Disk Persistence**: Automatic state saving & reloading via `RUSTSTACK_DATA_DIR=/data` or `--data-dir ./data`
 - **State Snapshots**:
   - Dump: `GET /_ruststack/state/dump`
   - Load / Restore: `POST /_ruststack/state/load`
-  - Atomic Reset: `POST /_ruststack/state/reset` (supports `{"services": ["s3", "dynamodb"]}`)
+  - Atomic Reset: `POST /_ruststack/state/reset` (supports `{"services": ["s3", "dynamodb", "kms"]}`)
 - **Chaos Engineering**:
   - Register Rule: `POST /_ruststack/chaos/rules` (configurable service, action, probability 0.0-1.0, error_status, error_code, latency_ms, limit_times)
   - List Rules: `GET /_ruststack/chaos/rules`

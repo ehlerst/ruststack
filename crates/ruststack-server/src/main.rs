@@ -1,8 +1,9 @@
 use clap::{Parser, Subcommand};
 use ruststack_dynamodb::DynamoDbEngine;
 use ruststack_eventbridge::EventBridgeEngine;
-use ruststack_s3::InMemoryStorage;
+use ruststack_s3::{InMemoryStorage, S3Storage};
 use ruststack_secretsmanager::SecretsManagerEngine;
+use ruststack_server::state_api::RustStackStateSnapshot;
 use ruststack_server::{create_router, AppState, Opts};
 use ruststack_sns::SnsEngine;
 use ruststack_sqs::SqsEngine;
@@ -355,29 +356,93 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         opts.account_id.clone(),
         opts.region.clone(),
     ));
+    let kms_state = Arc::new(ruststack_kms::KmsState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let state = AppState {
-        s3_storage,
-        sqs_engine,
-        sns_engine,
-        eventbridge_engine,
-        ssm_engine,
-        secretsmanager_engine,
-        sts_engine,
-        dynamodb_engine,
+        s3_storage: s3_storage.clone(),
+        sqs_engine: sqs_engine.clone(),
+        sns_engine: sns_engine.clone(),
+        eventbridge_engine: eventbridge_engine.clone(),
+        ssm_engine: ssm_engine.clone(),
+        secretsmanager_engine: secretsmanager_engine.clone(),
+        sts_engine: sts_engine.clone(),
+        dynamodb_engine: dynamodb_engine.clone(),
+        kms_state: kms_state.clone(),
         chaos_engine,
-        region: opts.region,
-        account_id: opts.account_id,
+        region: opts.region.clone(),
+        account_id: opts.account_id.clone(),
     };
 
-    let app = create_router(state);
+    // Auto-Disk Persistence Load on Startup
+    let persist_path = if let Some(ref dir) = opts.data_dir {
+        Some(format!("{}/state.json", dir.trim_end_matches('/')))
+    } else if opts.persistence {
+        Some("./.ruststack_data/state.json".to_string())
+    } else {
+        None
+    };
+
+    if let Some(ref path) = persist_path {
+        if std::path::Path::new(path).exists() {
+            match std::fs::read_to_string(path) {
+                Ok(content) => match serde_json::from_str::<RustStackStateSnapshot>(&content) {
+                    Ok(snapshot) => {
+                        s3_storage.load_state(snapshot.s3);
+                        sqs_engine.load_state(snapshot.sqs);
+                        sns_engine.load_state(snapshot.sns);
+                        eventbridge_engine.load_state(snapshot.eventbridge);
+                        ssm_engine.load_state(snapshot.ssm);
+                        secretsmanager_engine.load_state(snapshot.secretsmanager);
+                        sts_engine.load_state(snapshot.sts);
+                        dynamodb_engine.load_state(snapshot.dynamodb);
+                        kms_state.import_snapshot(snapshot.kms);
+                        info!("💾 Auto-loaded persistent cluster state from {}", path);
+                    }
+                    Err(e) => tracing::warn!("Failed to parse persistent state file {}: {}", path, e),
+                },
+                Err(e) => tracing::warn!("Failed to read persistent state file {}: {}", path, e),
+            }
+        }
+    }
+
+    let app = create_router(state.clone());
     let listener = tokio::net::TcpListener::bind(addr).await?;
     info!("RustStack gateway listening on {}", addr);
 
     axum::serve(listener, app)
         .with_graceful_shutdown(shutdown_signal())
         .await?;
+
+    // Auto-Disk Persistence Save on Shutdown
+    if let Some(ref path) = persist_path {
+        if let Some(parent) = std::path::Path::new(path).parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let snapshot = RustStackStateSnapshot {
+            version: 1,
+            created_at: chrono::Utc::now(),
+            region: opts.region,
+            account_id: opts.account_id,
+            s3: s3_storage.dump_state(),
+            sqs: sqs_engine.dump_state(),
+            sns: sns_engine.dump_state(),
+            eventbridge: eventbridge_engine.dump_state(),
+            ssm: ssm_engine.dump_state(),
+            secretsmanager: secretsmanager_engine.dump_state(),
+            sts: sts_engine.dump_state(),
+            dynamodb: dynamodb_engine.dump_state(),
+            kms: kms_state.export_snapshot(),
+        };
+        if let Ok(json_str) = serde_json::to_string_pretty(&snapshot) {
+            if let Ok(()) = std::fs::write(path, json_str) {
+                info!("💾 Auto-saved persistent cluster state to {}", path);
+            }
+        }
+    }
 
     info!("RustStack shut down successfully");
     Ok(())

@@ -16,6 +16,7 @@ ruststack-ssm = { path = "../ruststack-ssm" }
 ruststack-secretsmanager = { path = "../ruststack-secretsmanager" }
 ruststack-sts = { path = "../ruststack-sts" }
 ruststack-dynamodb = { path = "../ruststack-dynamodb" }
+ruststack-kms = { path = "../ruststack-kms" }
 ruststack-server = { path = "../ruststack-server" }
 tokio = { workspace = true }
 axum = { workspace = true }
@@ -27,4 +28,9 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 quick-xml = { workspace = true }
 uuid = { workspace = true }
+chrono = { workspace = true }
+base64 = { workspace = true }
 form_urlencoded = { workspace = true }
+
+[dev-dependencies]
+tempfile = "3.16"

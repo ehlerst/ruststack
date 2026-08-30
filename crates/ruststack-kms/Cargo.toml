@@ -1,0 +1,28 @@
+[package]
+name = "ruststack-kms"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "High-performance Amazon Key Management Service (KMS) engine for RustStack"
+
+[dependencies]
+ruststack-core = { path = "../ruststack-core" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+base64 = { workspace = true }
+fastrand = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }

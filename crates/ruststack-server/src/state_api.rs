@@ -21,6 +21,7 @@ pub struct RustStackStateSnapshot {
     pub secretsmanager: ruststack_secretsmanager::SecretsManagerSnapshot,
     pub sts: ruststack_sts::StsSnapshot,
     pub dynamodb: ruststack_dynamodb::DynamoDbSnapshot,
+    pub kms: ruststack_kms::KmsStateSnapshot,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -68,6 +69,7 @@ pub async fn state_reset_handler(
         "secretsmanager",
         "sts",
         "dynamodb",
+        "kms",
     ];
 
     let target_services = match reset_req.services {
@@ -85,6 +87,7 @@ pub async fn state_reset_handler(
             "secretsmanager" => state.secretsmanager_engine.reset(),
             "sts" => state.sts_engine.reset(),
             "dynamodb" => state.dynamodb_engine.reset(),
+            "kms" => state.kms_state.reset(),
             _ => {}
         }
     }
@@ -130,6 +133,7 @@ pub async fn state_dump_handler(
         secretsmanager: state.secretsmanager_engine.dump_state(),
         sts: state.sts_engine.dump_state(),
         dynamodb: state.dynamodb_engine.dump_state(),
+        kms: state.kms_state.export_snapshot(),
     };
 
     if let Some(file_path) = dump_req.file_path {
@@ -240,6 +244,7 @@ pub async fn state_load_handler(
         .load_state(snapshot.secretsmanager);
     state.sts_engine.load_state(snapshot.sts);
     state.dynamodb_engine.load_state(snapshot.dynamodb);
+    state.kms_state.import_snapshot(snapshot.kms);
 
     let resp_json = json!({
         "status": "ok",

@@ -53,6 +53,13 @@ impl Dispatcher {
             {
                 return AwsService::DynamoDb;
             }
+            if target.starts_with("TrentService")
+                || target.starts_with("TrentService.")
+                || target.starts_with("KMS")
+                || target.starts_with("KMS.")
+            {
+                return AwsService::Kms;
+            }
         }
 
         // 3. Check Authorization header (AWS SigV4 credential scope: .../us-east-1/<service>/aws4_request)
@@ -67,6 +74,7 @@ impl Dispatcher {
                     "secretsmanager" => return AwsService::SecretsManager,
                     "sts" => return AwsService::Sts,
                     "dynamodb" => return AwsService::DynamoDb,
+                    "kms" => return AwsService::Kms,
                     _ => {}
                 }
             }
@@ -104,6 +112,9 @@ impl Dispatcher {
             if host_clean.contains(".dynamodb.") || host_clean.starts_with("dynamodb.") {
                 return AwsService::DynamoDb;
             }
+            if host_clean.contains(".kms.") || host_clean.starts_with("kms.") {
+                return AwsService::Kms;
+            }
             // Check for S3 bucket subdomain style like bucket.localhost
             if host_clean.ends_with(".localhost")
                 && !host_clean.starts_with("localhost")
@@ -114,6 +125,7 @@ impl Dispatcher {
                 && !host_clean.starts_with("secretsmanager")
                 && !host_clean.starts_with("sts")
                 && !host_clean.starts_with("dynamodb")
+                && !host_clean.starts_with("kms")
             {
                 return AwsService::S3;
             }

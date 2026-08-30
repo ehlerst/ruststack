@@ -1,3 +1,4 @@
+use base64::Engine;
 use serde_json::json;
 use std::time::Instant;
 
@@ -207,8 +208,56 @@ async fn main() -> anyhow::Result<()> {
     assert_eq!(sts_val["Account"].as_str().unwrap(), "000000000000");
     println!("   ✓ GetCallerIdentity verified in {:.2} ms: Account = {}", t.elapsed().as_secs_f64() * 1000.0, sts_val["Account"]);
 
-    // 8. Chaos Engineering Fault Injection & Auto-Healing
-    println!("\n🌪️ 8. Testing Chaos Engineering & Self-Healing...");
+    // 8. AWS Key Management Service (KMS)
+    println!("\n🔐 8. Testing AWS Key Management Service (KMS)...");
+    let t = Instant::now();
+    let resp = client.post(format!("{}/", base_url))
+        .header("x-amz-target", "TrentService.CreateKey")
+        .header("content-type", "application/x-amz-json-1.1")
+        .json(&json!({
+            "Description": "Live Test Key",
+            "KeyUsage": "ENCRYPT_DECRYPT"
+        })).send().await?;
+    assert_eq!(resp.status(), 200);
+    let kms_val: serde_json::Value = resp.json().await?;
+    let key_id = kms_val["KeyMetadata"]["KeyId"].as_str().unwrap().to_string();
+
+    // Create Alias
+    let resp = client.post(format!("{}/", base_url))
+        .header("x-amz-target", "TrentService.CreateAlias")
+        .header("content-type", "application/x-amz-json-1.1")
+        .json(&json!({
+            "AliasName": "alias/live-key",
+            "TargetKeyId": key_id
+        })).send().await?;
+    assert_eq!(resp.status(), 200);
+
+    // Encrypt
+    let plain_b64 = base64::engine::general_purpose::STANDARD.encode("LiveEncryptedPayload123!");
+    let resp = client.post(format!("{}/", base_url))
+        .header("x-amz-target", "TrentService.Encrypt")
+        .header("content-type", "application/x-amz-json-1.1")
+        .json(&json!({
+            "KeyId": "alias/live-key",
+            "Plaintext": plain_b64
+        })).send().await?;
+    assert_eq!(resp.status(), 200);
+    let cipher_blob = resp.json::<serde_json::Value>().await?["CiphertextBlob"].as_str().unwrap().to_string();
+
+    // Decrypt
+    let resp = client.post(format!("{}/", base_url))
+        .header("x-amz-target", "TrentService.Decrypt")
+        .header("content-type", "application/x-amz-json-1.1")
+        .json(&json!({
+            "CiphertextBlob": cipher_blob
+        })).send().await?;
+    assert_eq!(resp.status(), 200);
+    let decrypted_b64 = resp.json::<serde_json::Value>().await?["Plaintext"].as_str().unwrap().to_string();
+    assert_eq!(decrypted_b64, plain_b64);
+    println!("   ✓ CreateKey + CreateAlias + Encrypt + Decrypt verified in {:.2} ms!", t.elapsed().as_secs_f64() * 1000.0);
+
+    // 9. Chaos Engineering Fault Injection & Auto-Healing
+    println!("\n🌪️ 9. Testing Chaos Engineering & Self-Healing...");
     let t = Instant::now();
     let resp = client.post(format!("{}/_ruststack/chaos/rules", base_url))
         .json(&json!({

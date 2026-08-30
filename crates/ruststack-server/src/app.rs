@@ -9,6 +9,7 @@ use http_body_util::BodyExt;
 use ruststack_core::{AwsService, ChaosDecision, ChaosEngine, Dispatcher};
 use ruststack_dynamodb::{handle_dynamodb_request, DynamoDbEngine};
 use ruststack_eventbridge::{handle_eventbridge_request, EventBridgeEngine};
+use ruststack_kms::{handle_kms_request, KmsState};
 use ruststack_s3::{handle_s3_request, S3NotificationTarget, S3Storage};
 use ruststack_secretsmanager::{handle_secretsmanager_request, SecretsManagerEngine};
 use ruststack_sns::{handle_sns_request, SnsEngine};
@@ -41,7 +42,7 @@ pub struct Opts {
     #[arg(
         short,
         long,
-        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb",
+        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms",
         env = "SERVICES"
     )]
     pub services: String,
@@ -51,6 +52,12 @@ pub struct Opts {
 
     #[arg(long, default_value = "000000000000", env = "ACCOUNT_ID")]
     pub account_id: String,
+
+    #[arg(long, env = "RUSTSTACK_DATA_DIR", alias = "data-dir")]
+    pub data_dir: Option<String>,
+
+    #[arg(long, env = "PERSISTENCE", default_value_t = false)]
+    pub persistence: bool,
 }
 
 impl Default for Opts {
@@ -58,9 +65,11 @@ impl Default for Opts {
         Self {
             port: 4566,
             host: "0.0.0.0".to_string(),
-            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb".to_string(),
+            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms".to_string(),
             region: "us-east-1".to_string(),
             account_id: "000000000000".to_string(),
+            data_dir: None,
+            persistence: false,
         }
     }
 }
@@ -123,6 +132,7 @@ pub struct AppState {
     pub secretsmanager_engine: Arc<SecretsManagerEngine>,
     pub sts_engine: Arc<StsEngine>,
     pub dynamodb_engine: Arc<DynamoDbEngine>,
+    pub kms_state: Arc<KmsState>,
     pub chaos_engine: Arc<ChaosEngine>,
     pub region: String,
     pub account_id: String,
@@ -303,7 +313,7 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
         }
     }
 
-    let reconstructed_req = Request::from_parts(parts, Body::from(body_bytes));
+    let reconstructed_req = Request::from_parts(parts, Body::from(body_bytes.clone()));
 
     match service {
         AwsService::S3 => handle_s3_request(state.s3_storage.clone(), reconstructed_req).await,
@@ -320,6 +330,14 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
         AwsService::Sts => handle_sts_request(state.sts_engine.clone(), reconstructed_req).await,
         AwsService::DynamoDb => {
             handle_dynamodb_request(state.dynamodb_engine.clone(), reconstructed_req).await
+        }
+        AwsService::Kms => {
+            handle_kms_request(
+                State((*state.kms_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
         }
         AwsService::Internal => Response::builder()
             .status(StatusCode::OK)
