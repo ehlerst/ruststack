@@ -5,7 +5,7 @@ ARG TARGETARCH
 RUN apk add --no-cache ca-certificates curl
 
 WORKDIR /app
-COPY target/bin-${TARGETARCH}/ruststack /usr/local/bin/ruststack
+COPY docker-bin/${TARGETARCH}/ruststack /usr/local/bin/ruststack
 RUN chmod +x /usr/local/bin/ruststack
 
 EXPOSE 4566

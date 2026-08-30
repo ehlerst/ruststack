@@ -1,0 +1,16 @@
+[package]
+name = "ruststack-testcontainers-example"
+version = "0.1.0"
+edition = "2021"
+authors = ["RustStack Contributors"]
+license = "Apache-2.0 OR MIT"
+description = "Rust Testcontainers integration example for RustStack"
+
+[workspace]
+
+[dependencies]
+testcontainers = "0.23"
+tokio = { version = "1.43", features = ["full"] }
+reqwest = { version = "0.12", features = ["json"] }
+serde_json = "1.0"
+bytes = "1.10"
