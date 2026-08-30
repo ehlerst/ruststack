@@ -2,11 +2,11 @@ use axum::body::Body;
 use axum::extract::State;
 use axum::http::{Request, Response, StatusCode};
 use axum::response::IntoResponse;
-use axum::routing::{any, get};
+use axum::routing::{any, delete, get};
 use axum::Router;
 use clap::Parser;
 use http_body_util::BodyExt;
-use ruststack_core::{AwsService, Dispatcher};
+use ruststack_core::{AwsService, ChaosDecision, ChaosEngine, Dispatcher};
 use ruststack_dynamodb::{handle_dynamodb_request, DynamoDbEngine};
 use ruststack_eventbridge::{handle_eventbridge_request, EventBridgeEngine};
 use ruststack_s3::{handle_s3_request, S3NotificationTarget, S3Storage};
@@ -18,6 +18,12 @@ use ruststack_sts::{handle_sts_request, StsEngine};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
+
+use crate::chaos_api::{
+    add_chaos_rule_handler, clear_chaos_rules_handler, delete_chaos_rule_handler,
+    disable_chaos_handler, enable_chaos_handler, list_chaos_rules_handler,
+};
+use crate::state_api::{state_dump_handler, state_load_handler, state_reset_handler};
 
 #[derive(Parser, Debug, Clone)]
 #[command(
@@ -116,11 +122,10 @@ pub struct AppState {
     pub secretsmanager_engine: Arc<SecretsManagerEngine>,
     pub sts_engine: Arc<StsEngine>,
     pub dynamodb_engine: Arc<DynamoDbEngine>,
+    pub chaos_engine: Arc<ChaosEngine>,
     pub region: String,
     pub account_id: String,
 }
-
-use crate::state_api::{state_dump_handler, state_load_handler, state_reset_handler};
 
 pub fn create_router(state: AppState) -> Router {
     state
@@ -143,6 +148,19 @@ pub fn create_router(state: AppState) -> Router {
         .route("/_ruststack/state/reset", any(state_reset_handler))
         .route("/_ruststack/state/dump", any(state_dump_handler))
         .route("/_ruststack/state/load", any(state_load_handler))
+        .route(
+            "/_ruststack/chaos/rules",
+            get(list_chaos_rules_handler)
+                .post(add_chaos_rule_handler)
+                .delete(clear_chaos_rules_handler),
+        )
+        .route(
+            "/_ruststack/chaos/rules/{id}",
+            delete(delete_chaos_rule_handler),
+        )
+        .route("/_ruststack/chaos/reset", any(clear_chaos_rules_handler))
+        .route("/_ruststack/chaos/enable", any(enable_chaos_handler))
+        .route("/_ruststack/chaos/disable", any(disable_chaos_handler))
         .route("/health", get(health_check))
         .fallback(any(gateway_handler))
         .layer(cors)
@@ -171,7 +189,8 @@ async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
             "ssm": ["parameters", "hierarchical-paths", "versioning", "secure-string", "json-protocol"],
             "secretsmanager": ["secrets", "version-stages", "rotation", "binary-and-string", "json-protocol"],
             "sts": ["caller-identity", "assume-role", "session-tokens", "query-and-json-protocols"],
-            "dynamodb": ["tables", "crud", "query", "scan", "key-conditions", "filter-expressions", "gsi-lsi", "batching", "json-protocol"]
+            "dynamodb": ["tables", "crud", "query", "scan", "key-conditions", "filter-expressions", "gsi-lsi", "batching", "json-protocol"],
+            "chaos": ["latency-injection", "jitter", "error-rate-simulation", "rule-limits", "service-filtering"]
         }
     });
 
@@ -200,6 +219,69 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
 
     // Check service classification with body peek for Form Query actions
     let service = Dispatcher::classify_request(&method, &uri, &headers, Some(&body_bytes));
+
+    // Determine action for chaos rule matching
+    let action_opt: Option<String> = if let Some(target) = headers.get("x-amz-target") {
+        if let Ok(target_str) = target.to_str() {
+            if let Some(pos) = target_str.rfind('.') {
+                Some(target_str[pos + 1..].to_string())
+            } else {
+                Some(target_str.to_string())
+            }
+        } else {
+            None
+        }
+    } else if let Some(query) = uri.query() {
+        form_urlencoded::parse(query.as_bytes())
+            .find(|(k, _)| k.eq_ignore_ascii_case("Action"))
+            .map(|(_, v)| v.into_owned())
+    } else if let Some(content_type) = headers.get("content-type") {
+        if content_type
+            .to_str()
+            .unwrap_or("")
+            .starts_with("application/x-www-form-urlencoded")
+        {
+            form_urlencoded::parse(&body_bytes)
+                .find(|(k, _)| k.eq_ignore_ascii_case("Action"))
+                .map(|(_, v)| v.into_owned())
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    // Evaluate chaos rules
+    let decision = state
+        .chaos_engine
+        .evaluate(service, action_opt.as_deref(), uri.path());
+
+    match decision {
+        ChaosDecision::PassThrough { latency_ms } => {
+            if let Some(ms) = latency_ms {
+                tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+            }
+        }
+        ChaosDecision::InjectError {
+            status,
+            code,
+            message,
+            latency_ms,
+        } => {
+            if let Some(ms) = latency_ms {
+                tokio::time::sleep(std::time::Duration::from_millis(ms)).await;
+            }
+            let request_id = uuid::Uuid::new_v4().to_string();
+            return ChaosEngine::format_error_response(
+                service,
+                status,
+                &code,
+                &message,
+                &request_id,
+            );
+        }
+    }
+
     let reconstructed_req = Request::from_parts(parts, Body::from(body_bytes));
 
     match service {

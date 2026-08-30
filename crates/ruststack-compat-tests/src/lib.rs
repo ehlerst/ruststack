@@ -58,6 +58,7 @@ impl RustStackTestClient {
             secretsmanager_engine,
             sts_engine,
             dynamodb_engine,
+            chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
             region: region.clone(),
             account_id: account_id.clone(),
         };

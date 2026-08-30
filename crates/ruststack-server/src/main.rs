@@ -60,6 +60,7 @@ async fn main() -> anyhow::Result<()> {
         secretsmanager_engine,
         sts_engine,
         dynamodb_engine,
+        chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region: opts.region,
         account_id: opts.account_id,
     };

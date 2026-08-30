@@ -87,6 +87,64 @@ Automated in-memory performance rating on standard developer hardware:
 
 ---
 
+## 🌪️ Chaos Engineering & Fault Injection Engine
+
+Test client resiliency, retry backoff algorithms, and disaster recovery locally:
+
+### 1. Inject DynamoDB Throttling
+```bash
+curl -X POST http://localhost:4566/_ruststack/chaos/rules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "dynamodb",
+    "action": "PutItem",
+    "probability": 0.5,
+    "error_status": 400,
+    "error_code": "ProvisionedThroughputExceededException",
+    "error_message": "Rate of requests exceeds current throughput capacity."
+  }'
+```
+
+### 2. Inject S3 SlowDown / Service Unavailable with Auto-Expiration
+```bash
+# Inject 503 error for the first 3 requests then automatically recover
+curl -X POST http://localhost:4566/_ruststack/chaos/rules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "s3",
+    "error_status": 503,
+    "error_code": "SlowDown",
+    "limit_times": 3
+  }'
+```
+
+### 3. Inject Network Latency & Jitter
+```bash
+# Injects 150ms ± 50ms latency on SQS operations
+curl -X POST http://localhost:4566/_ruststack/chaos/rules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "sqs",
+    "latency_ms": 150,
+    "latency_jitter_ms": 50
+  }'
+```
+
+### 4. Manage Chaos Rules
+```bash
+# List all active rules and trigger counters
+curl http://localhost:4566/_ruststack/chaos/rules
+
+# Clear all rules
+curl -X POST http://localhost:4566/_ruststack/chaos/reset
+
+# Toggle chaos globally
+curl -X POST http://localhost:4566/_ruststack/chaos/disable
+curl -X POST http://localhost:4566/_ruststack/chaos/enable
+```
+
+---
+
 ## 💾 State Management & Deterministic Testing API
 
 RustStack provides instant state control plane endpoints for integration test isolation, snapshotting, and CI/CD deterministic runs:
@@ -214,33 +272,6 @@ aws --endpoint-url=http://localhost:4566 dynamodb query \
   --table-name Users \
   --key-condition-expression "userId = :uid" \
   --expression-attribute-values '{":uid": {"S": "u100"}}'
-```
-
-### STS & Identity
-```bash
-# Verify credentials & caller identity
-aws --endpoint-url=http://localhost:4566 sts get-caller-identity
-```
-
-### SSM Parameter Store
-```bash
-# Put parameter
-aws --endpoint-url=http://localhost:4566 ssm put-parameter \
-  --name "/app/prod/database/url" \
-  --value "postgres://user:pass@localhost:5432/app" \
-  --type "SecureString"
-
-# Get parameter
-aws --endpoint-url=http://localhost:4566 ssm get-parameter \
-  --name "/app/prod/database/url"
-```
-
-### Secrets Manager
-```bash
-# Create secret
-aws --endpoint-url=http://localhost:4566 secretsmanager create-secret \
-  --name "prod/api/keys" \
-  --secret-string '{"api_key": "sk_live_12345"}'
 ```
 
 ---

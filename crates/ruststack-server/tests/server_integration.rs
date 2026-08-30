@@ -58,6 +58,7 @@ async fn test_server_unified_routing() {
         secretsmanager_engine,
         sts_engine,
         dynamodb_engine,
+        chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region: "us-east-1".to_string(),
         account_id: "000000000000".to_string(),
     };

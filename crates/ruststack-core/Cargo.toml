@@ -19,3 +19,5 @@ regex.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 form_urlencoded.workspace = true
+fastrand.workspace = true
+parking_lot.workspace = true

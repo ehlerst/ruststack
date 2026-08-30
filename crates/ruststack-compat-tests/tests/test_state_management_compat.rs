@@ -53,6 +53,7 @@ fn setup_test_app() -> axum::Router {
         secretsmanager_engine,
         sts_engine,
         dynamodb_engine,
+        chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region,
         account_id,
     };
