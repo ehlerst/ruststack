@@ -1,0 +1,28 @@
+[package]
+name = "ruststack-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "ruststack"
+path = "src/main.rs"
+
+[dependencies]
+ruststack-core.workspace = true
+ruststack-s3.workspace = true
+ruststack-sqs.workspace = true
+tokio.workspace = true
+axum.workspace = true
+tower.workspace = true
+tower-http.workspace = true
+http.workspace = true
+http-body-util.workspace = true
+bytes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true

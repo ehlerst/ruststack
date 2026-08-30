@@ -1,0 +1,99 @@
+name: Performance Benchmarks
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: "Benchmark iterations"
+        required: false
+        default: "10000"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  s3-performance:
+    name: S3 Feature Performance Rating
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run S3 Criterion Micro-benchmarks
+        run: cargo bench -p ruststack-s3 -- --verbose
+
+      - name: Run S3 Performance Rating Suite
+        run: |
+          mkdir -p reports
+          cargo run --release -p ruststack-benchmarks -- \
+            --service s3 \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format markdown \
+            --output reports/s3-benchmark.md
+
+          cargo run --release -p ruststack-benchmarks -- \
+            --service s3 \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format json \
+            --output reports/s3-benchmark.json
+
+      - name: Publish S3 Benchmark Step Summary
+        run: |
+          cat reports/s3-benchmark.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload S3 Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: s3-performance-report
+          path: reports/s3-benchmark.*
+
+  sqs-performance:
+    name: SQS Feature Performance Rating
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run SQS Criterion Micro-benchmarks
+        run: cargo bench -p ruststack-sqs -- --verbose
+
+      - name: Run SQS Performance Rating Suite
+        run: |
+          mkdir -p reports
+          cargo run --release -p ruststack-benchmarks -- \
+            --service sqs \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format markdown \
+            --output reports/sqs-benchmark.md
+
+          cargo run --release -p ruststack-benchmarks -- \
+            --service sqs \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format json \
+            --output reports/sqs-benchmark.json
+
+      - name: Publish SQS Benchmark Step Summary
+        run: |
+          cat reports/sqs-benchmark.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload SQS Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sqs-performance-report
+          path: reports/sqs-benchmark.*

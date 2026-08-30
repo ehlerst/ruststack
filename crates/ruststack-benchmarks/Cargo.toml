@@ -1,0 +1,22 @@
+[package]
+name = "ruststack-benchmarks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "ruststack-benchmarks"
+path = "src/main.rs"
+
+[dependencies]
+ruststack-core.workspace = true
+ruststack-s3.workspace = true
+ruststack-sqs.workspace = true
+tokio.workspace = true
+bytes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+clap.workspace = true
+chrono.workspace = true
+anyhow.workspace = true

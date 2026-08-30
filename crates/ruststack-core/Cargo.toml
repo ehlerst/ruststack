@@ -1,0 +1,21 @@
+[package]
+name = "ruststack-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+tokio.workspace = true
+axum.workspace = true
+http.workspace = true
+bytes.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+quick-xml.workspace = true
+chrono.workspace = true
+uuid.workspace = true
+regex.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+form_urlencoded.workspace = true
