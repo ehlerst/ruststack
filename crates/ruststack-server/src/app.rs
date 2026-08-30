@@ -9,7 +9,7 @@ use http_body_util::BodyExt;
 use ruststack_core::{AwsService, Dispatcher};
 use ruststack_dynamodb::{handle_dynamodb_request, DynamoDbEngine};
 use ruststack_eventbridge::{handle_eventbridge_request, EventBridgeEngine};
-use ruststack_s3::{handle_s3_request, S3Storage};
+use ruststack_s3::{handle_s3_request, S3NotificationTarget, S3Storage};
 use ruststack_secretsmanager::{handle_secretsmanager_request, SecretsManagerEngine};
 use ruststack_sns::{handle_sns_request, SnsEngine};
 use ruststack_sqs::{handle_sqs_request, SqsEngine};
@@ -58,6 +58,54 @@ impl Default for Opts {
     }
 }
 
+pub struct ServerNotificationTarget {
+    sqs: Arc<SqsEngine>,
+    sns: Arc<SnsEngine>,
+    eventbridge: Arc<EventBridgeEngine>,
+}
+
+impl ServerNotificationTarget {
+    pub fn new(
+        sqs: Arc<SqsEngine>,
+        sns: Arc<SnsEngine>,
+        eventbridge: Arc<EventBridgeEngine>,
+    ) -> Self {
+        Self {
+            sqs,
+            sns,
+            eventbridge,
+        }
+    }
+}
+
+impl S3NotificationTarget for ServerNotificationTarget {
+    fn send_sqs(&self, queue_arn: &str, payload: &str) {
+        let _ = self
+            .sqs
+            .send_message(queue_arn, payload.to_string(), None, None, None, None);
+    }
+
+    fn send_sns(&self, topic_arn: &str, payload: &str) {
+        let _ = self
+            .sns
+            .publish(topic_arn, payload.to_string(), None, None, None, None);
+    }
+
+    fn send_eventbridge(&self, source: &str, detail_type: &str, detail: &str) {
+        let _ = self.eventbridge.put_events(vec![
+            ruststack_eventbridge::types::PutEventsRequestEntry {
+                event_bus_name: Some("default".to_string()),
+                source: Some(source.to_string()),
+                detail_type: Some(detail_type.to_string()),
+                detail: Some(detail.to_string()),
+                resources: None,
+                time: None,
+                trace_header: None,
+            },
+        ]);
+    }
+}
+
 #[derive(Clone)]
 pub struct AppState {
     pub s3_storage: Arc<dyn S3Storage>,
@@ -73,6 +121,14 @@ pub struct AppState {
 }
 
 pub fn create_router(state: AppState) -> Router {
+    state
+        .s3_storage
+        .set_notification_target(Arc::new(ServerNotificationTarget::new(
+            state.sqs_engine.clone(),
+            state.sns_engine.clone(),
+            state.eventbridge_engine.clone(),
+        )));
+
     let cors = CorsLayer::new()
         .allow_origin(Any)
         .allow_methods(Any)
@@ -103,7 +159,7 @@ async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
         "region": state.region,
         "account_id": state.account_id,
         "features": {
-            "s3": ["buckets", "objects", "multipart", "byte-range", "virtual-hosting"],
+            "s3": ["buckets", "objects", "multipart", "byte-range", "virtual-hosting", "bucket-notifications"],
             "sqs": ["standard-queue", "fifo-queue", "dlq-redrive", "long-polling", "batching", "visibility-timeout", "query-and-json-protocols"],
             "sns": ["topics", "subscriptions", "sqs-fanout", "filter-policy", "raw-message-delivery", "query-and-json-protocols"],
             "events": ["event-buses", "rules", "pattern-matching", "targets-sqs-sns", "json-protocol"],

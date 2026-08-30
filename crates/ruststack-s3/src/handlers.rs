@@ -117,8 +117,20 @@ fn dispatch_s3_op(
             Ok(res)
         }
 
-        // PUT /<bucket> -> CreateBucket
+        // PUT /<bucket> -> CreateBucket / PutBucketNotificationConfiguration
         (&Method::PUT, Some(bucket), None) => {
+            if query.contains_key("notification") {
+                let config = xml::parse_notification_configuration(&body)?;
+                storage.put_bucket_notification_configuration(bucket, config)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
             let region = "us-east-1";
             storage.create_bucket(bucket, region)?;
             let mut res = Response::new(Body::empty());
@@ -158,8 +170,22 @@ fn dispatch_s3_op(
             Ok(res)
         }
 
-        // GET /<bucket> -> ListObjectsV2 / GetBucketLocation
+        // GET /<bucket> -> ListObjectsV2 / GetBucketLocation / GetBucketNotificationConfiguration
         (&Method::GET, Some(bucket), None) => {
+            if query.contains_key("notification") {
+                let config = storage.get_bucket_notification_configuration(bucket)?;
+                let xml_body = xml::serialize_notification_configuration(&config);
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
             if query.contains_key("location") {
                 let info = storage.head_bucket(bucket)?;
                 let xml_body = xml::serialize_bucket_location(&info.region);

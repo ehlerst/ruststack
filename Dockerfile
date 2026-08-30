@@ -1,23 +1,27 @@
-# Build stage
-FROM rust:1.89-bookworm AS builder
+# Multi-stage Docker build for RustStack
+FROM rust:alpine AS builder
 
-WORKDIR /usr/src/ruststack
-COPY Cargo.toml Cargo.lock ./
-COPY crates ./crates
+RUN apk add --no-cache musl-dev pkgconfig
 
-RUN cargo build --release --bin ruststack
+WORKDIR /app
+COPY . .
 
-# Runtime stage
-FROM debian:bookworm-slim
+RUN cargo build --release --bin ruststack -p ruststack-server
 
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+FROM alpine:3.21
 
-COPY --from=builder /usr/src/ruststack/target/release/ruststack /usr/local/bin/ruststack
+RUN apk add --no-cache ca-certificates curl
 
-ENV PORT=4566
-ENV HOST=0.0.0.0
-ENV SERVICES=s3,sqs
+WORKDIR /app
+COPY --from=builder /app/target/release/ruststack /usr/local/bin/ruststack
 
 EXPOSE 4566
 
-ENTRYPOINT ["ruststack"]
+ENV HOST=0.0.0.0
+ENV PORT=4566
+
+HEALTHCHECK --interval=5s --timeout=3s --start-period=2s --retries=3 \
+  CMD curl -f http://localhost:4566/_ruststack/health || exit 1
+
+ENTRYPOINT ["/usr/local/bin/ruststack"]
+CMD []

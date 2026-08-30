@@ -14,6 +14,7 @@ RustStack aims to deliver an ultra-fast, zero-dependency local AWS cloud emulato
 - **Pure Rust Native Architecture**: Zero external dependencies, no Python runtime requirement in the codebase.
 - **Single Port Multiplexing**: Seamlessly serves all 8 emulated AWS services over a unified port (default `4566`) using SigV4 headers, `Host` header inspection, `x-amz-target`, query parameters, and URL path patterns.
 - **Performance Rating & CI Benchmarks**: Every feature is measured with dedicated Criterion and load benchmarks integrated directly into GitHub Actions (GHA) with automated metric tracking and regression detection.
+- **Multi-Platform & Container Delivery**: Multi-arch Linux & macOS binaries and official multi-arch Docker images on DockerHub (`ehlers320/ruststack`).
 
 ---
 
@@ -42,6 +43,10 @@ RustStack aims to deliver an ultra-fast, zero-dependency local AWS cloud emulato
                 |        |        |         |        |        |       |       |
               Items/  In-Mem   Std/FIFO   SQS      Targets  Prefix  DashMap Caller
               Indexes Storage    +DLQ   Delivery  (SQS/SNS) Ranges  Labels  Id/Role
+                         |        ^         ^        ^
+                         +--------+---------+--------+
+                               S3 Bucket Notifications
+                     (s3:ObjectCreated:* / s3:ObjectRemoved:*)
 ```
 
 ---
@@ -59,6 +64,7 @@ RustStack aims to deliver an ultra-fast, zero-dependency local AWS cloud emulato
 - **Object Operations**: `PutObject`, `GetObject` (with byte ranges `Range: bytes=start-end`), `HeadObject`, `DeleteObject`, `DeleteObjects`, `CopyObject`.
 - **Object Listing**: `ListObjectsV2` & `ListObjects` with prefix, delimiter, and continuation tokens.
 - **Multipart Uploads**: `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts`.
+- **Bucket Notifications**: `PutBucketNotificationConfiguration` and `GetBucketNotificationConfiguration` with instant in-memory event dispatching to SQS queues, SNS topics, and EventBridge default bus on `s3:ObjectCreated:*`, `s3:ObjectCreated:Put`, `s3:ObjectCreated:Copy`, `s3:ObjectCreated:CompleteMultipartUpload`, and `s3:ObjectRemoved:Delete` with key prefix/suffix filtering.
 
 ### 3.3 Amazon SQS (`ruststack-sqs`)
 - **Dual Protocols**: Query Protocol (form-urlencoded & query params) and AWS JSON 1.0 Protocol (`x-amz-target: AmazonSQS.*`).
@@ -92,65 +98,30 @@ RustStack aims to deliver an ultra-fast, zero-dependency local AWS cloud emulato
 
 ## 4. Pure Rust Native AWS Compatibility Test Suite (`crates/ruststack-compat-tests`)
 
-Translating the comprehensive test scenarios from Ministack (`https://github.com/ministackorg/ministack/tree/main/tests`) into a 100% pure Rust test harness:
+Translating the comprehensive test scenarios from Ministack into a 100% pure Rust test harness:
 
-### Service Test Modules:
-1. `tests/test_dynamodb_compat.rs`:
-   - Table lifecycle (Hash key, Hash+Range key, GSI, LSI)
-   - Full attribute types (`S`, `N`, `B`, `SS`, `NS`, `BS`, `M`, `L`, `NULL`, `BOOL`)
-   - KeyCondition expressions (`=`, `begins_with`, `BETWEEN`, `>`, `<`, `>=`, `<=`)
-   - Filter expressions with expression attribute names (`#n`) & values (`:v`)
-   - `ConditionalCheckFailedException` testing
-   - `BatchGetItem` & `BatchWriteItem`
-2. `tests/test_s3_compat.rs`:
-   - Bucket creation, deletion, location, head bucket
-   - Object put, get, head, delete, multi-delete
-   - Byte-range downloads (`bytes=0-10`, `bytes=5-`, `bytes=-10`)
-   - `ListObjectsV2` & `ListObjects` pagination (delimiter, prefix, start-after, continuation-token)
-   - Multipart upload complete lifecycle & aborted multipart uploads
-   - Virtual hosted bucket routing vs path-style routing
-3. `tests/test_sqs_compat.rs`:
-   - Standard and FIFO queues
-   - `SendMessage` and `SendMessageBatch` (up to 10 items)
-   - `ReceiveMessage` with visibility timeout, long polling, and receipt handles
-   - `DeleteMessage` and `DeleteMessageBatch`
-   - Dead-letter queue redrive (`maxReceiveCount`) & `ListDeadLetterSourceQueues`
-   - Query protocol & JSON 1.0 protocol
-4. `tests/test_sns_compat.rs`:
-   - Topic CRUD & attributes
-   - Subscriptions to SQS queues
-   - Direct message publish and SQS fanout
-   - `RawMessageDelivery` vs standard JSON notification payload
-   - Attribute `FilterPolicy`
-5. `tests/test_eventbridge_compat.rs`:
-   - Event bus CRUD
-   - Rule creation, patterns (source, detail-type, nested detail, prefix, exists)
-   - Target binding (SQS queues & SNS topics)
-   - `PutEvents` matching and target execution
-6. `tests/test_ssm_compat.rs`:
-   - Parameter CRUD (String, StringList, SecureString)
-   - Overwrite & version tracking
-   - `GetParametersByPath` recursive & single-level tree scans
-   - `GetParameters` multi-key query
-7. `tests/test_secretsmanager_compat.rs`:
-   - Secret lifecycle (create, get, put value, update, delete)
-   - Version stages (`AWSCURRENT`, `AWSPREVIOUS`)
-   - String and binary secrets
-8. `tests/test_sts_compat.rs`:
-   - `GetCallerIdentity`, `AssumeRole`, `GetSessionToken` across Query and JSON protocols
+- `test_dynamodb_compat.rs`: Full table and item CRUD, batch operations, query condition expressions, filter expressions.
+- `test_s3_compat.rs`: Bucket CRUD, object CRUD, byte-range downloads, `ListObjectsV2` prefix pagination, virtual-hosted routing.
+- `test_s3_notifications_compat.rs`: Bucket notification configuration to SQS and SNS on `s3:ObjectCreated:*` with prefix filter rules.
+- `test_sqs_compat.rs`: SQS JSON 1.0 protocol, DLQ redrive policies, and Query protocol.
+- `test_sns_compat.rs`: Topic CRUD, SQS subscriptions, in-memory fanout, raw delivery, filter policy.
+- `test_eventbridge_compat.rs`: Event bus CRUD, rule patterns, SQS target dispatching on `PutEvents`.
+- `test_ssm_compat.rs`: Parameter CRUD, overwrite versioning, hierarchical path tree scans.
+- `test_secretsmanager_compat.rs`: Secret lifecycle, multi-version rotation, staging labels.
+- `test_sts_compat.rs`: `GetCallerIdentity`, `AssumeRole`, `GetSessionToken` across Query and JSON protocols.
 
 ---
 
 ## 5. Implementation Roadmap Sequence
 
 ```
-  [Step 1] (Completed)  --->  [Step 2] (Completed)  --->  [Step 3] (Current)
-  - SSM Parameter Store        - DynamoDB Engine           - Pure Rust Native Ministack
-  - Secrets Manager            - KeyCondition & Scan         Compatibility Test Suite
-  - STS Identity Mock          - 8 GHA Benchmarks Jobs       (Full Parity Suite)
+  [Step 1] (Completed)  --->  [Step 2] (Completed)  --->  [Step 3] (Completed)
+  - SSM Parameter Store        - DynamoDB Engine           - S3 Bucket Notifications
+  - Secrets Manager            - KeyCondition & Scan       - Pure Rust Compat Tests
+  - STS Identity Mock          - 8 GHA Benchmarks Jobs     - DockerHub Publishing
                                                                     |
                                                                     v
-  [Step 6]              <---  [Step 5]              <---  [Step 4]
+  [Step 6]              <---  [Step 5]              <---  [Step 4] (Next)
   - Embedded Web Admin UI      - Chaos Engineering         - State Management & Snapshots
   - ruststack-cli               (Latency/Fault Injection)   (/_ruststack/state/dump/load)
 ```

@@ -13,6 +13,7 @@ http.workspace = true
 http-body-util.workspace = true
 bytes.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 quick-xml.workspace = true
 chrono.workspace = true
 uuid.workspace = true

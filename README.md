@@ -5,9 +5,10 @@
 [![CI](https://github.com/ruststack/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/ci.yml)
 [![Performance Benchmarks](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml)
 [![Release](https://github.com/ruststack/ruststack/actions/workflows/release.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/release.yml)
+[![Docker Image](https://img.shields.io/badge/docker-ehlers320%2Fruststack-blue.svg)](https://hub.docker.com/r/ehlers320/ruststack)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-RustStack is a high-performance local AWS emulator designed for instant local development, automated integration testing, and rapid CI/CD test runners. It is delivered as a single lightweight binary with zero runtime dependencies.
+RustStack is a high-performance local AWS emulator designed for instant local development, automated integration testing, and rapid CI/CD test runners. It is delivered as a single lightweight binary with zero runtime dependencies and official multi-arch Docker images.
 
 ---
 
@@ -36,19 +37,20 @@ Automated in-memory performance rating on standard developer hardware:
 
 ## 📦 Features Implemented
 
-### 1. Amazon DynamoDB (`ruststack-dynamodb`)
+### 1. Amazon S3 (`ruststack-s3`)
+- **Bucket Operations**: `CreateBucket`, `DeleteBucket`, `ListBuckets`, `HeadBucket`, `GetBucketLocation`.
+- **Object Operations**: `PutObject`, `GetObject` (with byte-range `Range: bytes=start-end`), `HeadObject`, `DeleteObject`, `DeleteObjects` (multi-delete), `CopyObject`.
+- **Object Listing**: `ListObjectsV2` & `ListObjects` with prefix, delimiter, start-after, and continuation tokens.
+- **Multipart Uploads**: `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts`.
+- **Bucket Notifications**: `PutBucketNotificationConfiguration` and `GetBucketNotificationConfiguration` with instant in-memory event dispatching to SQS queues, SNS topics, and EventBridge default bus on `s3:ObjectCreated:*`, `s3:ObjectCreated:Put`, `s3:ObjectCreated:Copy`, `s3:ObjectCreated:CompleteMultipartUpload`, and `s3:ObjectRemoved:Delete` with key prefix/suffix filtering.
+- **Routing**: Full support for both path-style (`http://localhost:4566/bucket/key`) and virtual-hosted style (`http://bucket.localhost:4566/key`).
+
+### 2. Amazon DynamoDB (`ruststack-dynamodb`)
 - **Protocols**: AWS JSON 1.0 protocol (`x-amz-target: DynamoDB_20120810.*`).
 - **Table Operations**: `CreateTable`, `DeleteTable`, `DescribeTable`, `ListTables` (supporting `String`, `Number`, `Binary` Partition & Sort Keys, `PAY_PER_REQUEST` billing mode, GSIs and LSIs).
 - **Item Operations**: `PutItem` (with `ConditionExpression`), `GetItem` (with `ProjectionExpression`), `DeleteItem`, `UpdateItem` (with `SET` / `REMOVE` expressions).
 - **Batch Operations**: `BatchGetItem`, `BatchWriteItem` across multiple tables.
 - **Query & Scan Engine**: `Query` with `KeyConditionExpression` (`=`, `<`, `<=`, `>`, `>=`, `BETWEEN`, `begins_with`), `Scan` with `FilterExpression`.
-
-### 2. Amazon S3 (`ruststack-s3`)
-- **Bucket Operations**: `CreateBucket`, `DeleteBucket`, `ListBuckets`, `HeadBucket`, `GetBucketLocation`.
-- **Object Operations**: `PutObject`, `GetObject` (with byte-range `Range: bytes=start-end`), `HeadObject`, `DeleteObject`, `DeleteObjects` (multi-delete), `CopyObject`.
-- **Object Listing**: `ListObjectsV2` & `ListObjects` with prefix, delimiter, start-after, and continuation tokens.
-- **Multipart Uploads**: `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts`.
-- **Routing**: Full support for both path-style (`http://localhost:4566/bucket/key`) and virtual-hosted style (`http://bucket.localhost:4566/key`).
 
 ### 3. Amazon SQS (`ruststack-sqs`)
 - **Protocols**: Dual protocol support — **SQS Query Protocol** (form-urlencoded & query params) and modern AWS SDK **JSON 1.0 Protocol** (`x-amz-target: AmazonSQS.*`).
@@ -87,14 +89,23 @@ Automated in-memory performance rating on standard developer hardware:
 
 ## 🚀 Quick Start
 
-### Run on Linux & macOS
+### Run with Docker
 ```bash
-# Build and run directly with cargo (port 4566)
+# Pull official multi-arch image from DockerHub
+docker pull ehlers320/ruststack:latest
+
+# Run container on port 4566
+docker run -d --name ruststack -p 4566:4566 ehlers320/ruststack:latest
+```
+
+### Run Native Binary (Linux & macOS)
+```bash
+# Build and run directly with cargo
 cargo run --release -p ruststack-server -- --port 4566
 ```
 
 ### Windows Users: Use WSL2
-Native Windows targets are not supported directly. Windows users should use **WSL2 (Windows Subsystem for Linux)**:
+Native Windows targets are not supported directly. Windows users should use **WSL2 (Windows Subsystem for Linux)** or Docker:
 1. Open PowerShell and install WSL if not already installed:
    ```powershell
    wsl --install
@@ -116,6 +127,33 @@ export AWS_SECRET_ACCESS_KEY=test
 export AWS_DEFAULT_REGION=us-east-1
 ```
 
+### S3 & Bucket Notifications
+```bash
+# Create bucket and upload
+aws --endpoint-url=http://localhost:4566 s3 mb s3://my-bucket
+aws --endpoint-url=http://localhost:4566 s3 cp myfile.txt s3://my-bucket/uploads/myfile.txt
+
+# Configure S3 bucket notification to SQS
+aws --endpoint-url=http://localhost:4566 s3api put-bucket-notification-configuration \
+  --bucket my-bucket \
+  --notification-configuration '{
+    "QueueConfigurations": [
+      {
+        "Id": "uploads-notif",
+        "QueueArn": "arn:aws:sqs:us-east-1:000000000000:orders-queue",
+        "Events": ["s3:ObjectCreated:*"],
+        "Filter": {
+          "Key": {
+            "FilterRules": [
+              { "Name": "prefix", "Value": "uploads/" }
+            ]
+          }
+        }
+      }
+    ]
+  }'
+```
+
 ### DynamoDB
 ```bash
 # Create Table
@@ -129,11 +167,6 @@ aws --endpoint-url=http://localhost:4566 dynamodb create-table \
 aws --endpoint-url=http://localhost:4566 dynamodb put-item \
   --table-name Users \
   --item '{"userId": {"S": "u100"}, "timestamp": {"N": "1700000000"}, "email": {"S": "user@example.com"}}'
-
-# Get Item
-aws --endpoint-url=http://localhost:4566 dynamodb get-item \
-  --table-name Users \
-  --key '{"userId": {"S": "u100"}, "timestamp": {"N": "1700000000"}}'
 
 # Query
 aws --endpoint-url=http://localhost:4566 dynamodb query \
@@ -167,16 +200,6 @@ aws --endpoint-url=http://localhost:4566 ssm get-parameter \
 aws --endpoint-url=http://localhost:4566 secretsmanager create-secret \
   --name "prod/api/keys" \
   --secret-string '{"api_key": "sk_live_12345"}'
-```
-
-### S3 & SQS
-```bash
-# S3
-aws --endpoint-url=http://localhost:4566 s3 mb s3://my-bucket
-aws --endpoint-url=http://localhost:4566 s3 cp myfile.txt s3://my-bucket/myfile.txt
-
-# SQS
-aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name orders-queue
 ```
 
 ---
