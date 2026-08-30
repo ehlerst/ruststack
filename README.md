@@ -4,11 +4,29 @@
 
 [![CI](https://github.com/ruststack/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/ci.yml)
 [![Performance Benchmarks](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml)
+[![Resource & Startup Benchmark](https://github.com/ruststack/ruststack/actions/workflows/compare-alternatives.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/compare-alternatives.yml)
 [![Release](https://github.com/ruststack/ruststack/actions/workflows/release.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/release.yml)
 [![Docker Image](https://img.shields.io/badge/docker-ehlers320%2Fruststack-blue.svg)](https://hub.docker.com/r/ehlers320/ruststack)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
 RustStack is a high-performance local AWS emulator designed for instant local development, automated integration testing, and rapid CI/CD test runners. It is delivered as a single lightweight binary with zero runtime dependencies and official multi-arch Docker images.
+
+---
+
+## ⚡ Resource & Startup Benchmark (RustStack vs MiniStack vs LocalStack)
+
+Automated container startup time, idle memory footprint, and image size measured via [`Testcontainers/rust-measure-alternatives/`](file:///home/tim/git/ruststack/Testcontainers/rust-measure-alternatives/):
+
+| Local Cloud Stack | Docker Image | Image Size | Avg Startup Time | Min Startup Time | Idle Memory (RSS) | Idle CPU |
+|:---|:---|---:|---:|---:|---:|---:|
+| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **101.4 MB** | **240.2 ms** | **226.4 ms** | **2.0 MiB** | **0.00%** |
+| **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 1,607.6 ms | 1,586.5 ms | 33.6 MiB | 0.00% |
+| **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 3,990.0 ms | 3,972.2 ms | 419.2 MiB | 25.80% |
+
+### 🚀 RustStack Advantages
+- **Startup Speed**: **6.7x faster** than MiniStack (240 ms vs 1,608 ms) and **16.6x faster** than LocalStack (3,990 ms).
+- **Memory Footprint**: **16.8x less memory** than MiniStack (2.0 MiB vs 33.6 MiB) and **209.6x less memory** than LocalStack (419.2 MiB).
+- **Docker Image Size**: **1.7x smaller** than MiniStack and **11.9x smaller** than LocalStack.
 
 ---
 

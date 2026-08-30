@@ -1,0 +1,59 @@
+name: Resource & Startup Benchmark (RustStack vs MiniStack vs LocalStack)
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'crates/**'
+      - 'Testcontainers/rust-measure-alternatives/**'
+      - '.github/workflows/compare-alternatives.yml'
+  workflow_dispatch:
+    inputs:
+      ruststack_tag:
+        description: 'RustStack image tag (default: latest)'
+        required: false
+        default: 'latest'
+      ministack_tag:
+        description: 'MiniStack image tag (default: latest)'
+        required: false
+        default: 'latest'
+      localstack_tag:
+        description: 'LocalStack image tag (default: 3.8.1)'
+        required: false
+        default: '3.8.1'
+      runs:
+        description: 'Number of profiling runs per stack'
+        required: false
+        default: '3'
+
+jobs:
+  compare-alternatives:
+    name: Compare RustStack vs MiniStack vs LocalStack
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build local RustStack Docker image
+        run: |
+          cargo build --release -p ruststack-server
+          mkdir -p docker-bin/amd64
+          cp target/release/ruststack docker-bin/amd64/ruststack
+          docker build --build-arg TARGETARCH=amd64 -t ehlers320/ruststack:latest .
+
+      - name: Build and Run Resource Profiler
+        working-directory: Testcontainers/rust-measure-alternatives
+        run: |
+          cargo build --release
+          ./target/release/rust-measure-alternatives \
+            --runs ${{ github.event.inputs.runs || 3 }} \
+            --ruststack-image ehlers320/ruststack:${{ github.event.inputs.ruststack_tag || 'latest' }} \
+            --ministack-image ministackorg/ministack:${{ github.event.inputs.ministack_tag || 'latest' }} \
+            --localstack-image localstack/localstack:${{ github.event.inputs.localstack_tag || '3.8.1' }} \
+            --output-markdown $GITHUB_STEP_SUMMARY
