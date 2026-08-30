@@ -1,19 +1,12 @@
-# Multi-stage Docker build for RustStack
-FROM rust:alpine AS builder
-
-RUN apk add --no-cache musl-dev pkgconfig
-
-WORKDIR /app
-COPY . .
-
-RUN cargo build --release --bin ruststack -p ruststack-server
-
 FROM alpine:3.21
+
+ARG TARGETARCH
 
 RUN apk add --no-cache ca-certificates curl
 
 WORKDIR /app
-COPY --from=builder /app/target/release/ruststack /usr/local/bin/ruststack
+COPY target/bin-${TARGETARCH}/ruststack /usr/local/bin/ruststack
+RUN chmod +x /usr/local/bin/ruststack
 
 EXPOSE 4566
 

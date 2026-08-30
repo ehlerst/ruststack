@@ -89,12 +89,23 @@ jobs:
 
   docker:
     name: Build & Push Multi-Arch Docker Image
-    needs: test
+    needs: build
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Download Pre-compiled Binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Stage Multi-Arch Binaries
+        run: |
+          mkdir -p target/bin-amd64 target/bin-arm64
+          tar xzf artifacts/ruststack-x86_64-unknown-linux-musl/ruststack-x86_64-unknown-linux-musl.tar.gz -C target/bin-amd64/
+          tar xzf artifacts/ruststack-aarch64-unknown-linux-musl/ruststack-aarch64-unknown-linux-musl.tar.gz -C target/bin-arm64/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -130,8 +141,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
 
   release:
     name: Create GitHub Release
