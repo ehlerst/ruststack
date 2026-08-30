@@ -142,6 +142,15 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      - name: Update Docker Hub Description
+        uses: peter-evans/dockerhub-description@v4
+        with:
+          username: ehlers320
+          password: ${{ secrets.DOCKER_TOKEN }}
+          repository: ehlers320/ruststack
+          readme-filepath: ./DOCKERHUB.md
+          short-description: "⚡ Ultra-fast local AWS emulator in Rust: 1.6MB memory, 500ms startup & 20x lighter than LocalStack"
+
   release:
     name: Create GitHub Release
     needs: build
