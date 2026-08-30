@@ -3,9 +3,9 @@
 > RustStack is an ultra-fast, lightweight, single-binary local AWS cloud emulator written in 100% pure Rust. It serves as a drop-in replacement for LocalStack and MiniStack with sub-microsecond latency, a 1.6 MB memory footprint, and 500ms cold-start startup.
 
 ## Quick Facts
-- **Memory Footprint**: ~1.6 MiB RSS at idle (20x lighter than MiniStack, 250x lighter than LocalStack)
-- **Startup Time**: ~500ms cold start
-- **Docker Image**: `ehlers320/ruststack:latest` (~92 MB multi-arch Linux & macOS)
+- **Memory Footprint**: ~1.9 MiB RSS at idle (17.7x lighter than MiniStack, 209x lighter than LocalStack)
+- **Startup Time**: ~200ms cold start
+- **Docker Image**: `ehlers320/ruststack:latest` (~30.7 MB multi-arch Linux & macOS)
 - **Default Endpoint**: `http://localhost:4566` (Single port multiplexer)
 - **AWS Credentials**: Dummy credentials accepted (`AWS_ACCESS_KEY_ID=test`, `AWS_SECRET_ACCESS_KEY=test`, `AWS_DEFAULT_REGION=us-east-1`)
 

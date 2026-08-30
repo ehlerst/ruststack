@@ -16,14 +16,14 @@ Measured on standard GitHub Actions runners (`ubuntu-latest`):
 
 | Local Cloud Stack | Docker Image | Image Size | Avg Startup Time | Min Startup Time | Idle Memory (RSS) | Idle CPU |
 |:---|:---|---:|---:|---:|---:|---:|
-| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **92.9 MB** | **977.3 ms** | **548.9 ms** | **1.6 MiB** | **0.00%** |
-| **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 2,172.4 ms | 2,025.6 ms | 34.3 MiB | 0.00% |
-| **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 2,995.1 ms | 2,830.6 ms | 400.7 MiB | 25.80% |
+| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **30.7 MB** | **216.2 ms** | **199.3 ms** | **1.9 MiB** | **0.00%** |
+| **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 1,685.8 ms | 1,567.2 ms | 33.7 MiB | 0.00% |
+| **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 2,770.1 ms | 2,668.0 ms | 398.5 MiB | 0.04% |
 
 ### 🚀 Key Advantages
-- **Memory Footprint**: **21.4x lighter** than MiniStack (`1.6 MiB` vs `34.3 MiB`) and **250.4x lighter** than LocalStack (`400.7 MiB`).
-- **Cold-Start Readiness**: **3.7x faster** startup (`548.9 ms` vs `2,025.6 ms`).
-- **Image Size**: **92.9 MB** (multi-arch for Linux `x86_64` and `arm64`/Apple Silicon).
+- **Memory Footprint**: **17.7x lighter** than MiniStack (`1.9 MiB` vs `33.7 MiB`) and **209.7x lighter** than LocalStack (`398.5 MiB`).
+- **Cold-Start Readiness**: **7.8x faster** startup (`216.2 ms` vs `1,685.8 ms`).
+- **Image Size**: **30.7 MB** (down from 92.9 MB, **5.7x smaller** than MiniStack and **39.2x smaller** than LocalStack).
 
 ---
 

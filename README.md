@@ -19,14 +19,14 @@ Continuous automated container startup time, idle memory footprint, and image si
 
 | Local Cloud Stack | Docker Image | Image Size | Avg Startup Time | Min Startup Time | Idle Memory (RSS) | Idle CPU |
 |:---|:---|---:|---:|---:|---:|---:|
-| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **92.9 MB** | **977.3 ms** | **548.9 ms** | **1.6 MiB** | **0.00%** |
-| **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 2,172.4 ms | 2,025.6 ms | 34.3 MiB | 0.00% |
-| **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 2,995.1 ms | 2,830.6 ms | 400.7 MiB | 25.80% |
+| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **30.7 MB** | **216.2 ms** | **199.3 ms** | **1.9 MiB** | **0.00%** |
+| **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 1,685.8 ms | 1,567.2 ms | 33.7 MiB | 0.00% |
+| **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 2,770.1 ms | 2,668.0 ms | 398.5 MiB | 0.04% |
 
 ### 🚀 RustStack Benchmark Findings
-- **Memory Footprint**: **21.4x less memory** than MiniStack (1.6 MiB vs 34.3 MiB) and **250.4x less memory** than LocalStack (400.7 MiB).
-- **Cold-Start Startup Speed**: **3.7x faster** than MiniStack (548.9 ms vs 2,025.6 ms) and **5.2x faster** than LocalStack (2,830.6 ms).
-- **Docker Image Size**: **1.9x smaller** than MiniStack (92.9 MB vs 175.9 MB) and **13.0x smaller** than LocalStack (1,204.1 MB).
+- **Memory Footprint**: **17.7x less memory** than MiniStack (1.9 MiB vs 33.7 MiB) and **209.7x less memory** than LocalStack (398.5 MiB).
+- **Cold-Start Startup Speed**: **7.8x faster** than MiniStack (216.2 ms vs 1,685.8 ms) and **12.8x faster** than LocalStack (2,770.1 ms).
+- **Docker Image Size**: **5.7x smaller** than MiniStack (30.7 MB vs 175.9 MB) and **39.2x smaller** than LocalStack (1,204.1 MB).
 
 ---
 
