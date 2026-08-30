@@ -24,6 +24,7 @@ use crate::chaos_api::{
     disable_chaos_handler, enable_chaos_handler, list_chaos_rules_handler,
 };
 use crate::state_api::{state_dump_handler, state_load_handler, state_reset_handler};
+use crate::ui::serve_ui;
 
 #[derive(Parser, Debug, Clone)]
 #[command(
@@ -143,6 +144,8 @@ pub fn create_router(state: AppState) -> Router {
         .expose_headers(Any);
 
     Router::new()
+        .route("/_ruststack/ui", get(serve_ui))
+        .route("/_ruststack/ui/", get(serve_ui))
         .route("/_ruststack/health", get(health_check))
         .route("/_ruststack/info", get(info_handler))
         .route("/_ruststack/state/reset", any(state_reset_handler))
@@ -216,6 +219,24 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
                 .unwrap();
         }
     };
+
+    // Browser auto-detection on root path
+    if (uri.path() == "/" || uri.path() == "")
+        && method == axum::http::Method::GET
+        && headers
+            .get("accept")
+            .and_then(|a| a.to_str().ok())
+            .unwrap_or("")
+            .contains("text/html")
+        && !headers.contains_key("authorization")
+        && !headers.contains_key("x-amz-date")
+    {
+        return Response::builder()
+            .status(StatusCode::OK)
+            .header("content-type", "text/html; charset=utf-8")
+            .body(Body::from(crate::ui::EMBEDDED_UI_HTML))
+            .unwrap();
+    }
 
     // Check service classification with body peek for Form Query actions
     let service = Dispatcher::classify_request(&method, &uri, &headers, Some(&body_bytes));

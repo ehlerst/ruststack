@@ -375,7 +375,13 @@ fn dispatch_s3_op(
                 .insert("etag", HeaderValue::from_str(&meta.etag).unwrap());
             res.headers_mut().insert(
                 "last-modified",
-                HeaderValue::from_str(&meta.last_modified.to_rfc2822()).unwrap(),
+                HeaderValue::from_str(
+                    &meta
+                        .last_modified
+                        .format("%a, %d %b %Y %H:%M:%S GMT")
+                        .to_string(),
+                )
+                .unwrap(),
             );
             res.headers_mut()
                 .insert("accept-ranges", HeaderValue::from_static("bytes"));
@@ -412,7 +418,13 @@ fn dispatch_s3_op(
                 .insert("etag", HeaderValue::from_str(&meta.etag).unwrap());
             res.headers_mut().insert(
                 "last-modified",
-                HeaderValue::from_str(&meta.last_modified.to_rfc2822()).unwrap(),
+                HeaderValue::from_str(
+                    &meta
+                        .last_modified
+                        .format("%a, %d %b %Y %H:%M:%S GMT")
+                        .to_string(),
+                )
+                .unwrap(),
             );
             res.headers_mut()
                 .insert("accept-ranges", HeaderValue::from_static("bytes"));

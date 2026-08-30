@@ -163,7 +163,7 @@ Restores the complete cluster state directly from a JSON snapshot payload or fil
   - STS Identity Mock          - 8 GHA Benchmarks Jobs     - DockerHub Publishing
                                                                     |
                                                                     v
-  [Step 6]              <---  [Step 5] (Completed)  <---  [Step 4] (Completed)
+  [Step 6] (Completed)  <---  [Step 5] (Completed)  <---  [Step 4] (Completed)
   - Embedded Web Admin UI      - Chaos Engineering         - State Management & Snapshots
-  - ruststack-cli               (Latency/Fault Injection)   (/_ruststack/state/dump/load)
+  - ruststack-cli Commands      (Latency/Fault Injection)   (/_ruststack/state/dump/load)
 ```

@@ -217,6 +217,40 @@ Native Windows targets are not supported directly. Windows users should use **WS
 
 ---
 
+## 🖥️ Embedded Web Admin UI & `ruststack` CLI
+
+RustStack comes out of the box with an embedded, zero-dependency dark-mode visual administration console and a powerful companion CLI:
+
+### 1. Web Admin UI
+Open `http://localhost:4566/_ruststack/ui/` in any browser (or navigate directly to `http://localhost:4566/`):
+- **Overview & Ratings**: Live dashboard displaying cluster health, region, account ID, and in-memory engine benchmark ratings.
+- **Resource Explorers**: Visual inspection tables for S3 Buckets, DynamoDB Tables & Items, SQS Queues, SNS Topics, SSM Parameters, and SecretsManager Secrets.
+- **Interactive Chaos Studio**: Create, list, delete, and toggle fault injection rules on the fly with live execution counters.
+- **State Snapshot Management**: 1-click JSON snapshot export/copy, import/restore, and atomic selective/full cluster resets.
+
+### 2. `ruststack` CLI Companion Commands
+The `ruststack` binary doubles as a local management CLI:
+```bash
+# Query status and health of running RustStack cluster
+ruststack status
+
+# Export full cluster snapshot to a file or stdout
+ruststack state dump --output snapshot.json
+
+# Restore cluster state from a snapshot file
+ruststack state load snapshot.json
+
+# Atomically reset state (all services or selective)
+ruststack state reset --services s3,dynamodb
+
+# Manage Chaos Engineering rules
+ruststack chaos list
+ruststack chaos add --service dynamodb --action PutItem --probability 0.5 --status 400 --error-code ProvisionedThroughputExceededException
+ruststack chaos reset
+```
+
+---
+
 ## 💻 AWS CLI Examples
 
 Set standard dummy credentials:

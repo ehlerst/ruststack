@@ -12,7 +12,7 @@ env:
 
 jobs:
   check-and-test:
-    name: Build & Test
+    name: Build & Test (Pure Rust Suite)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -34,3 +34,63 @@ jobs:
 
       - name: Run Unit and Integration Tests
         run: cargo test --workspace --all-targets --all-features --verbose
+
+  testcontainers-go:
+    name: Go Testcontainers Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: |
+          cargo build --release -p ruststack-server
+          mkdir -p docker-bin/amd64
+          cp target/release/ruststack docker-bin/amd64/ruststack
+
+      - name: Build local Docker image
+        run: |
+          docker build --build-arg TARGETARCH=amd64 -t ehlers320/ruststack:latest .
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          cache-dependency-path: Testcontainers/go-testcontainers/go.sum
+
+      - name: Run Go Testcontainers Integration Tests
+        working-directory: Testcontainers/go-testcontainers
+        run: go test -v .
+
+  testcontainers-rust:
+    name: Rust Testcontainers Suite
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Build release binary
+        run: |
+          cargo build --release -p ruststack-server
+          mkdir -p docker-bin/amd64
+          cp target/release/ruststack docker-bin/amd64/ruststack
+
+      - name: Build local Docker image
+        run: |
+          docker build --build-arg TARGETARCH=amd64 -t ehlers320/ruststack:latest .
+
+      - name: Run Rust Testcontainers Integration Tests
+        working-directory: Testcontainers/rust-testcontainers
+        run: cargo test -- --ignored --nocapture

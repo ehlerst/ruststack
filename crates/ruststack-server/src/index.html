@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RustStack Cloud Console</title>
+  <style>
+    :root {
+      --bg: #090d16;
+      --card-bg: #111827;
+      --card-border: #1f2937;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --text: #f3f4f6;
+      --text-muted: #9ca3af;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    header {
+      background-color: #0f172a;
+      border-bottom: 1px solid var(--card-border);
+      padding: 1rem 2rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #60a5fa;
+      text-decoration: none;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 9999px;
+      font-weight: 600;
+    }
+    .badge-success { background: #064e3b; color: #6ee7b7; }
+    .badge-primary { background: #1e3a8a; color: #93c5fd; }
+    .badge-danger { background: #7f1d1d; color: #fca5a5; }
+    .container {
+      flex: 1;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 2rem;
+      width: 100%;
+    }
+    .tabs {
+      display: flex;
+      gap: 0.5rem;
+      border-bottom: 1px solid var(--card-border);
+      margin-bottom: 2rem;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      padding: 0.75rem 1.25rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.2s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+      display: flex;
+      justify-content: space-between;
+    }
+    .card-value {
+      font-size: 1.75rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .section-title {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      margin-top: 1rem;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--card-border);
+      font-size: 0.9rem;
+    }
+    th {
+      color: var(--text-muted);
+      font-weight: 600;
+      background: #0f172a;
+    }
+    tr:hover { background: #1e293b; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 0.5rem 1rem;
+      border-radius: 0.5rem;
+      font-weight: 500;
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn:hover { background: var(--accent-hover); }
+    .btn-danger { background: var(--danger); }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-outline {
+      background: transparent;
+      border: 1px solid var(--card-border);
+      color: var(--text);
+    }
+    .btn-outline:hover { background: #1e293b; }
+    .btn-group { display: flex; gap: 0.5rem; }
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    label {
+      display: block;
+      font-size: 0.875rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+    input, select, textarea {
+      width: 100%;
+      padding: 0.6rem 0.8rem;
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 0.5rem;
+      color: var(--text);
+      font-size: 0.9rem;
+    }
+    input:focus, select:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+    pre {
+      background: #0f172a;
+      padding: 1rem;
+      border-radius: 0.5rem;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      color: #93c5fd;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <a href="#" class="logo">
+      <span>⚡ RustStack</span>
+      <span class="badge badge-success">Running</span>
+    </a>
+    <div style="display: flex; gap: 1rem; align-items: center;">
+      <span style="font-size: 0.85rem; color: var(--text-muted);">Region: <strong style="color: var(--text);" id="hdr-region">us-east-1</strong></span>
+      <span style="font-size: 0.85rem; color: var(--text-muted);">Account: <strong style="color: var(--text);" id="hdr-account">000000000000</strong></span>
+      <button class="btn btn-outline" onclick="fetchStateOverview()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('overview')">📊 Overview</button>
+      <button class="tab-btn" onclick="switchTab('dynamodb')">🗄️ DynamoDB</button>
+      <button class="tab-btn" onclick="switchTab('s3')">🪣 S3</button>
+      <button class="tab-btn" onclick="switchTab('sqs')">📬 SQS & SNS</button>
+      <button class="tab-btn" onclick="switchTab('ssm')">🔐 SSM & Secrets</button>
+      <button class="tab-btn" onclick="switchTab('chaos')">🌪️ Chaos Studio</button>
+      <button class="tab-btn" onclick="switchTab('snapshots')">💾 Snapshots</button>
+    </div>
+
+    <!-- OVERVIEW TAB -->
+    <div id="tab-overview" class="tab-content active">
+      <div class="grid">
+        <div class="card">
+          <div class="card-title">S3 Buckets & Objects</div>
+          <div class="card-value" id="card-s3-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">DynamoDB Tables</div>
+          <div class="card-value" id="card-ddb-count">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">SQS Queues & Messages</div>
+          <div class="card-value" id="card-sqs-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">SSM Parameters & Secrets</div>
+          <div class="card-value" id="card-ssm-count">0 / 0</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom: 2rem;">
+        <div class="section-title">⚡ In-Memory Engine Rating</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Operation</th>
+              <th>Throughput</th>
+              <th>p50 Latency</th>
+              <th>Rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>SSM Parameter Store</td><td><code>GetParameter</code></td><td>450,000+ ops/s</td><td>1.0 µs</td><td><span class="badge badge-success">A+ Ultra Fast</span></td></tr>
+            <tr><td>Amazon S3</td><td><code>GetObject</code></td><td>422,000+ ops/s</td><td>1.4 µs</td><td><span class="badge badge-success">A+ Ultra Fast</span></td></tr>
+            <tr><td>Amazon DynamoDB</td><td><code>GetItem</code></td><td>389,000+ ops/s</td><td>1.4 µs</td><td><span class="badge badge-success">A+ Ultra Fast</span></td></tr>
+            <tr><td>Secrets Manager</td><td><code>GetSecretValue</code></td><td>293,000+ ops/s</td><td>2.4 µs</td><td><span class="badge badge-success">A+ Ultra Fast</span></td></tr>
+            <tr><td>Amazon SNS</td><td><code>Publish</code></td><td>227,000+ ops/s</td><td>3.4 µs</td><td><span class="badge badge-success">A+ Ultra Fast</span></td></tr>
+            <tr><td>Amazon SQS</td><td><code>SendMessageBatch</code></td><td>211,000+ msgs/s</td><td>42.8 µs</td><td><span class="badge badge-primary">A Excellent</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- DYNAMODB TAB -->
+    <div id="tab-dynamodb" class="tab-content">
+      <div class="card">
+        <div class="section-title">
+          <span>Active Tables</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh Tables</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Table Name</th>
+              <th>Status</th>
+              <th>Items Count</th>
+              <th>Partition Key</th>
+              <th>Sort Key</th>
+            </tr>
+          </thead>
+          <tbody id="table-ddb-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No tables created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- S3 TAB -->
+    <div id="tab-s3" class="tab-content">
+      <div class="card">
+        <div class="section-title">
+          <span>S3 Buckets</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh Buckets</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Bucket Name</th>
+              <th>Creation Date</th>
+              <th>Objects Count</th>
+              <th>Notifications</th>
+            </tr>
+          </thead>
+          <tbody id="table-s3-rows">
+            <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No buckets created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SQS & SNS TAB -->
+    <div id="tab-sqs" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title"><span>SQS Queues</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Queue Name</th>
+              <th>Messages</th>
+              <th>In-Flight</th>
+              <th>FIFO</th>
+              <th>URL</th>
+            </tr>
+          </thead>
+          <tbody id="table-sqs-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No queues created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="section-title"><span>SNS Topics</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Topic Name</th>
+              <th>ARN</th>
+              <th>Subscriptions</th>
+            </tr>
+          </thead>
+          <tbody id="table-sns-rows">
+            <tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No topics created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SSM & SECRETS TAB -->
+    <div id="tab-ssm" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title"><span>SSM Parameter Store</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Type</th>
+              <th>Version</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody id="table-ssm-rows">
+            <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No parameters created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="section-title"><span>Secrets Manager</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Secret Name</th>
+              <th>ARN</th>
+              <th>Current Version</th>
+            </tr>
+          </thead>
+          <tbody id="table-secrets-rows">
+            <tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No secrets created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CHAOS TAB -->
+    <div id="tab-chaos" class="tab-content">
+      <div class="grid" style="grid-template-columns: 1fr 2fr;">
+        <div class="card">
+          <div class="section-title">➕ Inject Chaos Rule</div>
+          <div class="form-group">
+            <label>Target Service</label>
+            <select id="chaos-service">
+              <option value="">All Services</option>
+              <option value="dynamodb">DynamoDB</option>
+              <option value="s3">S3</option>
+              <option value="sqs">SQS</option>
+              <option value="sns">SNS</option>
+              <option value="ssm">SSM</option>
+              <option value="secretsmanager">Secrets Manager</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Action / Method Filter (Optional)</label>
+            <input type="text" id="chaos-action" placeholder="e.g. PutItem, SendMessage">
+          </div>
+          <div class="form-group">
+            <label>Failure Probability (0.0 to 1.0)</label>
+            <input type="number" step="0.1" min="0" max="1" id="chaos-prob" value="1.0">
+          </div>
+          <div class="form-group">
+            <label>Error Status Code</label>
+            <input type="number" id="chaos-status" value="500">
+          </div>
+          <div class="form-group">
+            <label>AWS Error Code</label>
+            <input type="text" id="chaos-code" placeholder="e.g. ProvisionedThroughputExceededException, SlowDown">
+          </div>
+          <div class="form-group">
+            <label>Injected Latency (ms)</label>
+            <input type="number" id="chaos-latency" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>Latency Jitter (± ms)</label>
+            <input type="number" id="chaos-jitter" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label>Trigger Limit Times (Auto-Expire)</label>
+            <input type="number" id="chaos-limit" placeholder="Optional max times">
+          </div>
+          <button class="btn" style="width: 100%;" onclick="addChaosRule()">Register Chaos Rule</button>
+        </div>
+
+        <div class="card">
+          <div class="section-title">
+            <span>🌪️ Active Chaos Rules</span>
+            <div class="btn-group">
+              <button class="btn btn-outline" onclick="toggleChaos(false)">Disable Chaos</button>
+              <button class="btn" onclick="toggleChaos(true)">Enable Chaos</button>
+              <button class="btn btn-danger" onclick="clearChaos()">Clear All</button>
+            </div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Service</th>
+                <th>Action</th>
+                <th>Error</th>
+                <th>Latency</th>
+                <th>Triggered</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="table-chaos-rows">
+              <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No active chaos rules</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- SNAPSHOTS TAB -->
+    <div id="tab-snapshots" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title">
+          <span>💾 State Snapshot Controls</span>
+          <div class="btn-group">
+            <button class="btn" onclick="dumpStateJson()">📥 Export Snapshot JSON</button>
+            <button class="btn btn-danger" onclick="resetState()">⚠️ Reset All State</button>
+          </div>
+        </div>
+        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
+          RustStack supports instant atomic snapshotting and state recovery across all 8 services.
+        </p>
+        <div class="form-group">
+          <label>Raw Snapshot JSON (Paste here to restore)</label>
+          <textarea id="snapshot-json-input" rows="8" placeholder="Paste RustStackStateSnapshot JSON..."></textarea>
+        </div>
+        <button class="btn" onclick="loadStateJson()">Restore State from JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let stateCache = null;
+
+    function switchTab(name) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      event.target.classList.add('active');
+      document.getElementById('tab-' + name).classList.add('active');
+      if (name === 'chaos') fetchChaosRules();
+    }
+
+    async function fetchStateOverview() {
+      try {
+        const [infoRes, dumpRes] = await Promise.all([
+          fetch('/_ruststack/info'),
+          fetch('/_ruststack/state/dump')
+        ]);
+        const info = await infoRes.json();
+        const dump = await dumpRes.json();
+        stateCache = dump;
+
+        document.getElementById('hdr-region').innerText = dump.region || 'us-east-1';
+        document.getElementById('hdr-account').innerText = dump.account_id || '000000000000';
+
+        // Update Overview Cards
+        const totalObjects = (dump.s3.buckets || []).reduce((acc, b) => acc + (b.objects || []).length, 0);
+        document.getElementById('card-s3-count').innerText = `${(dump.s3.buckets || []).length} / ${totalObjects}`;
+        document.getElementById('card-ddb-count').innerText = `${(dump.dynamodb.tables || []).length}`;
+        const totalMsgs = (dump.sqs.queues || []).reduce((acc, q) => acc + (q.messages || []).length, 0);
+        document.getElementById('card-sqs-count').innerText = `${(dump.sqs.queues || []).length} / ${totalMsgs}`;
+        document.getElementById('card-ssm-count').innerText = `${(dump.ssm.parameters || []).length} / ${(dump.secretsmanager.secrets || []).length}`;
+
+        // Populate Tables
+        renderDynamoTables(dump.dynamodb.tables || []);
+        renderS3Buckets(dump.s3.buckets || []);
+        renderSqs(dump.sqs.queues || []);
+        renderSns(dump.sns.topics || []);
+        renderSsm(dump.ssm.parameters || []);
+        renderSecrets(dump.secretsmanager.secrets || []);
+      } catch (err) {
+        console.error("Failed to load state", err);
+      }
+    }
+
+    function renderDynamoTables(tables) {
+      const tbody = document.getElementById('table-ddb-rows');
+      if (!tables.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No tables created yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = tables.map(t => {
+        const pk = (t.description.KeySchema || []).find(k => k.KeyType === 'HASH')?.AttributeName || '-';
+        const sk = (t.description.KeySchema || []).find(k => k.KeyType === 'RANGE')?.AttributeName || '-';
+        return `<tr>
+          <td><strong>${t.description.TableName}</strong></td>
+          <td><span class="badge badge-success">${t.description.TableStatus}</span></td>
+          <td>${t.items ? t.items.length : 0}</td>
+          <td><code>${pk}</code></td>
+          <td><code>${sk}</code></td>
+        </tr>`;
+      }).join('');
+    }
+
+    function renderS3Buckets(buckets) {
+      const tbody = document.getElementById('table-s3-rows');
+      if (!buckets.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No buckets created yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = buckets.map(b => `<tr>
+        <td><strong>${b.info.name}</strong></td>
+        <td>${new Date(b.info.creation_date * 1000).toLocaleString()}</td>
+        <td>${(b.objects || []).length}</td>
+        <td>${(b.notifications?.queue_configurations || []).length ? '<span class="badge badge-primary">Active</span>' : 'None'}</td>
+      </tr>`).join('');
+    }
+
+    function renderSqs(queues) {
+      const tbody = document.getElementById('table-sqs-rows');
+      if (!queues.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No queues created yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = queues.map(q => `<tr>
+        <td><strong>${q.name}</strong></td>
+        <td>${(q.messages || []).length}</td>
+        <td>0</td>
+        <td>${q.attributes?.is_fifo ? '<span class="badge badge-primary">FIFO</span>' : 'Standard'}</td>
+        <td><small style="color: var(--text-muted);">${q.url}</small></td>
+      </tr>`).join('');
+    }
+
+    function renderSns(topics) {
+      const tbody = document.getElementById('table-sns-rows');
+      if (!topics.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No topics created yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = topics.map(t => `<tr>
+        <td><strong>${t.name}</strong></td>
+        <td><small style="color: var(--text-muted);">${t.arn}</small></td>
+        <td>${(t.subscriptions || []).length}</td>
+      </tr>`).join('');
+    }
+
+    function renderSsm(params) {
+      const tbody = document.getElementById('table-ssm-rows');
+      if (!params.length) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No parameters created yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = params.map(p => `<tr>
+        <td><strong>${p.name}</strong></td>
+        <td><span class="badge badge-primary">${p.param_type}</span></td>
+        <td>v${p.version}</td>
+        <td><code>${p.value}</code></td>
+      </tr>`).join('');
+    }
+
+    function renderSecrets(secrets) {
+      const tbody = document.getElementById('table-secrets-rows');
+      if (!secrets.length) {
+        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No secrets created yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = secrets.map(s => `<tr>
+        <td><strong>${s.name}</strong></td>
+        <td><small style="color: var(--text-muted);">${s.arn}</small></td>
+        <td><span class="badge badge-success">AWSCURRENT</span></td>
+      </tr>`).join('');
+    }
+
+    async function fetchChaosRules() {
+      try {
+        const res = await fetch('/_ruststack/chaos/rules');
+        const data = await res.json();
+        const tbody = document.getElementById('table-chaos-rows');
+        if (!data.rules || !data.rules.length) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No active chaos rules</td></tr>';
+          return;
+        }
+        tbody.innerHTML = data.rules.map(r => `<tr>
+          <td><span class="badge badge-primary">${r.service || 'ALL'}</span></td>
+          <td>${r.action || '*'}</td>
+          <td>${r.error_status ? `<span class="badge badge-danger">${r.error_status} ${r.error_code || ''}</span>` : 'None'}</td>
+          <td>${r.latency_ms ? `${r.latency_ms}ms (±${r.latency_jitter_ms || 0}ms)` : '0ms'}</td>
+          <td><strong>${r.times_triggered}</strong>${r.limit_times ? ` / ${r.limit_times}` : ''}</td>
+          <td><button class="btn btn-danger" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;" onclick="deleteChaosRule('${r.id}')">Delete</button></td>
+        </tr>`).join('');
+      } catch (err) {
+        console.error("Failed to fetch chaos rules", err);
+      }
+    }
+
+    async function addChaosRule() {
+      const rule = {
+        service: document.getElementById('chaos-service').value || null,
+        action: document.getElementById('chaos-action').value || null,
+        probability: parseFloat(document.getElementById('chaos-prob').value) || 1.0,
+        error_status: parseInt(document.getElementById('chaos-status').value) || null,
+        error_code: document.getElementById('chaos-code').value || null,
+        latency_ms: parseInt(document.getElementById('chaos-latency').value) || null,
+        latency_jitter_ms: parseInt(document.getElementById('chaos-jitter').value) || null,
+        limit_times: parseInt(document.getElementById('chaos-limit').value) || null,
+      };
+      await fetch('/_ruststack/chaos/rules', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(rule)
+      });
+      fetchChaosRules();
+    }
+
+    async function deleteChaosRule(id) {
+      await fetch(`/_ruststack/chaos/rules/${id}`, { method: 'DELETE' });
+      fetchChaosRules();
+    }
+
+    async function clearChaos() {
+      await fetch('/_ruststack/chaos/reset', { method: 'POST' });
+      fetchChaosRules();
+    }
+
+    async function toggleChaos(enable) {
+      await fetch(`/_ruststack/chaos/${enable ? 'enable' : 'disable'}`, { method: 'POST' });
+      fetchChaosRules();
+    }
+
+    async function dumpStateJson() {
+      const res = await fetch('/_ruststack/state/dump');
+      const text = await res.text();
+      document.getElementById('snapshot-json-input').value = text;
+      navigator.clipboard.writeText(text);
+      alert("Snapshot JSON copied to clipboard!");
+    }
+
+    async function loadStateJson() {
+      const val = document.getElementById('snapshot-json-input').value;
+      if (!val) return alert("Please paste snapshot JSON first.");
+      await fetch('/_ruststack/state/load', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: val
+      });
+      alert("State restored successfully!");
+      fetchStateOverview();
+    }
+
+    async function resetState() {
+      if (!confirm("Are you sure you want to reset all 8 services completely?")) return;
+      await fetch('/_ruststack/state/reset', { method: 'POST' });
+      alert("All state wiped!");
+      fetchStateOverview();
+    }
+
+    fetchStateOverview();
+  </script>
+</body>
+</html>

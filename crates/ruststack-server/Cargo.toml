@@ -36,3 +36,4 @@ anyhow.workspace = true
 fastrand.workspace = true
 uuid.workspace = true
 form_urlencoded.workspace = true
+reqwest.workspace = true
