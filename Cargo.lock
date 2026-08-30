@@ -1042,7 +1042,9 @@ dependencies = [
  "chrono",
  "clap",
  "ruststack-core",
+ "ruststack-eventbridge",
  "ruststack-s3",
+ "ruststack-sns",
  "ruststack-sqs",
  "serde",
  "serde_json",
@@ -1060,6 +1062,29 @@ dependencies = [
  "http",
  "quick-xml",
  "regex",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "ruststack-eventbridge"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "criterion",
+ "dashmap",
+ "form_urlencoded",
+ "http",
+ "http-body-util",
+ "parking_lot",
+ "ruststack-core",
+ "ruststack-sns",
+ "ruststack-sqs",
  "serde",
  "serde_json",
  "thiserror",
@@ -1105,7 +1130,9 @@ dependencies = [
  "http",
  "http-body-util",
  "ruststack-core",
+ "ruststack-eventbridge",
  "ruststack-s3",
+ "ruststack-sns",
  "ruststack-sqs",
  "serde",
  "serde_json",
@@ -1114,6 +1141,29 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "ruststack-sns"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "criterion",
+ "dashmap",
+ "form_urlencoded",
+ "http",
+ "http-body-util",
+ "parking_lot",
+ "quick-xml",
+ "ruststack-core",
+ "ruststack-sqs",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]

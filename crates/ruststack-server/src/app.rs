@@ -6,7 +6,9 @@ use axum::routing::{any, get};
 use axum::Router;
 use clap::Parser;
 use ruststack_core::{AwsService, Dispatcher};
+use ruststack_eventbridge::{handle_eventbridge_request, EventBridgeEngine};
 use ruststack_s3::{handle_s3_request, S3Storage};
+use ruststack_sns::{handle_sns_request, SnsEngine};
 use ruststack_sqs::{handle_sqs_request, SqsEngine};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
@@ -24,7 +26,7 @@ pub struct Opts {
     #[arg(long, default_value = "0.0.0.0", env = "HOST")]
     pub host: String,
 
-    #[arg(short, long, default_value = "s3,sqs", env = "SERVICES")]
+    #[arg(short, long, default_value = "s3,sqs,sns,events", env = "SERVICES")]
     pub services: String,
 
     #[arg(long, default_value = "us-east-1", env = "DEFAULT_REGION")]
@@ -39,7 +41,7 @@ impl Default for Opts {
         Self {
             port: 4566,
             host: "0.0.0.0".to_string(),
-            services: "s3,sqs".to_string(),
+            services: "s3,sqs,sns,events".to_string(),
             region: "us-east-1".to_string(),
             account_id: "000000000000".to_string(),
         }
@@ -50,6 +52,8 @@ impl Default for Opts {
 pub struct AppState {
     pub s3_storage: Arc<dyn S3Storage>,
     pub sqs_engine: Arc<SqsEngine>,
+    pub sns_engine: Arc<SnsEngine>,
+    pub eventbridge_engine: Arc<EventBridgeEngine>,
     pub region: String,
     pub account_id: String,
 }
@@ -81,12 +85,14 @@ async fn health_check() -> impl IntoResponse {
 async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
     let json_info = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "services": ["s3", "sqs"],
+        "services": ["s3", "sqs", "sns", "events"],
         "region": state.region,
         "account_id": state.account_id,
         "features": {
             "s3": ["buckets", "objects", "multipart", "byte-range", "virtual-hosting"],
-            "sqs": ["standard-queue", "fifo-queue", "long-polling", "batching", "visibility-timeout", "query-and-json-protocols"]
+            "sqs": ["standard-queue", "fifo-queue", "dlq-redrive", "long-polling", "batching", "visibility-timeout", "query-and-json-protocols"],
+            "sns": ["topics", "subscriptions", "sqs-fanout", "filter-policy", "raw-message-delivery", "query-and-json-protocols"],
+            "events": ["event-buses", "rules", "pattern-matching", "targets-sqs-sns", "json-protocol"]
         }
     });
 
@@ -108,6 +114,10 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
     match service {
         AwsService::S3 => handle_s3_request(state.s3_storage.clone(), req).await,
         AwsService::Sqs => handle_sqs_request(state.sqs_engine.clone(), req).await,
+        AwsService::Sns => handle_sns_request(state.sns_engine.clone(), req).await,
+        AwsService::EventBridge => {
+            handle_eventbridge_request(state.eventbridge_engine.clone(), req).await
+        }
         AwsService::Internal => Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "application/json")

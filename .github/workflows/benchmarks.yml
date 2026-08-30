@@ -97,3 +97,85 @@ jobs:
         with:
           name: sqs-performance-report
           path: reports/sqs-benchmark.*
+
+  sns-performance:
+    name: SNS Feature Performance Rating
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run SNS Criterion Micro-benchmarks
+        run: cargo bench -p ruststack-sns
+
+      - name: Run SNS Performance Rating Suite
+        run: |
+          mkdir -p reports
+          cargo run --release -p ruststack-benchmarks -- \
+            --service sns \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format markdown \
+            --output reports/sns-benchmark.md
+
+          cargo run --release -p ruststack-benchmarks -- \
+            --service sns \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format json \
+            --output reports/sns-benchmark.json
+
+      - name: Publish SNS Benchmark Step Summary
+        run: |
+          cat reports/sns-benchmark.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload SNS Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sns-performance-report
+          path: reports/sns-benchmark.*
+
+  eventbridge-performance:
+    name: EventBridge Feature Performance Rating
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run EventBridge Criterion Micro-benchmarks
+        run: cargo bench -p ruststack-eventbridge
+
+      - name: Run EventBridge Performance Rating Suite
+        run: |
+          mkdir -p reports
+          cargo run --release -p ruststack-benchmarks -- \
+            --service eventbridge \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format markdown \
+            --output reports/eventbridge-benchmark.md
+
+          cargo run --release -p ruststack-benchmarks -- \
+            --service eventbridge \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format json \
+            --output reports/eventbridge-benchmark.json
+
+      - name: Publish EventBridge Benchmark Step Summary
+        run: |
+          cat reports/eventbridge-benchmark.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload EventBridge Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: eventbridge-performance-report
+          path: reports/eventbridge-benchmark.*

@@ -6,10 +6,10 @@
 
 ## 1. Executive Summary & Vision
 
-RustStack aims to deliver an ultra-fast, zero-dependency (or minimal dependency) local AWS cloud emulator for testing, local development, and CI/CD pipelines.
+RustStack aims to deliver an ultra-fast, zero-dependency local AWS cloud emulator for testing, local development, and CI/CD pipelines.
 
 ### Key Goals
-- **Blazing Performance**: Sub-millisecond latency for typical S3/SQS operations, minimal CPU/memory overhead.
+- **Blazing Performance**: Sub-millisecond latency for typical S3/SQS/SNS/EventBridge operations, minimal CPU/memory overhead.
 - **Drop-in AWS Compatibility**: Native support for standard AWS SDKs (Rust, Python `boto3`, Node/JS, Go, Java), AWS CLI, and Terraform.
 - **Single Port Multiplexing**: Seamlessly serves all emulated AWS services over a unified port (default `4566`) using SigV4 headers, `Host` header inspection, `x-amz-target`, and query parameters.
 - **Performance Rating & CI Benchmarks**: Every feature is measured with dedicated Criterion and load benchmarks integrated directly into GitHub Actions (GHA) with automated metric tracking and regression detection.
@@ -30,179 +30,75 @@ RustStack aims to deliver an ultra-fast, zero-dependency (or minimal dependency)
                               +---------------+---------------+
                                               |
                                      Service Dispatcher
-                      +-----------------------+-----------------------+
-                      | (Host / Auth Scope / Target Header / Path)    |
-                      v                                               v
-        +---------------------------+                   +---------------------------+
-        |        ruststack-s3       |                   |       ruststack-sqs       |
-        | S3 REST / XML Engine      |                   | SQS Query & JSON Engine   |
-        +-------------+-------------+                   +-------------+-------------+
-                      |                                               |
-         +------------+------------+                     +------------+------------+
-         | In-Memory | Filesystem |                     | Standard   |    FIFO     |
-         | Storage   | Storage    |                     | Engine     |   Engine    |
-         +-------------------------+                     +-------------------------+
+                  +-------------------+-------+-------------------+
+                  | (Host / Auth Scope / Target Header / Path / Query) |
+                  v                   v                   v       v
+        +-------------------+ +-------------------+ +-------+ +--------------------+
+        |   ruststack-s3    | |   ruststack-sqs   | |  SNS  | |   EventBridge      |
+        |  REST / XML Engine| | Query & JSON Engine| |Fanout | | Buses & Rule Match|
+        +---------+---------+ +---------+---------+ +---+---+ +---------+----------+
+                  |                     |               |               |
+             In-Memory             Standard/FIFO   SQS Delivery   SQS/SNS Targets
+             Storage               + DLQ Redrive
 ```
-
-### 2.1 Service Dispatcher / Protocol Multiplexer
-Incoming requests on port `4566` are routed to the appropriate service handler using the standard AWS protocol resolution matrix:
-1. **`Authorization` Header (SigV4)**: Extract credential scope `.../us-east-1/<service>/aws4_request`.
-2. **`x-amz-target` Header**: For JSON 1.0/1.1 protocols (e.g. `AmazonSQS.SendMessage`, `DynamoDB_20120810.*`).
-3. **`Host` Header (Virtual Hosted Style)**: `<bucket>.localhost:4566` or `<bucket>.s3.localhost` $\to$ **S3**.
-4. **URL Path & Query Parameters**:
-   - `Action=...&Version=2012-11-05` or `/000000000000/<queue_name>` $\to$ **SQS**.
-   - Path-style `/bucket/key` $\to$ **S3**.
 
 ---
 
-## 3. Initial Features Specification
+## 3. Services Implemented
 
 ### 3.1 Amazon S3 (`ruststack-s3`)
-Supports both Path-Style (`http://localhost:4566/<bucket>/<key>`) and Virtual-Hosted Style (`http://<bucket>.localhost:4566/<key>`).
-
-#### Operations Supported:
-- **Bucket Operations**:
-  - `CreateBucket` (`PUT /<bucket>`)
-  - `DeleteBucket` (`DELETE /<bucket>`)
-  - `ListBuckets` (`GET /`)
-  - `HeadBucket` (`HEAD /<bucket>`)
-  - `GetBucketLocation` (`GET /<bucket>?location`)
-- **Object Operations**:
-  - `PutObject` (`PUT /<bucket>/<key>`) with metadata (`x-amz-meta-*`), Content-Type, MD5 / ETag calculation.
-  - `GetObject` (`GET /<bucket>/<key>`) with byte-range requests (`Range: bytes=start-end`), conditional headers (`If-Match`, `If-None-Match`).
-  - `HeadObject` (`HEAD /<bucket>/<key>`)
-  - `DeleteObject` (`DELETE /<bucket>/<key>`)
-  - `DeleteObjects` (`POST /<bucket>?delete`) multi-object deletion.
-  - `ListObjectsV2` (`GET /<bucket>?list-type=2`) & `ListObjects` (prefix, delimiter, continuation token, max-keys).
-  - `CopyObject` (`PUT /<bucket>/<key>` with `x-amz-copy-source`).
-- **Multipart Uploads**:
-  - `CreateMultipartUpload` (`POST /<bucket>/<key>?uploads`)
-  - `UploadPart` (`PUT /<bucket>/<key>?uploadId=...&partNumber=...`)
-  - `CompleteMultipartUpload` (`POST /<bucket>/<key>?uploadId=...`)
-  - `AbortMultipartUpload` (`DELETE /<bucket>/<key>?uploadId=...`)
-  - `ListParts` / `ListMultipartUploads`
-- **Storage Backends**:
-  - **In-Memory Backend**: Fast concurrent in-memory map for testing and zero-IO benchmark performance.
-  - **Filesystem Backend**: Local directory persistence.
-
----
+- **Bucket Operations**: `CreateBucket`, `DeleteBucket`, `ListBuckets`, `HeadBucket`, `GetBucketLocation`.
+- **Object Operations**: `PutObject`, `GetObject` (with byte ranges `Range: bytes=start-end`), `HeadObject`, `DeleteObject`, `DeleteObjects`, `CopyObject`.
+- **Object Listing**: `ListObjectsV2` & `ListObjects` with prefix, delimiter, and continuation tokens.
+- **Multipart Uploads**: `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts`.
+- **Routing**: Full support for both path-style (`http://localhost:4566/bucket/key`) and virtual-hosted style (`http://bucket.localhost:4566/key`).
 
 ### 3.2 Amazon SQS (`ruststack-sqs`)
-Supports both **SQS Query Protocol** (`Action=SendMessage&...`) and modern AWS SDK **JSON 1.0 Protocol** (`x-amz-target: AmazonSQS.*`).
+- **Dual Protocols**: Query Protocol (form-urlencoded & query params) and AWS JSON 1.0 Protocol (`x-amz-target: AmazonSQS.*`).
+- **Dead-Letter Queues (DLQ)**: Automatic redrive policy execution when message receive counts exceed `maxReceiveCount`, and `ListDeadLetterSourceQueues`.
+- **Queue Operations**: `CreateQueue`, `DeleteQueue`, `GetQueueUrl`, `ListQueues`, `GetQueueAttributes`, `SetQueueAttributes`, `PurgeQueue`.
+- **Message Operations**: `SendMessage`, `SendMessageBatch`, `ReceiveMessage` (with long polling & visibility timeout), `DeleteMessage`, `DeleteMessageBatch`, `ChangeMessageVisibility`.
+- **Queue Types**: Standard Queues and FIFO Queues (`.fifo` suffix, `MessageGroupId`, `MessageDeduplicationId`, 5-minute deduplication window).
 
-#### Operations Supported:
-- **Queue Operations**:
-  - `CreateQueue` (`Action=CreateQueue` or JSON `CreateQueue`) - Standard and FIFO queues.
-  - `GetQueueUrl`, `ListQueues`, `GetQueueAttributes`, `SetQueueAttributes`, `DeleteQueue`, `PurgeQueue`.
-- **Message Operations**:
-  - `SendMessage` with message bodies, delay (`DelaySeconds`), message attributes, and FIFO attributes (`MessageGroupId`, `MessageDeduplicationId`).
-  - `SendMessageBatch` (up to 10 messages per batch).
-  - `ReceiveMessage`:
-    - `MaxNumberOfMessages` (1-10)
-    - `VisibilityTimeout` management (in-flight tracking and timeout expiration)
-    - `WaitTimeSeconds` (async long-polling without blocking threads)
-  - `DeleteMessage` & `DeleteMessageBatch` (via receipt handles).
-  - `ChangeMessageVisibility` & `ChangeMessageVisibilityBatch`.
-- **Queue Engine**:
-  - Tokio-native asynchronous timer wheel for visibility timeout expiration.
-  - FIFO deduplication window (5 minutes) and group sequence ordering.
-  - Dead Letter Queue (DLQ) support via `RedrivePolicy` and `maxReceiveCount`.
+### 3.3 Amazon SNS (`ruststack-sns`)
+- **Dual Protocols**: Query Protocol and AWS JSON Protocol (`x-amz-target: AmazonSNS.*`).
+- **Topic Management**: `CreateTopic`, `DeleteTopic`, `ListTopics`, `GetTopicAttributes`, `SetTopicAttributes`.
+- **Subscriptions**: `Subscribe`, `Unsubscribe`, `ListSubscriptions`, `ListSubscriptionsByTopic`, `GetSubscriptionAttributes`, `SetSubscriptionAttributes`.
+- **SQS Fanout**: Automatic zero-latency in-memory fanout from SNS topics to multiple subscribed SQS queues.
+- **Delivery & Filtering**: Standard AWS JSON Notification envelope or `RawMessageDelivery`, with attribute `FilterPolicy` matching.
 
----
-
-## 4. Performance & Benchmarking Architecture
-
-Every feature in RustStack is treated with a **performance-first** mindset. We provide both micro-benchmarks (in-process engine benchmarks) and end-to-end HTTP load benchmarks.
-
-### 4.1 Benchmark Suites
-1. **S3 Benchmarks (`benches/s3_bench.rs`)**:
-   - `PutObject` throughput (1 KB, 64 KB, 1 MB, 10 MB payloads).
-   - `GetObject` read latency and streaming throughput.
-   - `ListObjectsV2` latency on flat and hierarchical bucket keys (1k to 10k objects).
-   - Multipart Upload concurrency and part assembly throughput.
-2. **SQS Benchmarks (`benches/sqs_bench.rs`)**:
-   - `SendMessage` single and batch (10 items) throughput (messages/sec).
-   - `ReceiveMessage` + `DeleteMessage` round-trip consumer latency under high concurrency.
-   - Long-polling efficiency under high idle connection counts (1,000+ waiting consumers).
-   - FIFO queue in-order processing rate under multiple message groups.
-3. **End-to-End Server Load Benchmarks (`benches/e2e_bench.rs` or load runner)**:
-   - Measures raw requests per second (RPS), p50 / p90 / p99 / p99.9 latency, and memory footprint.
-
-### 4.2 GitHub Actions (GHA) Performance Workflow (`.github/workflows/benchmarks.yml`)
-To ensure continuous performance tracking and prevent regressions:
-- **Per-Feature Matrix**: Individual benchmark jobs run for S3 and SQS independently on every push and pull request.
-- **Criterion Output Capture**: Generates JSON & markdown benchmark reports.
-- **Step Summary & PR Comments**: Posts clean performance rating tables with:
-  - Throughput (ops/sec or MB/s)
-  - Latency (p50, p95, p99 in $\mu$s/ms)
-  - Memory consumption (peak RSS)
-  - Comparison vs previous baseline / main branch.
-- **Fail-on-Regression**: Configurable threshold (e.g. warn if regression > 10%, fail if > 25%).
+### 3.4 Amazon EventBridge / CloudWatch Events (`ruststack-eventbridge`)
+- **Event Buses**: `CreateEventBus`, `DeleteEventBus`, `ListEventBuses`, `DescribeEventBus` (with pre-provisioned `default` bus).
+- **Rule Engine**: `PutRule`, `DeleteRule`, `ListRules`, `DescribeRule`, `EnableRule`, `DisableRule`.
+- **Pattern Matching**: Content-based JSON rule matching (`source`, `detail-type`, nested `detail`, prefix matching, anything-but, exists).
+- **Target Dispatching**: `PutTargets`, `RemoveTargets`, `ListTargetsByRule` with automated dispatching to SQS queues and SNS topics on `PutEvents`.
 
 ---
 
-## 5. Workspace Project Structure
+## 4. Performance Rating System & CI Integration
+
+### 4.1 Rating Tiers
+- **Grade A+ (Ultra Fast)**: Latency $p95 < 20\,\mu\text{s}$, Throughput $> 50,000\,\text{ops/s}$.
+- **Grade A (Excellent)**: Latency $p95 < 100\,\mu\text{s}$, Throughput $> 10,000\,\text{ops/s}$.
+- **Grade B+ (Very Good)**: Latency $p95 < 500\,\mu\text{s}$, Throughput $> 2,000\,\text{ops/s}$.
+
+### 4.2 GitHub Actions Benchmark Workflows
+The `benchmarks.yml` workflow tests each service independently across four parallel jobs:
+1. `s3-performance`: S3 micro-benchmarks and rating report.
+2. `sqs-performance`: SQS micro-benchmarks and rating report.
+3. `sns-performance`: SNS publish and SQS fanout rating report.
+4. `eventbridge-performance`: EventBridge rule pattern matching and target dispatch rating report.
+
+Reports are automatically posted to `$GITHUB_STEP_SUMMARY` and uploaded as workflow artifacts (`.md` and `.json`).
+
+---
+
+## 5. Implementation Roadmap
 
 ```
-ruststack/
-├── .github/
-│   └── workflows/
-│       ├── ci.yml                 # Build, test, format, clippy
-│       └── benchmarks.yml         # Individual S3 & SQS GHA benchmark runner
-├── Cargo.toml                     # Cargo workspace definition
-├── crates/
-│   ├── ruststack-core/            # Shared types, SigV4 parser, error models, router
-│   ├── ruststack-s3/              # S3 service implementation, XML codecs, storage
-│   ├── ruststack-sqs/             # SQS service implementation, queue engine, codecs
-│   ├── ruststack-server/          # Main binary, CLI arguments, Axum server integration
-│   └── ruststack-benchmarks/      # Reusable load testing & benchmark harnesses
-├── benches/
-│   ├── s3_bench.rs                # S3 Criterion benchmark suite
-│   ├── sqs_bench.rs               # SQS Criterion benchmark suite
-│   └── e2e_bench.rs               # End-to-End HTTP load benchmark suite
-├── tests/
-│   ├── s3_integration.rs          # S3 integration tests (AWS SDK & HTTP)
-│   └── sqs_integration.rs         # SQS integration tests (AWS SDK & HTTP)
-├── Dockerfile                     # Multi-stage lightweight scratch/alpine container
-└── PLAN.md                        # This document
+  [Phase 1] (Completed)  --->  [Phase 2] (Completed)     --->  [Phase 3] (Next)
+  - S3 (Buckets, Objects)       - SNS Engine & Topics          - DynamoDB Engine
+  - SQS (Query & JSON)          - SQS Fanout                   - SSM & SecretsManager
+  - Unified Gateway             - DLQ Redrive Policies         - STS Identity Mock
+  - GHA Release & Benchmarks    - EventBridge Buses & Rules    - State Reset & Snapshots
 ```
-
----
-
-## 6. Phased Implementation Plan
-
-### Phase 1: Workspace & Core Foundation
-- Initialize Cargo workspace with optimal compiler flags (`lto = "thin"`, `codegen-units = 1`, `opt-level = 3`).
-- Implement `ruststack-core`:
-  - Request dispatcher & service classifier (SigV4, Host, x-amz-target, path).
-  - Common AWS XML/JSON error serializers (`NoSuchBucket`, `NoSuchKey`, `QueueDoesNotExist`, etc.).
-  - Unified HTTP middleware (logging, metrics, tracing, CORS).
-
-### Phase 2: S3 Implementation (`ruststack-s3`)
-- Fast in-memory storage layer using `dashmap` / `parking_lot` / `bytes::Bytes`.
-- Quick-xml based serialization for `ListBucketsResult`, `ListBucketResult`, `DeleteResult`, `CopyObjectResult`.
-- Full HTTP routing for S3 REST API (Path-style & Virtual-hosted style).
-- Range requests, multipart uploads, and ETag calculation.
-- Unit and integration tests with realistic S3 payloads.
-
-### Phase 3: SQS Implementation (`ruststack-sqs`)
-- In-memory queue manager supporting Standard and FIFO queues.
-- Asynchronous message visibility tracker & long-polling wait queue (`tokio::sync::Notify`).
-- Protocol parsers for both SQS Query Form-URL-Encoded and JSON 1.0.
-- XML and JSON response serializers matching AWS SQS specs.
-- Unit and integration tests covering message lifecycle, batch operations, and visibility expiration.
-
-### Phase 4: Server Integration & Binary (`ruststack-server`)
-- Axum router combining S3 and SQS endpoints on port `4566`.
-- Graceful shutdown, CLI configuration flags (`--port`, `--host`, `--data-dir`, `--services`).
-- Health check endpoints (`/_ruststack/health`, `/_ruststack/info`).
-
-### Phase 5: Individual Benchmark Suite & Performance Rating
-- Criterion benchmarks for:
-  - S3 `PutObject`, `GetObject`, `ListObjectsV2` at various sizes.
-  - SQS `SendMessage`, `ReceiveMessage`, `DeleteMessage`, batch operations.
-- Dedicated standalone benchmark CLI / harness to calculate RPS, latency percentiles, and memory usage.
-
-### Phase 6: GitHub Actions Workflows
-- `.github/workflows/ci.yml`: Format, Clippy, Multi-platform builds, Unit & Integration tests.
-- `.github/workflows/benchmarks.yml`: Individual benchmark runs for S3 and SQS, Markdown summary report generation to GitHub Step Summary.

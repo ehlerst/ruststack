@@ -1,6 +1,8 @@
 use bytes::Bytes;
 use clap::Parser;
+use ruststack_eventbridge::{EventBridgeEngine, PutEventsRequestEntry, Target};
 use ruststack_s3::{CompletedPart, InMemoryStorage, S3Storage};
+use ruststack_sns::SnsEngine;
 use ruststack_sqs::{DeleteMessageBatchEntry, SendMessageBatchEntry, SqsEngine};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -385,6 +387,159 @@ pub fn run_sqs_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     results
 }
 
+pub fn run_sns_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let sqs = Arc::new(SqsEngine::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let sns = SnsEngine::new(
+        sqs.clone(),
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    );
+
+    let topic_arn = sns.create_topic("bench-topic", None).unwrap();
+
+    // 1. Publish without subscribers
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let start = Instant::now();
+        sns.publish(
+            &topic_arn,
+            format!("notification body {}", i),
+            Some("Subject".to_string()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "SNS",
+        "Publish",
+        Some("No Subscribers"),
+    ));
+
+    // 2. Publish with 5 SQS Queues Fanout
+    let fanout_topic = sns.create_topic("fanout-topic", None).unwrap();
+    for i in 0..5 {
+        let q = sqs.create_queue(&format!("fanout-q-{}", i), None).unwrap();
+        sns.subscribe(&fanout_topic, "sqs", &q, None).unwrap();
+    }
+
+    let iters_fanout = iterations / 2;
+    let mut latencies = Vec::with_capacity(iters_fanout);
+    let start_total = Instant::now();
+    for i in 0..iters_fanout {
+        let start = Instant::now();
+        sns.publish(
+            &fanout_topic,
+            format!("fanout notification {}", i),
+            Some("Fanout".to_string()),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_fanout * 5,
+        None,
+        "SNS",
+        "PublishWithFanout",
+        Some("5 SQS Subscribers"),
+    ));
+
+    results
+}
+
+pub fn run_eventbridge_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let sqs = Arc::new(SqsEngine::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let sns = Arc::new(SnsEngine::new(
+        sqs.clone(),
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let eb = EventBridgeEngine::new(
+        sqs.clone(),
+        sns.clone(),
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    );
+
+    let queue_url = sqs.create_queue("eb-target-queue", None).unwrap();
+    let queue_attrs = sqs
+        .get_queue_attributes(&queue_url, &["QueueArn".to_string()])
+        .unwrap();
+    let queue_arn = queue_attrs.get("QueueArn").unwrap().clone();
+
+    let pattern = r#"{"source": ["ecommerce.orders"], "detail-type": ["OrderPlaced"]}"#;
+    eb.put_rule(
+        "orders-rule",
+        None,
+        Some(pattern.to_string()),
+        Some("ENABLED"),
+        None,
+        None,
+    )
+    .unwrap();
+    eb.put_targets(
+        "orders-rule",
+        None,
+        vec![Target {
+            id: "sqs-target".to_string(),
+            arn: queue_arn,
+            input: None,
+            input_path: None,
+            role_arn: None,
+        }],
+    )
+    .unwrap();
+
+    // 1. PutEvents (Single Event matching rule and dispatching to SQS)
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let entry = PutEventsRequestEntry {
+            time: None,
+            source: Some("ecommerce.orders".to_string()),
+            resources: None,
+            detail_type: Some("OrderPlaced".to_string()),
+            detail: Some(format!(r#"{{"order_id": {}, "status": "CONFIRMED"}}"#, i)),
+            event_bus_name: None,
+            trace_header: None,
+        };
+        let start = Instant::now();
+        eb.put_events(vec![entry]).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "EventBridge",
+        "PutEvents",
+        Some("Rule Pattern + SQS Target"),
+    ));
+
+    results
+}
+
 fn format_markdown(results: &[BenchmarkResult]) -> String {
     let mut md = String::new();
     md.push_str("# 🚀 RustStack Performance Benchmark Report\n\n");
@@ -442,6 +597,24 @@ fn main() -> anyhow::Result<()> {
         );
         let sqs_res = run_sqs_benchmarks(opts.iterations);
         all_results.extend(sqs_res);
+    }
+
+    if opts.service == "sns" || opts.service == "all" {
+        eprintln!(
+            "Running SNS performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let sns_res = run_sns_benchmarks(opts.iterations);
+        all_results.extend(sns_res);
+    }
+
+    if opts.service == "events" || opts.service == "eventbridge" || opts.service == "all" {
+        eprintln!(
+            "Running EventBridge performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let eb_res = run_eventbridge_benchmarks(opts.iterations);
+        all_results.extend(eb_res);
     }
 
     let output_str = if opts.format == "json" {

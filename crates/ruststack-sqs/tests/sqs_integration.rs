@@ -263,3 +263,167 @@ async fn test_sqs_fifo_queue() {
     let messages = val["Messages"].as_array().unwrap();
     assert_eq!(messages.len(), 1);
 }
+
+#[tokio::test]
+async fn test_sqs_dead_letter_queue_redrive() {
+    let engine = setup_sqs();
+
+    // 1. Create DLQ
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "AmazonSQS.CreateQueue")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(r#"{"QueueName": "poison-dlq"}"#))
+        .unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let dlq_url = val["QueueUrl"].as_str().unwrap();
+
+    // 2. Create Source Queue with RedrivePolicy (maxReceiveCount = 2)
+    let redrive_policy = serde_json::json!({
+        "deadLetterTargetArn": "arn:aws:sqs:us-east-1:000000000000:poison-dlq",
+        "maxReceiveCount": 2
+    });
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "AmazonSQS.CreateQueue")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "QueueName": "source-work-queue",
+                "Attributes": {
+                    "VisibilityTimeout": "1",
+                    "RedrivePolicy": redrive_policy.to_string()
+                }
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let src_url = val["QueueUrl"].as_str().unwrap();
+
+    // 3. Test ListDeadLetterSourceQueues
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "AmazonSQS.ListDeadLetterSourceQueues")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "QueueUrl": dlq_url
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let src_list = val["queueUrls"].as_array().unwrap();
+    assert_eq!(src_list.len(), 1);
+    assert_eq!(src_list[0].as_str().unwrap(), src_url);
+
+    // 4. Send Message to source queue
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "AmazonSQS.SendMessage")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "QueueUrl": src_url,
+                "MessageBody": "poison_pill_payload"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 5. Receive #1 (Visibility Timeout = 1s, don't delete)
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "AmazonSQS.ReceiveMessage")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "QueueUrl": src_url,
+                "VisibilityTimeout": 1
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Wait for visibility timeout to expire
+    tokio::time::sleep(tokio::time::Duration::from_millis(1100)).await;
+
+    // 6. Receive #2 (receive_count becomes 2, visibility expires -> exceeds maxReceiveCount)
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "AmazonSQS.ReceiveMessage")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "QueueUrl": src_url,
+                "VisibilityTimeout": 1
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Wait for visibility timeout to expire again
+    tokio::time::sleep(tokio::time::Duration::from_millis(1100)).await;
+
+    // 7. Receive from Source Queue -> Should now be Empty!
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "AmazonSQS.ReceiveMessage")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "QueueUrl": src_url
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(val["Messages"].as_array().unwrap().len(), 0);
+
+    // 8. Receive from DLQ -> Message should have been automatically redriven to DLQ!
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "AmazonSQS.ReceiveMessage")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "QueueUrl": dlq_url
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let dlq_msgs = val["Messages"].as_array().unwrap();
+    assert_eq!(dlq_msgs.len(), 1);
+    assert_eq!(dlq_msgs[0]["Body"].as_str().unwrap(), "poison_pill_payload");
+}

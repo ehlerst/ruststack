@@ -133,6 +133,21 @@ async fn handle_sqs_json(
             make_json_response(resp_json, StatusCode::OK)
         }
 
+        "ListDeadLetterSourceQueues" => {
+            let queue_url = json_val
+                .get("QueueUrl")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::sqs_bad_request(
+                        "MissingParameter",
+                        "The request must contain the parameter QueueUrl.",
+                    )
+                })?;
+            let list = engine.list_dead_letter_source_queues(queue_url)?;
+            let resp_json = codec::json_list_dead_letter_source_queues_response(&list);
+            make_json_response(resp_json, StatusCode::OK)
+        }
+
         "GetQueueAttributes" => {
             let queue_url = json_val
                 .get("QueueUrl")
@@ -540,6 +555,12 @@ async fn handle_sqs_query(
             let prefix = params.get("QueueNamePrefix").map(|s| s.as_str());
             let list = engine.list_queues(prefix)?;
             let xml_body = codec::xml_list_queues_response(&list, request_id);
+            make_xml_response(xml_body, StatusCode::OK, request_id)
+        }
+
+        "ListDeadLetterSourceQueues" => {
+            let list = engine.list_dead_letter_source_queues(&queue_url)?;
+            let xml_body = codec::xml_list_dead_letter_source_queues_response(&list, request_id);
             make_xml_response(xml_body, StatusCode::OK, request_id)
         }
 

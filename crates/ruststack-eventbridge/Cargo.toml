@@ -1,0 +1,32 @@
+[package]
+name = "ruststack-eventbridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "High-performance Amazon EventBridge (CloudWatch Events) bus, rule evaluation, and target dispatch engine for RustStack"
+
+[dependencies]
+ruststack-core = { path = "../ruststack-core" }
+ruststack-sqs = { path = "../ruststack-sqs" }
+ruststack-sns = { path = "../ruststack-sns" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+form_urlencoded = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+
+[[bench]]
+name = "eventbridge_bench"
+harness = false

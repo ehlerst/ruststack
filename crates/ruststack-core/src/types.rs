@@ -4,6 +4,8 @@ use std::fmt;
 pub enum AwsService {
     S3,
     Sqs,
+    Sns,
+    EventBridge,
     Internal,
     Unknown,
 }
@@ -13,6 +15,8 @@ impl fmt::Display for AwsService {
         match self {
             AwsService::S3 => write!(f, "s3"),
             AwsService::Sqs => write!(f, "sqs"),
+            AwsService::Sns => write!(f, "sns"),
+            AwsService::EventBridge => write!(f, "events"),
             AwsService::Internal => write!(f, "internal"),
             AwsService::Unknown => write!(f, "unknown"),
         }

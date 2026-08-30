@@ -461,3 +461,39 @@ pub fn json_delete_message_batch_response(
         "Failed": fail_vals
     })
 }
+
+pub fn xml_list_dead_letter_source_queues_response(
+    queue_urls: &[String],
+    request_id: &str,
+) -> String {
+    let mut xml = r#"<?xml version="1.0"?>
+<ListDeadLetterSourceQueuesResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+    <ListDeadLetterSourceQueuesResult>"#
+        .to_string();
+
+    for url in queue_urls {
+        xml.push_str(&format!(
+            r#"
+        <QueueUrl>{}</QueueUrl>"#,
+            quick_xml::escape::escape(url)
+        ));
+    }
+
+    xml.push_str(&format!(
+        r#"
+    </ListDeadLetterSourceQueuesResult>
+    <ResponseMetadata>
+        <RequestId>{}</RequestId>
+    </ResponseMetadata>
+</ListDeadLetterSourceQueuesResponse>"#,
+        quick_xml::escape::escape(request_id)
+    ));
+
+    xml
+}
+
+pub fn json_list_dead_letter_source_queues_response(queue_urls: &[String]) -> serde_json::Value {
+    json!({
+        "queueUrls": queue_urls
+    })
+}

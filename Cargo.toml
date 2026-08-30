@@ -4,6 +4,8 @@ members = [
     "crates/ruststack-core",
     "crates/ruststack-s3",
     "crates/ruststack-sqs",
+    "crates/ruststack-sns",
+    "crates/ruststack-eventbridge",
     "crates/ruststack-server",
     "crates/ruststack-benchmarks",
 ]
@@ -21,6 +23,8 @@ readme = "README.md"
 ruststack-core = { path = "crates/ruststack-core" }
 ruststack-s3 = { path = "crates/ruststack-s3" }
 ruststack-sqs = { path = "crates/ruststack-sqs" }
+ruststack-sns = { path = "crates/ruststack-sns" }
+ruststack-eventbridge = { path = "crates/ruststack-eventbridge" }
 
 # Async & HTTP runtime
 tokio = { version = "1.43", features = ["full"] }

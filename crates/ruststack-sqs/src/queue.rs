@@ -42,24 +42,6 @@ impl QueueState {
         }
     }
 
-    fn check_expired_in_flight(&mut self) {
-        let now = Instant::now();
-        let mut expired_keys = Vec::new();
-
-        for (handle, msg) in self.in_flight.iter() {
-            if now >= msg.visible_at {
-                expired_keys.push(handle.clone());
-            }
-        }
-
-        for handle in expired_keys {
-            if let Some(msg) = self.in_flight.remove(&handle) {
-                // If it exceeded maxReceiveCount (if DLQ configured), could route to DLQ
-                self.messages.push_front(msg);
-            }
-        }
-    }
-
     fn purge(&mut self) {
         self.messages.clear();
         self.in_flight.clear();
@@ -88,13 +70,66 @@ impl SqsEngine {
         hex::encode(hasher.finalize())
     }
 
-    fn resolve_queue_name(&self, queue_identifier: &str) -> String {
-        // queue_identifier can be full URL or queue name
+    pub fn resolve_queue_name(&self, queue_identifier: &str) -> String {
+        // queue_identifier can be full URL or queue name or ARN (arn:aws:sqs:us-east-1:000000000000:my-queue)
         let clean = queue_identifier.trim_end_matches('/');
+        if let Some(pos) = clean.rfind(':') {
+            if clean.starts_with("arn:aws:sqs:") {
+                return clean[pos + 1..].to_string();
+            }
+        }
         if let Some(pos) = clean.rfind('/') {
             clean[pos + 1..].to_string()
         } else {
             clean.to_string()
+        }
+    }
+
+    fn parse_redrive_policy(policy_str: &str) -> Option<(String, u32)> {
+        let val: serde_json::Value = serde_json::from_str(policy_str).ok()?;
+        let arn = val
+            .get("deadLetterTargetArn")
+            .and_then(|v| v.as_str())?
+            .to_string();
+        let max_count = val.get("maxReceiveCount").and_then(|v| {
+            v.as_u64()
+                .or_else(|| v.as_str().and_then(|s| s.parse().ok()))
+        })? as u32;
+        Some((arn, max_count))
+    }
+
+    fn process_expired_in_flight(&self, state: &mut QueueState) {
+        let now = Instant::now();
+        let mut expired_keys = Vec::new();
+
+        for (handle, msg) in state.in_flight.iter() {
+            if now >= msg.visible_at {
+                expired_keys.push(handle.clone());
+            }
+        }
+
+        let redrive = state
+            .attributes
+            .redrive_policy
+            .as_deref()
+            .and_then(Self::parse_redrive_policy);
+
+        for handle in expired_keys {
+            if let Some(msg) = state.in_flight.remove(&handle) {
+                if let Some((ref dlq_arn, max_count)) = redrive {
+                    if msg.receive_count >= max_count {
+                        // Route to DLQ!
+                        let dlq_name = self.resolve_queue_name(dlq_arn);
+                        if let Some(dlq_entry) = self.queues.get(&dlq_name) {
+                            let mut dlq_state = dlq_entry.lock();
+                            dlq_state.messages.push_back(msg);
+                            dlq_state.notify.notify_waiters();
+                            continue;
+                        }
+                    }
+                }
+                state.messages.push_front(msg);
+            }
         }
     }
 
@@ -198,6 +233,34 @@ impl SqsEngine {
         Ok(urls)
     }
 
+    pub fn list_dead_letter_source_queues(
+        &self,
+        queue_id: &str,
+    ) -> Result<Vec<String>, RustStackError> {
+        let name = self.resolve_queue_name(queue_id);
+        let target_q = self.queues.get(&name).ok_or_else(|| {
+            RustStackError::sqs_not_found(
+                "AWS.SimpleQueueService.NonExistentQueue",
+                "The specified queue does not exist.",
+            )
+        })?;
+        let target_arn = target_q.lock().arn.clone();
+
+        let mut sources = Vec::new();
+        for item in self.queues.iter() {
+            let state = item.value().lock();
+            if let Some(ref policy_str) = state.attributes.redrive_policy {
+                if let Some((ref dlq_arn, _)) = Self::parse_redrive_policy(policy_str) {
+                    if dlq_arn == &target_arn {
+                        sources.push(state.url.clone());
+                    }
+                }
+            }
+        }
+        sources.sort();
+        Ok(sources)
+    }
+
     pub fn get_queue_attributes(
         &self,
         queue_id: &str,
@@ -212,7 +275,7 @@ impl SqsEngine {
         })?;
 
         let mut state = q.lock();
-        state.check_expired_in_flight();
+        self.process_expired_in_flight(&mut state);
 
         let mut map = HashMap::new();
         let all = attribute_names.is_empty() || attribute_names.iter().any(|a| a == "All");
@@ -456,7 +519,7 @@ impl SqsEngine {
         let errors = Vec::new();
 
         for entry in entries {
-            match self.send_message(
+            if let Ok((msg_id, md5, seq)) = self.send_message(
                 queue_id,
                 entry.message_body,
                 entry.delay_seconds,
@@ -464,17 +527,12 @@ impl SqsEngine {
                 entry.message_group_id,
                 entry.message_deduplication_id,
             ) {
-                Ok((msg_id, md5, seq)) => {
-                    successful.push(SendMessageBatchResultEntry {
-                        id: entry.id,
-                        message_id: msg_id,
-                        md5_of_message_body: md5,
-                        sequence_number: seq,
-                    });
-                }
-                Err(_) => {
-                    // Collect batch error
-                }
+                successful.push(SendMessageBatchResultEntry {
+                    id: entry.id,
+                    message_id: msg_id,
+                    md5_of_message_body: md5,
+                    sequence_number: seq,
+                });
             }
         }
 
@@ -508,7 +566,7 @@ impl SqsEngine {
         loop {
             {
                 let mut state = q.lock();
-                state.check_expired_in_flight();
+                self.process_expired_in_flight(&mut state);
 
                 if !state.messages.is_empty() {
                     let vt = visibility_timeout_opt.unwrap_or(state.attributes.visibility_timeout);

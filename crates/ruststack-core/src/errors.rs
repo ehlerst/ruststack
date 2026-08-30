@@ -26,6 +26,20 @@ pub enum RustStackError {
         status: StatusCode,
         error_type: String, // "Sender" or "Receiver"
     },
+
+    #[error("SNS Error [{code}]: {message}")]
+    Sns {
+        code: String,
+        message: String,
+        status: StatusCode,
+    },
+
+    #[error("EventBridge Error [{code}]: {message}")]
+    EventBridge {
+        code: String,
+        message: String,
+        status: StatusCode,
+    },
 }
 
 impl RustStackError {
@@ -62,6 +76,38 @@ impl RustStackError {
             message: message.into(),
             status: StatusCode::NOT_FOUND,
             error_type: "Sender".to_string(),
+        }
+    }
+
+    pub fn sns_bad_request(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::Sns {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::BAD_REQUEST,
+        }
+    }
+
+    pub fn sns_not_found(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::Sns {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::NOT_FOUND,
+        }
+    }
+
+    pub fn eventbridge_bad_request(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::EventBridge {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::BAD_REQUEST,
+        }
+    }
+
+    pub fn eventbridge_not_found(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::EventBridge {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::NOT_FOUND,
         }
     }
 
@@ -152,6 +198,58 @@ impl RustStackError {
         })
     }
 
+    pub fn to_sns_xml(&self, request_id: &str) -> String {
+        let (code, message) = match self {
+            Self::Sns { code, message, .. } => (code.as_str(), message.as_str()),
+            Self::NotFound(msg) => ("NotFound", msg.as_str()),
+            Self::BadRequest(msg) => ("InvalidParameter", msg.as_str()),
+            _ => ("InternalError", "An internal error occurred."),
+        };
+
+        format!(
+            r#"<?xml version="1.0"?>
+<ErrorResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
+    <Error>
+        <Type>Sender</Type>
+        <Code>{}</Code>
+        <Message>{}</Message>
+    </Error>
+    <RequestId>{}</RequestId>
+</ErrorResponse>"#,
+            quick_xml::escape::escape(code),
+            quick_xml::escape::escape(message),
+            quick_xml::escape::escape(request_id)
+        )
+    }
+
+    pub fn to_sns_json(&self) -> serde_json::Value {
+        let (code, message) = match self {
+            Self::Sns { code, message, .. } => (code.as_str(), message.as_str()),
+            Self::NotFound(msg) => ("NotFound", msg.as_str()),
+            Self::BadRequest(msg) => ("InvalidParameter", msg.as_str()),
+            _ => ("InternalError", "An internal error occurred."),
+        };
+
+        serde_json::json!({
+            "__type": code,
+            "message": message
+        })
+    }
+
+    pub fn to_eventbridge_json(&self) -> serde_json::Value {
+        let (code, message) = match self {
+            Self::EventBridge { code, message, .. } => (code.as_str(), message.as_str()),
+            Self::NotFound(msg) => ("ResourceNotFoundException", msg.as_str()),
+            Self::BadRequest(msg) => ("InvalidParameterValueException", msg.as_str()),
+            _ => ("InternalException", "An internal error occurred."),
+        };
+
+        serde_json::json!({
+            "__type": code,
+            "message": message
+        })
+    }
+
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::NotFound(_) => StatusCode::NOT_FOUND,
@@ -159,6 +257,8 @@ impl RustStackError {
             Self::Internal(_) => StatusCode::INTERNAL_SERVER_ERROR,
             Self::S3 { status, .. } => *status,
             Self::Sqs { status, .. } => *status,
+            Self::Sns { status, .. } => *status,
+            Self::EventBridge { status, .. } => *status,
         }
     }
 }
