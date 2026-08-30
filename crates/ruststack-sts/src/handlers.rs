@@ -41,7 +41,7 @@ impl StsEngine {
 
         let access_key_id = format!(
             "ASIA{}",
-            &uuid::Uuid::new_v4().to_string().replace('-', "")[..16].to_uppercase()
+            uuid::Uuid::new_v4().to_string().replace('-', "")[..16].to_uppercase()
         );
         let secret_access_key = uuid::Uuid::new_v4().to_string();
         let session_token = format!("mock-sts-session-token-{}", uuid::Uuid::new_v4());
@@ -75,7 +75,7 @@ impl StsEngine {
         Credentials {
             access_key_id: format!(
                 "ASIA{}",
-                &uuid::Uuid::new_v4().to_string().replace('-', "")[..16].to_uppercase()
+                uuid::Uuid::new_v4().to_string().replace('-', "")[..16].to_uppercase()
             ),
             secret_access_key: uuid::Uuid::new_v4().to_string(),
             session_token: format!("mock-session-token-{}", uuid::Uuid::new_v4()),
