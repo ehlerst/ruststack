@@ -265,7 +265,7 @@ impl DynamoDbEngine {
         let max_items = limit.unwrap_or(usize::MAX);
         let forward = scan_index_forward.unwrap_or(true);
 
-        for (_pk, item) in table.items.iter() {
+        for item in table.items.values() {
             scanned_count += 1;
             if evaluate_expression(key_condition_expr, item, attr_names, attr_values) {
                 let matches_filter = match filter_expr {
@@ -318,7 +318,7 @@ impl DynamoDbEngine {
         let mut scanned_count = 0;
         let max_items = limit.unwrap_or(usize::MAX);
 
-        for (_pk, item) in table.items.iter() {
+        for item in table.items.values() {
             scanned_count += 1;
             let matches_filter = match filter_expr {
                 Some(f) => evaluate_expression(f, item, attr_names, attr_values),
