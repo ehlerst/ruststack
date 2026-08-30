@@ -1,6 +1,6 @@
 # ⚡ RustStack
 
-> **LocalStack / Ministack alternative in Rust — built for ultra-low latency, blazing throughput, and sub-millisecond execution.**
+> **Blazing-fast local AWS emulator in Rust: 1.6 MB memory footprint, 500ms cold-start & 20x lighter than MiniStack / LocalStack.**
 
 [![CI](https://github.com/ruststack/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/ci.yml)
 [![Performance Benchmarks](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml)
@@ -9,24 +9,24 @@
 [![Docker Image](https://img.shields.io/badge/docker-ehlers320%2Fruststack-blue.svg)](https://hub.docker.com/r/ehlers320/ruststack)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-RustStack is a high-performance local AWS emulator designed for instant local development, automated integration testing, and rapid CI/CD test runners. It is delivered as a single lightweight binary with zero runtime dependencies and official multi-arch Docker images.
+RustStack is an ultra-fast, lightweight local AWS cloud emulator designed for instant local development, automated integration testing, and sub-second CI/CD test runners. It is delivered as a single zero-dependency static binary with official multi-arch Docker images.
 
 ---
 
 ## ⚡ Resource & Startup Benchmark (RustStack vs MiniStack vs LocalStack)
 
-Automated container startup time, idle memory footprint, and image size measured via [`Testcontainers/rust-measure-alternatives/`](file:///home/tim/git/ruststack/Testcontainers/rust-measure-alternatives/):
+Continuous automated container startup time, idle memory footprint, and image size measured on GitHub Actions runners via [`Testcontainers/rust-measure-alternatives/`](file:///home/tim/git/ruststack/Testcontainers/rust-measure-alternatives/):
 
 | Local Cloud Stack | Docker Image | Image Size | Avg Startup Time | Min Startup Time | Idle Memory (RSS) | Idle CPU |
 |:---|:---|---:|---:|---:|---:|---:|
-| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **101.4 MB** | **240.2 ms** | **226.4 ms** | **2.0 MiB** | **0.00%** |
-| **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 1,607.6 ms | 1,586.5 ms | 33.6 MiB | 0.00% |
-| **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 3,990.0 ms | 3,972.2 ms | 419.2 MiB | 25.80% |
+| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **92.9 MB** | **977.3 ms** | **548.9 ms** | **1.6 MiB** | **0.00%** |
+| **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 2,172.4 ms | 2,025.6 ms | 34.3 MiB | 0.00% |
+| **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 2,995.1 ms | 2,830.6 ms | 400.7 MiB | 25.80% |
 
-### 🚀 RustStack Advantages
-- **Startup Speed**: **6.7x faster** than MiniStack (240 ms vs 1,608 ms) and **16.6x faster** than LocalStack (3,990 ms).
-- **Memory Footprint**: **16.8x less memory** than MiniStack (2.0 MiB vs 33.6 MiB) and **209.6x less memory** than LocalStack (419.2 MiB).
-- **Docker Image Size**: **1.7x smaller** than MiniStack and **11.9x smaller** than LocalStack.
+### 🚀 RustStack Benchmark Findings
+- **Memory Footprint**: **21.4x less memory** than MiniStack (1.6 MiB vs 34.3 MiB) and **250.4x less memory** than LocalStack (400.7 MiB).
+- **Cold-Start Startup Speed**: **3.7x faster** than MiniStack (548.9 ms vs 2,025.6 ms) and **5.2x faster** than LocalStack (2,830.6 ms).
+- **Docker Image Size**: **1.9x smaller** than MiniStack (92.9 MB vs 175.9 MB) and **13.0x smaller** than LocalStack (1,204.1 MB).
 
 ---
 
