@@ -52,15 +52,11 @@ jobs:
           - target: aarch64-unknown-linux-musl
             os: ubuntu-latest
 
-          # macOS targets
-          - target: x86_64-apple-darwin
-            os: macos-latest
+          # macOS targets (Apple Silicon & Intel)
           - target: aarch64-apple-darwin
             os: macos-latest
-
-          # Windows target
-          - target: x86_64-pc-windows-msvc
-            os: windows-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
 
     steps:
       - name: Checkout
@@ -79,32 +75,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Package (Unix)
-        if: runner.os != 'Windows'
+      - name: Package
         run: |
           cd target/${{ matrix.target }}/release
           tar czf ../../../ruststack-${{ matrix.target }}.tar.gz ruststack
 
-      - name: Package (Windows)
-        if: runner.os == 'Windows'
-        shell: bash
-        run: |
-          cd target/${{ matrix.target }}/release
-          7z a ../../../ruststack-${{ matrix.target }}.zip ruststack.exe
-
-      - name: Upload Artifact (Unix)
-        if: runner.os != 'Windows'
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: ruststack-${{ matrix.target }}
           path: ruststack-${{ matrix.target }}.tar.gz
-
-      - name: Upload Artifact (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ruststack-${{ matrix.target }}
-          path: ruststack-${{ matrix.target }}.zip
 
   release:
     name: Create Release
@@ -125,6 +105,5 @@ jobs:
         with:
           files: |
             artifacts/**/*.tar.gz
-            artifacts/**/*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

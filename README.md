@@ -4,6 +4,7 @@
 
 [![CI](https://github.com/ruststack/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/ci.yml)
 [![Performance Benchmarks](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml)
+[![Release](https://github.com/ruststack/ruststack/actions/workflows/release.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/release.yml)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
 RustStack is a high-performance local AWS emulator designed for instant local development, automated integration testing, and rapid CI/CD test runners. It is delivered as a single lightweight binary with zero runtime dependencies.
@@ -43,16 +44,24 @@ Automated in-memory performance rating on standard developer hardware:
 
 ## 🚀 Quick Start
 
-### Run via Cargo
+### Run on Linux & macOS
 ```bash
+# Build and run directly with cargo
 cargo run --release -p ruststack-server -- --port 4566
 ```
 
-### Run via Docker
-```bash
-docker build -t ruststack .
-docker run -p 4566:4566 ruststack
-```
+### Windows Users: Use WSL2
+Native Windows targets are not supported directly. Windows users should use **WSL2 (Windows Subsystem for Linux)**:
+1. Open PowerShell and install WSL if not already installed:
+   ```powershell
+   wsl --install
+   ```
+2. In your WSL terminal (e.g. Ubuntu):
+   ```bash
+   # Download and extract the Linux binary from Releases, or run via cargo:
+   cargo run --release -p ruststack-server -- --port 4566
+   ```
+3. RustStack is immediately accessible from both WSL and Windows host at `http://localhost:4566`.
 
 ---
 
