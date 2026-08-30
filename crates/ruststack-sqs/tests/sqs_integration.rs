@@ -23,7 +23,7 @@ async fn test_sqs_query_protocol_lifecycle() {
         .header("content-type", "application/x-www-form-urlencoded")
         .body(Body::from("Action=CreateQueue&QueueName=test-query-queue"))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
@@ -40,7 +40,7 @@ async fn test_sqs_query_protocol_lifecycle() {
             "Action=SendMessage&QueueUrl=http://localhost:4566/000000000000/test-query-queue&MessageBody=HelloFromRustStack",
         ))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
@@ -55,7 +55,7 @@ async fn test_sqs_query_protocol_lifecycle() {
             "Action=ReceiveMessage&QueueUrl=http://localhost:4566/000000000000/test-query-queue&MaxNumberOfMessages=1",
         ))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
@@ -78,7 +78,7 @@ async fn test_sqs_query_protocol_lifecycle() {
             receipt_handle
         )))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
     // 5. Receive again -> Empty
@@ -90,7 +90,7 @@ async fn test_sqs_query_protocol_lifecycle() {
             "Action=ReceiveMessage&QueueUrl=http://localhost:4566/000000000000/test-query-queue&MaxNumberOfMessages=1",
         ))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
@@ -109,7 +109,7 @@ async fn test_sqs_json_protocol_lifecycle() {
         .header("content-type", "application/x-amz-json-1.0")
         .body(Body::from(r#"{"QueueName": "json-queue"}"#))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let val: Value = serde_json::from_slice(&body).unwrap();
@@ -133,7 +133,7 @@ async fn test_sqs_json_protocol_lifecycle() {
         .header("content-type", "application/x-amz-json-1.0")
         .body(Body::from(send_body.to_string()))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let val: Value = serde_json::from_slice(&body).unwrap();
@@ -154,7 +154,7 @@ async fn test_sqs_json_protocol_lifecycle() {
             .to_string(),
         ))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let val: Value = serde_json::from_slice(&body).unwrap();
@@ -182,7 +182,7 @@ async fn test_sqs_json_protocol_lifecycle() {
             .to_string(),
         ))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 }
 
@@ -198,7 +198,7 @@ async fn test_sqs_fifo_queue() {
         .header("content-type", "application/x-amz-json-1.0")
         .body(Body::from(r#"{"QueueName": "orders.fifo", "Attributes": {"FifoQueue": "true", "ContentBasedDeduplication": "true"}}"#))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let val: Value = serde_json::from_slice(&body).unwrap();
@@ -220,7 +220,7 @@ async fn test_sqs_fifo_queue() {
             .to_string(),
         ))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
     // Send duplicate message
@@ -239,7 +239,7 @@ async fn test_sqs_fifo_queue() {
             .to_string(),
         ))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
     // Receive -> only 1 message should be present
@@ -256,7 +256,7 @@ async fn test_sqs_fifo_queue() {
             .to_string(),
         ))
         .unwrap();
-    let resp = handle_sqs_request(engine.clone(), req).await.unwrap();
+    let resp = handle_sqs_request(engine.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let val: Value = serde_json::from_slice(&body).unwrap();

@@ -106,25 +106,13 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
     let service = Dispatcher::classify_request(&method, &uri, &headers, None);
 
     match service {
-        AwsService::S3 => match handle_s3_request(state.s3_storage.clone(), req).await {
-            Ok(resp) => resp,
-            Err(err_resp) => err_resp,
-        },
-        AwsService::Sqs => match handle_sqs_request(state.sqs_engine.clone(), req).await {
-            Ok(resp) => resp,
-            Err(err_resp) => err_resp,
-        },
+        AwsService::S3 => handle_s3_request(state.s3_storage.clone(), req).await,
+        AwsService::Sqs => handle_sqs_request(state.sqs_engine.clone(), req).await,
         AwsService::Internal => Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "application/json")
             .body(Body::from(r#"{"status":"healthy","service":"ruststack"}"#))
             .unwrap(),
-        AwsService::Unknown => {
-            // Default to S3
-            match handle_s3_request(state.s3_storage.clone(), req).await {
-                Ok(resp) => resp,
-                Err(err_resp) => err_resp,
-            }
-        }
+        AwsService::Unknown => handle_s3_request(state.s3_storage.clone(), req).await,
     }
 }

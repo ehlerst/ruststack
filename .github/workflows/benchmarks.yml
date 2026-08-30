@@ -30,7 +30,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run S3 Criterion Micro-benchmarks
-        run: cargo bench -p ruststack-s3 -- --verbose
+        run: cargo bench -p ruststack-s3
 
       - name: Run S3 Performance Rating Suite
         run: |
@@ -71,7 +71,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Run SQS Criterion Micro-benchmarks
-        run: cargo bench -p ruststack-sqs -- --verbose
+        run: cargo bench -p ruststack-sqs
 
       - name: Run SQS Performance Rating Suite
         run: |

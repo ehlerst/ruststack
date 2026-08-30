@@ -12,24 +12,12 @@ use std::sync::Arc;
 pub async fn handle_sqs_request(
     engine: Arc<SqsEngine>,
     req: Request<Body>,
-) -> Result<Response<Body>, Response<Body>> {
+) -> Response<Body> {
     let request_id = uuid::Uuid::new_v4().to_string();
     let (parts, body) = req.into_parts();
     let method = parts.method;
     let uri = parts.uri;
     let headers = parts.headers;
-
-    let body_bytes = body
-        .collect()
-        .await
-        .map_err(|e| {
-            make_sqs_error_response(
-                &RustStackError::BadRequest(e.to_string()),
-                &request_id,
-                false,
-            )
-        })?
-        .to_bytes();
 
     let is_json_proto = headers
         .get("x-amz-target")
@@ -42,31 +30,26 @@ pub async fn handle_sqs_request(
             .map(|t| t.contains("application/x-amz-json-1.0"))
             .unwrap_or(false);
 
+    let body_bytes = match body.collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(e) => {
+            return make_sqs_error_response(
+                &RustStackError::BadRequest(e.to_string()),
+                &request_id,
+                is_json_proto,
+            );
+        }
+    };
+
     let result = if is_json_proto {
-        handle_sqs_json(
-            engine.as_ref(),
-            &method,
-            &uri,
-            &headers,
-            &body_bytes,
-            &request_id,
-        )
-        .await
+        handle_sqs_json(engine.as_ref(), &method, &uri, &headers, &body_bytes, &request_id).await
     } else {
-        handle_sqs_query(
-            engine.as_ref(),
-            &method,
-            &uri,
-            &headers,
-            &body_bytes,
-            &request_id,
-        )
-        .await
+        handle_sqs_query(engine.as_ref(), &method, &uri, &headers, &body_bytes, &request_id).await
     };
 
     match result {
-        Ok(res) => Ok(res),
-        Err(err) => Err(make_sqs_error_response(&err, &request_id, is_json_proto)),
+        Ok(res) => res,
+        Err(err) => make_sqs_error_response(&err, &request_id, is_json_proto),
     }
 }
 

@@ -18,7 +18,7 @@ async fn test_bucket_lifecycle() {
         .uri("/test-bucket")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
     // 2. Head Bucket
@@ -27,7 +27,7 @@ async fn test_bucket_lifecycle() {
         .uri("/test-bucket")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
     // 3. List Buckets
@@ -36,7 +36,7 @@ async fn test_bucket_lifecycle() {
         .uri("/")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
@@ -48,7 +48,7 @@ async fn test_bucket_lifecycle() {
         .uri("/test-bucket")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 
     // 5. Head Bucket should 404
@@ -57,7 +57,7 @@ async fn test_bucket_lifecycle() {
         .uri("/test-bucket")
         .body(Body::empty())
         .unwrap();
-    let resp_err = handle_s3_request(storage.clone(), req).await.unwrap_err();
+    let resp_err = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp_err.status(), StatusCode::NOT_FOUND);
 }
 
@@ -71,7 +71,7 @@ async fn test_object_crud_and_range() {
         .uri("/my-bucket")
         .body(Body::empty())
         .unwrap();
-    let _ = handle_s3_request(storage.clone(), req).await.unwrap();
+    let _ = handle_s3_request(storage.clone(), req).await;
 
     // Put Object
     let req = Request::builder()
@@ -81,7 +81,7 @@ async fn test_object_crud_and_range() {
         .header("x-amz-meta-custom", "rust-rocks")
         .body(Body::from("Hello, RustStack!"))
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     assert!(resp.headers().contains_key("etag"));
 
@@ -91,12 +91,9 @@ async fn test_object_crud_and_range() {
         .uri("/my-bucket/hello.txt")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(
-        resp.headers().get("x-amz-meta-custom").unwrap(),
-        "rust-rocks"
-    );
+    assert_eq!(resp.headers().get("x-amz-meta-custom").unwrap(), "rust-rocks");
     assert_eq!(resp.headers().get("content-length").unwrap(), "17");
 
     // Get Object Full
@@ -105,7 +102,7 @@ async fn test_object_crud_and_range() {
         .uri("/my-bucket/hello.txt")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     assert_eq!(body.as_ref(), b"Hello, RustStack!");
@@ -117,7 +114,7 @@ async fn test_object_crud_and_range() {
         .header("range", "bytes=0-4")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::PARTIAL_CONTENT);
     assert_eq!(resp.headers().get("content-range").unwrap(), "bytes 0-4/17");
     let body = resp.into_body().collect().await.unwrap().to_bytes();
@@ -129,7 +126,7 @@ async fn test_object_crud_and_range() {
         .uri("/my-bucket/hello.txt")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::NO_CONTENT);
 }
 
@@ -138,12 +135,8 @@ async fn test_list_objects_v2() {
     let storage = setup_s3();
 
     // Create bucket
-    let req = Request::builder()
-        .method(Method::PUT)
-        .uri("/data-bucket")
-        .body(Body::empty())
-        .unwrap();
-    let _ = handle_s3_request(storage.clone(), req).await.unwrap();
+    let req = Request::builder().method(Method::PUT).uri("/data-bucket").body(Body::empty()).unwrap();
+    let _ = handle_s3_request(storage.clone(), req).await;
 
     // Insert 5 objects
     for i in 1..=5 {
@@ -152,7 +145,7 @@ async fn test_list_objects_v2() {
             .uri(format!("/data-bucket/file_{}.txt", i))
             .body(Body::from(format!("content {}", i)))
             .unwrap();
-        let _ = handle_s3_request(storage.clone(), req).await.unwrap();
+        let _ = handle_s3_request(storage.clone(), req).await;
     }
 
     // List objects
@@ -161,7 +154,7 @@ async fn test_list_objects_v2() {
         .uri("/data-bucket?list-type=2&max-keys=3")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
@@ -176,12 +169,8 @@ async fn test_multipart_upload_lifecycle() {
     let storage = setup_s3();
 
     // Create bucket
-    let req = Request::builder()
-        .method(Method::PUT)
-        .uri("/mp-bucket")
-        .body(Body::empty())
-        .unwrap();
-    let _ = handle_s3_request(storage.clone(), req).await.unwrap();
+    let req = Request::builder().method(Method::PUT).uri("/mp-bucket").body(Body::empty()).unwrap();
+    let _ = handle_s3_request(storage.clone(), req).await;
 
     // 1. Initiate Multipart
     let req = Request::builder()
@@ -189,55 +178,31 @@ async fn test_multipart_upload_lifecycle() {
         .uri("/mp-bucket/large.bin?uploads")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
-    let upload_id = xml
-        .split("<UploadId>")
-        .nth(1)
-        .unwrap()
-        .split("</UploadId>")
-        .next()
-        .unwrap();
+    let upload_id = xml.split("<UploadId>").nth(1).unwrap().split("</UploadId>").next().unwrap();
 
     // 2. Upload Part 1
     let req = Request::builder()
         .method(Method::PUT)
-        .uri(format!(
-            "/mp-bucket/large.bin?uploadId={}&partNumber=1",
-            upload_id
-        ))
+        .uri(format!("/mp-bucket/large.bin?uploadId={}&partNumber=1", upload_id))
         .body(Body::from("PART_ONE_DATA_"))
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    let etag1 = resp
-        .headers()
-        .get("etag")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
+    let etag1 = resp.headers().get("etag").unwrap().to_str().unwrap().to_string();
 
     // 3. Upload Part 2
     let req = Request::builder()
         .method(Method::PUT)
-        .uri(format!(
-            "/mp-bucket/large.bin?uploadId={}&partNumber=2",
-            upload_id
-        ))
+        .uri(format!("/mp-bucket/large.bin?uploadId={}&partNumber=2", upload_id))
         .body(Body::from("PART_TWO_DATA"))
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    let etag2 = resp
-        .headers()
-        .get("etag")
-        .unwrap()
-        .to_str()
-        .unwrap()
-        .to_string();
+    let etag2 = resp.headers().get("etag").unwrap().to_str().unwrap().to_string();
 
     // 4. List Parts
     let req = Request::builder()
@@ -245,7 +210,7 @@ async fn test_multipart_upload_lifecycle() {
         .uri(format!("/mp-bucket/large.bin?uploadId={}", upload_id))
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
@@ -271,7 +236,7 @@ async fn test_multipart_upload_lifecycle() {
         .uri(format!("/mp-bucket/large.bin?uploadId={}", upload_id))
         .body(Body::from(complete_xml))
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
     // 6. Verify concatenated object
@@ -280,7 +245,7 @@ async fn test_multipart_upload_lifecycle() {
         .uri("/mp-bucket/large.bin")
         .body(Body::empty())
         .unwrap();
-    let resp = handle_s3_request(storage.clone(), req).await.unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     assert_eq!(body.as_ref(), b"PART_ONE_DATA_PART_TWO_DATA");

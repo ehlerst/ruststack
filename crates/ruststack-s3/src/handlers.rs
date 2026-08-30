@@ -12,20 +12,22 @@ use std::sync::Arc;
 pub async fn handle_s3_request(
     storage: Arc<dyn S3Storage>,
     req: Request<Body>,
-) -> Result<Response<Body>, Response<Body>> {
+) -> Response<Body> {
     let request_id = uuid::Uuid::new_v4().to_string();
     let (parts, body) = req.into_parts();
     let method = parts.method;
     let uri = parts.uri;
     let headers = parts.headers;
 
-    let body_bytes = body
-        .collect()
-        .await
-        .map_err(|e| {
-            make_s3_error_response(&RustStackError::BadRequest(e.to_string()), &request_id)
-        })?
-        .to_bytes();
+    let body_bytes = match body.collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(e) => {
+            return make_s3_error_response(
+                &RustStackError::BadRequest(e.to_string()),
+                &request_id,
+            );
+        }
+    };
 
     let (bucket_opt, key_opt) = extract_bucket_and_key(&uri, &headers);
     let query_map = parse_query(uri.query());
@@ -42,8 +44,8 @@ pub async fn handle_s3_request(
     );
 
     match result {
-        Ok(res) => Ok(res),
-        Err(err) => Err(make_s3_error_response(&err, &request_id)),
+        Ok(res) => res,
+        Err(err) => make_s3_error_response(&err, &request_id),
     }
 }
 
