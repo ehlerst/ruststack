@@ -1,4 +1,4 @@
-use crate::types::{AssumedRoleUser, Credentials, GetCallerIdentityResult};
+use crate::types::{AssumedRoleUser, Credentials, GetCallerIdentityResult, StsSnapshot};
 use axum::body::Body;
 use axum::http::{HeaderMap, Method, Request, Response, StatusCode, Uri};
 use chrono::{Duration, Utc};
@@ -17,6 +17,18 @@ impl StsEngine {
     pub fn new(account_id: String, region: String) -> Self {
         Self { account_id, region }
     }
+
+    pub fn reset(&self) {}
+
+    pub fn dump_state(&self) -> StsSnapshot {
+        StsSnapshot {
+            account_id: self.account_id.clone(),
+            user_id: self.account_id.clone(),
+            arn: format!("arn:aws:iam::{}:root", self.account_id),
+        }
+    }
+
+    pub fn load_state(&self, _snapshot: StsSnapshot) {}
 
     pub fn get_caller_identity(&self, caller_arn_opt: Option<&str>) -> GetCallerIdentityResult {
         let arn = caller_arn_opt

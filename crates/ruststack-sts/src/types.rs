@@ -21,3 +21,11 @@ pub struct GetCallerIdentityResult {
     pub arn: String,
     pub user_id: String,
 }
+
+// Snapshot Structures
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct StsSnapshot {
+    pub account_id: String,
+    pub user_id: String,
+    pub arn: String,
+}

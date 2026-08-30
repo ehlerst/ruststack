@@ -1,7 +1,7 @@
 use crate::types::{
     BatchErrorEntry, ChangeMessageVisibilityBatchEntry, DeleteMessageBatchEntry,
-    MessageAttributeValue, QueueAttributes, SendMessageBatchEntry, SendMessageBatchResultEntry,
-    SqsMessage,
+    MessageAttributeValue, QueueAttributes, QueueSnapshot, SendMessageBatchEntry,
+    SendMessageBatchResultEntry, SqsMessage, SqsMessageSnapshot, SqsSnapshot,
 };
 use chrono::Utc;
 use dashmap::DashMap;
@@ -707,5 +707,52 @@ impl SqsEngine {
         }
 
         Ok((successful, errors))
+    }
+
+    pub fn reset(&self) {
+        self.queues.clear();
+    }
+
+    pub fn dump_state(&self) -> SqsSnapshot {
+        let mut qs = Vec::new();
+        for entry in self.queues.iter() {
+            let queue = entry.value();
+            let state = queue.lock();
+            let mut msgs: Vec<SqsMessageSnapshot> = state
+                .messages
+                .iter()
+                .map(SqsMessageSnapshot::from)
+                .collect();
+            for m in state.in_flight.values() {
+                msgs.push(m.into());
+            }
+            qs.push(QueueSnapshot {
+                url: state.url.clone(),
+                name: state.name.clone(),
+                arn: state.arn.clone(),
+                attributes: state.attributes.clone(),
+                messages: msgs,
+            });
+        }
+        SqsSnapshot { queues: qs }
+    }
+
+    pub fn load_state(&self, snapshot: SqsSnapshot) {
+        self.queues.clear();
+        for q_snap in snapshot.queues {
+            let state = QueueState {
+                name: q_snap.name.clone(),
+                url: q_snap.url.clone(),
+                arn: q_snap.arn.clone(),
+                attributes: q_snap.attributes,
+                messages: q_snap.messages.into_iter().map(Into::into).collect(),
+                in_flight: HashMap::new(),
+                dedup_cache: HashMap::new(),
+                sequence_counter: 0,
+                notify: Arc::new(Notify::new()),
+            };
+            self.queues
+                .insert(q_snap.name.clone(), Arc::new(Mutex::new(state)));
+        }
     }
 }

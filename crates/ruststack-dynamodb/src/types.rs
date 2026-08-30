@@ -205,3 +205,15 @@ pub struct QueryOutput {
     pub count: usize,
     pub scanned_count: usize,
 }
+
+// Snapshot Structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableSnapshot {
+    pub description: TableDescription,
+    pub items: Vec<HashMap<String, AttributeValue>>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct DynamoDbSnapshot {
+    pub tables: Vec<TableSnapshot>,
+}

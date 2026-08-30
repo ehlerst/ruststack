@@ -87,6 +87,47 @@ Automated in-memory performance rating on standard developer hardware:
 
 ---
 
+## 💾 State Management & Deterministic Testing API
+
+RustStack provides instant state control plane endpoints for integration test isolation, snapshotting, and CI/CD deterministic runs:
+
+### 1. Atomic State Reset (`POST /_ruststack/state/reset`)
+```bash
+# Wipe all 8 services completely
+curl -X POST http://localhost:4566/_ruststack/state/reset
+
+# Selectively reset only S3 and SQS
+curl -X POST http://localhost:4566/_ruststack/state/reset \
+  -H "Content-Type: application/json" \
+  -d '{"services": ["s3", "sqs"]}'
+```
+
+### 2. Full State Dump (`GET` or `POST /_ruststack/state/dump`)
+```bash
+# Export cluster snapshot as JSON payload
+curl http://localhost:4566/_ruststack/state/dump > my-state.json
+
+# Or tell RustStack to write directly to a file
+curl -X POST http://localhost:4566/_ruststack/state/dump \
+  -H "Content-Type: application/json" \
+  -d '{"file_path": "/tmp/cluster-state.json"}'
+```
+
+### 3. State Restoration (`POST /_ruststack/state/load`)
+```bash
+# Load state directly from JSON payload
+curl -X POST http://localhost:4566/_ruststack/state/load \
+  -H "Content-Type: application/json" \
+  -d @my-state.json
+
+# Or load from an existing file path
+curl -X POST http://localhost:4566/_ruststack/state/load \
+  -H "Content-Type: application/json" \
+  -d '{"file_path": "/tmp/cluster-state.json"}'
+```
+
+---
+
 ## 🚀 Quick Start
 
 ### Run with Docker
@@ -204,7 +245,25 @@ aws --endpoint-url=http://localhost:4566 secretsmanager create-secret \
 
 ---
 
-## 🧪 Pure Rust Native AWS Compatibility Test Suite
+## 🧪 Testcontainers Integration (Go & Rust)
+
+### Go Testcontainers Example
+Explore [`Testcontainers/go-testcontainers/`](file:///home/tim/git/ruststack/Testcontainers/go-testcontainers/):
+```bash
+cd Testcontainers/go-testcontainers
+go test -v .
+```
+
+### Rust Testcontainers Example
+Explore [`Testcontainers/rust-testcontainers/`](file:///home/tim/git/ruststack/Testcontainers/rust-testcontainers/):
+```bash
+cd Testcontainers/rust-testcontainers
+cargo test -- --ignored
+```
+
+---
+
+## 📊 Pure Rust AWS Compatibility Test Suite
 
 RustStack features a 100% pure Rust integration and compatibility test suite (`crates/ruststack-compat-tests`) providing full feature parity testing without any Python runtime dependencies:
 
@@ -214,31 +273,4 @@ cargo test --workspace
 
 # Run only the AWS Compatibility test suite
 cargo test -p ruststack-compat-tests
-```
-
----
-
-## 📊 Performance Testing & Benchmarking
-
-Every feature in RustStack comes with dedicated benchmarks and GitHub Actions CI rating workflows.
-
-```bash
-# Rate all 8 services
-cargo run --release -p ruststack-benchmarks -- --iterations 10000
-
-# Rate only specific services
-cargo run --release -p ruststack-benchmarks -- --service dynamodb --iterations 10000
-cargo run --release -p ruststack-benchmarks -- --service ssm --iterations 10000
-```
-
-### Run Criterion Micro-benchmarks
-```bash
-cargo bench -p ruststack-dynamodb
-cargo bench -p ruststack-s3
-cargo bench -p ruststack-sqs
-cargo bench -p ruststack-sns
-cargo bench -p ruststack-eventbridge
-cargo bench -p ruststack-ssm
-cargo bench -p ruststack-secretsmanager
-cargo bench -p ruststack-sts
 ```

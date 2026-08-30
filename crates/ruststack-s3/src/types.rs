@@ -151,3 +151,22 @@ impl BucketNotificationConfig {
             && !self.eventbridge_enabled
     }
 }
+
+// Snapshot Structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredObjectSnapshot {
+    pub metadata: ObjectMetadata,
+    pub data_base64: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BucketSnapshot {
+    pub info: BucketInfo,
+    pub notifications: BucketNotificationConfig,
+    pub objects: Vec<StoredObjectSnapshot>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct S3Snapshot {
+    pub buckets: Vec<BucketSnapshot>,
+}

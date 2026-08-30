@@ -1,6 +1,6 @@
 use crate::types::{
     BatchErrorEntry, MessageAttributeValue, PublishBatchEntry, PublishBatchResultEntry,
-    Subscription, SubscriptionAttributes, Topic, TopicAttributes,
+    SnsSnapshot, Subscription, SubscriptionAttributes, Topic, TopicAttributes,
 };
 use chrono::Utc;
 use dashmap::DashMap;
@@ -549,5 +549,39 @@ impl SnsEngine {
         }
 
         Ok((successful, errors))
+    }
+
+    pub fn reset(&self) {
+        self.topics.clear();
+        self.subscriptions.clear();
+    }
+
+    pub fn dump_state(&self) -> SnsSnapshot {
+        let topics: Vec<Topic> = self
+            .topics
+            .iter()
+            .map(|e| e.value().read().clone())
+            .collect();
+        let subscriptions: Vec<Subscription> = self
+            .subscriptions
+            .iter()
+            .map(|e| e.value().read().clone())
+            .collect();
+        SnsSnapshot {
+            topics,
+            subscriptions,
+        }
+    }
+
+    pub fn load_state(&self, snapshot: SnsSnapshot) {
+        self.topics.clear();
+        self.subscriptions.clear();
+        for t in snapshot.topics {
+            self.topics.insert(t.arn.clone(), Arc::new(RwLock::new(t)));
+        }
+        for s in snapshot.subscriptions {
+            self.subscriptions
+                .insert(s.subscription_arn.clone(), Arc::new(RwLock::new(s)));
+        }
     }
 }

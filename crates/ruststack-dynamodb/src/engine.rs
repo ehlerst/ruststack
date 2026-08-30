@@ -1,8 +1,8 @@
 use crate::query::evaluate_expression;
 use crate::table::Table;
 use crate::types::{
-    AttributeDefinition, AttributeValue, GlobalSecondaryIndexDescription, KeySchemaElement,
-    LocalSecondaryIndexDescription, QueryOutput, TableDescription,
+    AttributeDefinition, AttributeValue, DynamoDbSnapshot, GlobalSecondaryIndexDescription,
+    KeySchemaElement, LocalSecondaryIndexDescription, QueryOutput, TableDescription, TableSnapshot,
 };
 use dashmap::DashMap;
 use parking_lot::RwLock;
@@ -339,6 +339,51 @@ impl DynamoDbEngine {
             count,
             scanned_count,
         })
+    }
+
+    pub fn reset(&self) {
+        self.tables.clear();
+    }
+
+    pub fn dump_state(&self) -> DynamoDbSnapshot {
+        let mut tables = Vec::new();
+        for entry in self.tables.iter() {
+            let table = entry.value().read();
+            let items: Vec<HashMap<String, AttributeValue>> =
+                table.items.values().cloned().collect();
+            tables.push(TableSnapshot {
+                description: table.description.clone(),
+                items,
+            });
+        }
+        tables.sort_by(|a, b| a.description.table_name.cmp(&b.description.table_name));
+        DynamoDbSnapshot { tables }
+    }
+
+    pub fn load_state(&self, snapshot: DynamoDbSnapshot) {
+        self.tables.clear();
+        for t_snap in snapshot.tables {
+            let desc = t_snap.description;
+            if let Ok(mut table) = Table::new(
+                desc.table_name.clone(),
+                desc.table_arn.clone(),
+                desc.key_schema.clone(),
+                desc.attribute_definitions.clone(),
+                desc.billing_mode_summary.map(|b| b.billing_mode),
+                desc.global_secondary_indexes.clone(),
+                desc.local_secondary_indexes.clone(),
+            ) {
+                table.description.creation_date_time = desc.creation_date_time;
+                for item in t_snap.items {
+                    if let Ok(pk) = table.extract_primary_key(&item) {
+                        table.items.insert(pk, item);
+                    }
+                }
+                table.description.item_count = table.items.len() as i64;
+                self.tables
+                    .insert(desc.table_name, Arc::new(RwLock::new(table)));
+            }
+        }
     }
 }
 

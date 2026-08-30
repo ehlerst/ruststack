@@ -1,7 +1,9 @@
 use crate::types::{
-    BucketInfo, BucketNotificationConfig, ByteRange, CompletedPart, DeleteObjectsResult,
-    ListObjectsV2Result, ObjectMetadata, PartInfo,
+    BucketInfo, BucketNotificationConfig, BucketSnapshot, ByteRange, CompletedPart,
+    DeleteObjectsResult, ListObjectsV2Result, ObjectMetadata, PartInfo, S3Snapshot,
+    StoredObjectSnapshot,
 };
+use base64::Engine;
 use bytes::Bytes;
 use chrono::Utc;
 use dashmap::DashMap;
@@ -18,6 +20,10 @@ pub trait S3NotificationTarget: Send + Sync {
 }
 
 pub trait S3Storage: Send + Sync {
+    fn reset(&self);
+    fn dump_state(&self) -> S3Snapshot;
+    fn load_state(&self, snapshot: S3Snapshot);
+
     fn create_bucket(&self, bucket: &str, region: &str) -> Result<(), RustStackError>;
     fn delete_bucket(&self, bucket: &str) -> Result<(), RustStackError>;
     fn head_bucket(&self, bucket: &str) -> Result<BucketInfo, RustStackError>;
@@ -840,5 +846,58 @@ impl S3Storage for InMemoryStorage {
             .collect();
 
         Ok(list)
+    }
+
+    fn reset(&self) {
+        self.buckets.clear();
+    }
+
+    fn dump_state(&self) -> S3Snapshot {
+        let mut buckets_snap = Vec::new();
+        for entry in self.buckets.iter() {
+            let bucket = entry.value();
+            let mut objs = Vec::new();
+            for obj_entry in bucket.objects.iter() {
+                let obj = obj_entry.value();
+                objs.push(StoredObjectSnapshot {
+                    metadata: obj.metadata.clone(),
+                    data_base64: base64::engine::general_purpose::STANDARD.encode(&obj.data),
+                });
+            }
+            buckets_snap.push(BucketSnapshot {
+                info: bucket.info.clone(),
+                notifications: bucket.notifications.read().clone(),
+                objects: objs,
+            });
+        }
+        S3Snapshot {
+            buckets: buckets_snap,
+        }
+    }
+
+    fn load_state(&self, snapshot: S3Snapshot) {
+        self.buckets.clear();
+        for b_snap in snapshot.buckets {
+            let bucket = Bucket {
+                info: b_snap.info.clone(),
+                objects: DashMap::new(),
+                multipart_uploads: DashMap::new(),
+                notifications: RwLock::new(b_snap.notifications),
+            };
+            for obj_snap in b_snap.objects {
+                if let Ok(decoded_bytes) =
+                    base64::engine::general_purpose::STANDARD.decode(&obj_snap.data_base64)
+                {
+                    bucket.objects.insert(
+                        obj_snap.metadata.key.clone(),
+                        StoredObject {
+                            metadata: obj_snap.metadata,
+                            data: Bytes::from(decoded_bytes),
+                        },
+                    );
+                }
+            }
+            self.buckets.insert(b_snap.info.name.clone(), bucket);
+        }
     }
 }

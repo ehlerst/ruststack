@@ -34,3 +34,9 @@ pub struct CreateSecretRequest {
     pub secret_binary: Option<String>,
     pub client_request_token: Option<String>,
 }
+
+// Snapshot Structures
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SecretsManagerSnapshot {
+    pub secrets: Vec<Secret>,
+}

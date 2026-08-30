@@ -120,6 +120,8 @@ pub struct AppState {
     pub account_id: String,
 }
 
+use crate::state_api::{state_dump_handler, state_load_handler, state_reset_handler};
+
 pub fn create_router(state: AppState) -> Router {
     state
         .s3_storage
@@ -138,6 +140,9 @@ pub fn create_router(state: AppState) -> Router {
     Router::new()
         .route("/_ruststack/health", get(health_check))
         .route("/_ruststack/info", get(info_handler))
+        .route("/_ruststack/state/reset", any(state_reset_handler))
+        .route("/_ruststack/state/dump", any(state_dump_handler))
+        .route("/_ruststack/state/load", any(state_load_handler))
         .route("/health", get(health_check))
         .fallback(any(gateway_handler))
         .layer(cors)

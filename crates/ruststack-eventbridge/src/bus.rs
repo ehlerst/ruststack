@@ -1,7 +1,7 @@
 use crate::pattern::matches_event_pattern;
 use crate::types::{
-    EventBus, PutEventsRequestEntry, PutEventsResultEntry, PutTargetsResultEntry,
-    RemoveTargetsResultEntry, Rule, Target,
+    EventBridgeSnapshot, EventBus, PutEventsRequestEntry, PutEventsResultEntry,
+    PutTargetsResultEntry, RemoveTargetsResultEntry, Rule, RuleSnapshot, Target,
 };
 use chrono::Utc;
 use dashmap::DashMap;
@@ -465,5 +465,63 @@ impl EventBridgeEngine {
         }
 
         Ok((failed_count, result_entries))
+    }
+
+    pub fn reset(&self) {
+        self.buses.clear();
+        self.rules.clear();
+        self.targets.clear();
+
+        // Restore default event bus
+        let default_arn = format!(
+            "arn:aws:events:{}:{}:event-bus/default",
+            self.region, self.account_id
+        );
+        let default_bus = EventBus {
+            name: "default".to_string(),
+            arn: default_arn,
+            policy: None,
+            created_timestamp: Utc::now(),
+        };
+        self.buses
+            .insert("default".to_string(), Arc::new(RwLock::new(default_bus)));
+    }
+
+    pub fn dump_state(&self) -> EventBridgeSnapshot {
+        let buses = self
+            .buses
+            .iter()
+            .map(|e| e.value().read().clone())
+            .collect();
+        let mut rules = Vec::new();
+        for entry in self.rules.iter() {
+            let rule = entry.value().read().clone();
+            let targets = self
+                .targets
+                .get(&rule.name)
+                .map(|t| t.read().clone())
+                .unwrap_or_default();
+            rules.push(RuleSnapshot { rule, targets });
+        }
+        EventBridgeSnapshot {
+            event_buses: buses,
+            rules,
+        }
+    }
+
+    pub fn load_state(&self, snapshot: EventBridgeSnapshot) {
+        self.buses.clear();
+        self.rules.clear();
+        self.targets.clear();
+        for b in snapshot.event_buses {
+            self.buses.insert(b.name.clone(), Arc::new(RwLock::new(b)));
+        }
+        for r_snap in snapshot.rules {
+            let rule_name = r_snap.rule.name.clone();
+            self.rules
+                .insert(rule_name.clone(), Arc::new(RwLock::new(r_snap.rule)));
+            self.targets
+                .insert(rule_name, Arc::new(RwLock::new(r_snap.targets)));
+        }
     }
 }

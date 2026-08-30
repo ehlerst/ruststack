@@ -57,3 +57,15 @@ pub struct PutParameterRequest {
     pub data_type: Option<String>,
     pub allowed_pattern: Option<String>,
 }
+
+// Snapshot Structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ParameterRecordSnapshot {
+    pub current: Parameter,
+    pub history: Vec<Parameter>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SsmSnapshot {
+    pub parameters: Vec<ParameterRecordSnapshot>,
+}

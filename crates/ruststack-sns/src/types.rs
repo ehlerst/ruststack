@@ -69,3 +69,9 @@ pub struct BatchErrorEntry {
     pub message: String,
     pub sender_fault: bool,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SnsSnapshot {
+    pub topics: Vec<Topic>,
+    pub subscriptions: Vec<Subscription>,
+}

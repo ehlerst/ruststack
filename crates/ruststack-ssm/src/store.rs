@@ -1,4 +1,6 @@
-use crate::types::{Parameter, ParameterType, PutParameterRequest};
+use crate::types::{
+    Parameter, ParameterRecordSnapshot, ParameterType, PutParameterRequest, SsmSnapshot,
+};
 use chrono::Utc;
 use parking_lot::RwLock;
 use ruststack_core::RustStackError;
@@ -230,5 +232,38 @@ impl SsmEngine {
         let params = self.parameters.read();
         let list: Vec<Parameter> = params.values().cloned().collect();
         Ok(list)
+    }
+
+    pub fn reset(&self) {
+        self.parameters.write().clear();
+        self.history.write().clear();
+    }
+
+    pub fn dump_state(&self) -> SsmSnapshot {
+        let params = self.parameters.read();
+        let history = self.history.read();
+        let mut list = Vec::new();
+        for (name, current) in params.iter() {
+            let hist = history.get(name).cloned().unwrap_or_default();
+            list.push(ParameterRecordSnapshot {
+                current: current.clone(),
+                history: hist,
+            });
+        }
+        SsmSnapshot { parameters: list }
+    }
+
+    pub fn load_state(&self, snapshot: SsmSnapshot) {
+        let mut params = self.parameters.write();
+        let mut history = self.history.write();
+        params.clear();
+        history.clear();
+        for rec in snapshot.parameters {
+            let name = rec.current.name.clone();
+            params.insert(name.clone(), rec.current);
+            if !rec.history.is_empty() {
+                history.insert(name, rec.history);
+            }
+        }
     }
 }

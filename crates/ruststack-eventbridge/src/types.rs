@@ -61,3 +61,16 @@ pub struct RemoveTargetsResultEntry {
     pub error_code: Option<String>,
     pub error_message: Option<String>,
 }
+
+// Snapshot Structures
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RuleSnapshot {
+    pub rule: Rule,
+    pub targets: Vec<Target>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EventBridgeSnapshot {
+    pub event_buses: Vec<EventBus>,
+    pub rules: Vec<RuleSnapshot>,
+}

@@ -1,4 +1,4 @@
-use crate::types::{CreateSecretRequest, Secret, SecretVersion};
+use crate::types::{CreateSecretRequest, Secret, SecretVersion, SecretsManagerSnapshot};
 use chrono::Utc;
 use dashmap::DashMap;
 use parking_lot::RwLock;
@@ -295,5 +295,31 @@ impl SecretsManagerEngine {
         }
         list.sort_by(|a, b| a.name.cmp(&b.name));
         Ok(list)
+    }
+
+    pub fn reset(&self) {
+        self.secrets_by_name.clear();
+        self.secrets_by_arn.clear();
+    }
+
+    pub fn dump_state(&self) -> SecretsManagerSnapshot {
+        let mut secrets = Vec::new();
+        for item in self.secrets_by_name.iter() {
+            secrets.push(item.value().read().clone());
+        }
+        secrets.sort_by(|a, b| a.name.cmp(&b.name));
+        SecretsManagerSnapshot { secrets }
+    }
+
+    pub fn load_state(&self, snapshot: SecretsManagerSnapshot) {
+        self.secrets_by_name.clear();
+        self.secrets_by_arn.clear();
+        for s in snapshot.secrets {
+            let name = s.name.clone();
+            let arn = s.arn.clone();
+            let arc = Arc::new(RwLock::new(s));
+            self.secrets_by_name.insert(name, arc.clone());
+            self.secrets_by_arn.insert(arn, arc);
+        }
     }
 }
