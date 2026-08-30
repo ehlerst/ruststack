@@ -1,0 +1,49 @@
+# RustStack: Blazing-Fast Local AWS Cloud Emulator in Rust
+
+> RustStack is an ultra-fast, lightweight, single-binary local AWS cloud emulator written in 100% pure Rust. It serves as a drop-in replacement for LocalStack and MiniStack with sub-microsecond latency, a 1.6 MB memory footprint, and 500ms cold-start startup.
+
+## Quick Facts
+- **Memory Footprint**: ~1.6 MiB RSS at idle (20x lighter than MiniStack, 250x lighter than LocalStack)
+- **Startup Time**: ~500ms cold start
+- **Docker Image**: `ehlers320/ruststack:latest` (~92 MB multi-arch Linux & macOS)
+- **Default Endpoint**: `http://localhost:4566` (Single port multiplexer)
+- **AWS Credentials**: Dummy credentials accepted (`AWS_ACCESS_KEY_ID=test`, `AWS_SECRET_ACCESS_KEY=test`, `AWS_DEFAULT_REGION=us-east-1`)
+
+## Supported AWS Services
+1. **Amazon S3 (`s3`)**: Buckets, objects (with byte ranges), multipart uploads, prefix listing, notifications to SQS/SNS/EventBridge.
+2. **Amazon DynamoDB (`dynamodb`)**: Tables (HASH + RANGE keys), PutItem, GetItem, DeleteItem, UpdateItem, Query with KeyConditionExpression, Scan with FilterExpression, BatchGetItem, BatchWriteItem.
+3. **Amazon SQS (`sqs`)**: Standard & FIFO queues, dead-letter queue (DLQ) redrive policy, long polling, visibility timeouts, SendMessage, ReceiveMessage, DeleteMessage.
+4. **Amazon SNS (`sns`)**: Topics, subscriptions, SQS zero-latency fanout delivery, filter policies, RawMessageDelivery.
+5. **Amazon EventBridge (`events`)**: Event buses, rules, pattern matching (source, detail-type, nested detail), target dispatching to SQS & SNS.
+6. **Amazon SSM Parameter Store (`ssm`)**: String, StringList, SecureString, hierarchical paths (`GetParametersByPath`), versioning.
+7. **Amazon Secrets Manager (`secretsmanager`)**: Secret creation, version staging (`AWSCURRENT`, `AWSPREVIOUS`), GetSecretValue.
+8. **Amazon STS Mock (`sts`)**: `GetCallerIdentity`, `AssumeRole`, `GetSessionToken`.
+
+## Control Plane & Extensions
+- **Web Admin UI**: `GET /_ruststack/ui/` (Zero-dependency embedded dark-mode console)
+- **Health Check**: `GET /_ruststack/health` or `GET /health` -> `{"status": "running", "engine": "ruststack"}`
+- **Cluster Info**: `GET /_ruststack/info`
+- **State Snapshots**:
+  - Dump: `GET /_ruststack/state/dump`
+  - Load / Restore: `POST /_ruststack/state/load`
+  - Atomic Reset: `POST /_ruststack/state/reset` (supports `{"services": ["s3", "dynamodb"]}`)
+- **Chaos Engineering**:
+  - Register Rule: `POST /_ruststack/chaos/rules` (configurable service, action, probability 0.0-1.0, error_status, error_code, latency_ms, limit_times)
+  - List Rules: `GET /_ruststack/chaos/rules`
+  - Reset Rules: `POST /_ruststack/chaos/reset`
+
+## Usage with AWS CLI
+```bash
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+export AWS_DEFAULT_REGION=us-east-1
+
+aws --endpoint-url=http://localhost:4566 s3 mb s3://my-bucket
+aws --endpoint-url=http://localhost:4566 dynamodb list-tables
+aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name my-queue
+```
+
+## Usage with Testcontainers (Go / Rust / Python / Node)
+- **Docker Image**: `ehlers320/ruststack:latest`
+- **Port**: `4566`
+- **Wait Strategy**: Wait for HTTP `GET /_ruststack/health` returning status 200 OK.
