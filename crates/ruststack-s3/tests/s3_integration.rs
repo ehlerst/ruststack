@@ -93,7 +93,10 @@ async fn test_object_crud_and_range() {
         .unwrap();
     let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    assert_eq!(resp.headers().get("x-amz-meta-custom").unwrap(), "rust-rocks");
+    assert_eq!(
+        resp.headers().get("x-amz-meta-custom").unwrap(),
+        "rust-rocks"
+    );
     assert_eq!(resp.headers().get("content-length").unwrap(), "17");
 
     // Get Object Full
@@ -135,7 +138,11 @@ async fn test_list_objects_v2() {
     let storage = setup_s3();
 
     // Create bucket
-    let req = Request::builder().method(Method::PUT).uri("/data-bucket").body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method(Method::PUT)
+        .uri("/data-bucket")
+        .body(Body::empty())
+        .unwrap();
     let _ = handle_s3_request(storage.clone(), req).await;
 
     // Insert 5 objects
@@ -169,7 +176,11 @@ async fn test_multipart_upload_lifecycle() {
     let storage = setup_s3();
 
     // Create bucket
-    let req = Request::builder().method(Method::PUT).uri("/mp-bucket").body(Body::empty()).unwrap();
+    let req = Request::builder()
+        .method(Method::PUT)
+        .uri("/mp-bucket")
+        .body(Body::empty())
+        .unwrap();
     let _ = handle_s3_request(storage.clone(), req).await;
 
     // 1. Initiate Multipart
@@ -182,27 +193,51 @@ async fn test_multipart_upload_lifecycle() {
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(body.to_vec()).unwrap();
-    let upload_id = xml.split("<UploadId>").nth(1).unwrap().split("</UploadId>").next().unwrap();
+    let upload_id = xml
+        .split("<UploadId>")
+        .nth(1)
+        .unwrap()
+        .split("</UploadId>")
+        .next()
+        .unwrap();
 
     // 2. Upload Part 1
     let req = Request::builder()
         .method(Method::PUT)
-        .uri(format!("/mp-bucket/large.bin?uploadId={}&partNumber=1", upload_id))
+        .uri(format!(
+            "/mp-bucket/large.bin?uploadId={}&partNumber=1",
+            upload_id
+        ))
         .body(Body::from("PART_ONE_DATA_"))
         .unwrap();
     let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    let etag1 = resp.headers().get("etag").unwrap().to_str().unwrap().to_string();
+    let etag1 = resp
+        .headers()
+        .get("etag")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     // 3. Upload Part 2
     let req = Request::builder()
         .method(Method::PUT)
-        .uri(format!("/mp-bucket/large.bin?uploadId={}&partNumber=2", upload_id))
+        .uri(format!(
+            "/mp-bucket/large.bin?uploadId={}&partNumber=2",
+            upload_id
+        ))
         .body(Body::from("PART_TWO_DATA"))
         .unwrap();
     let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    let etag2 = resp.headers().get("etag").unwrap().to_str().unwrap().to_string();
+    let etag2 = resp
+        .headers()
+        .get("etag")
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .to_string();
 
     // 4. List Parts
     let req = Request::builder()

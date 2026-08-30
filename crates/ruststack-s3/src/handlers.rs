@@ -9,10 +9,7 @@ use ruststack_core::RustStackError;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-pub async fn handle_s3_request(
-    storage: Arc<dyn S3Storage>,
-    req: Request<Body>,
-) -> Response<Body> {
+pub async fn handle_s3_request(storage: Arc<dyn S3Storage>, req: Request<Body>) -> Response<Body> {
     let request_id = uuid::Uuid::new_v4().to_string();
     let (parts, body) = req.into_parts();
     let method = parts.method;
@@ -22,10 +19,7 @@ pub async fn handle_s3_request(
     let body_bytes = match body.collect().await {
         Ok(collected) => collected.to_bytes(),
         Err(e) => {
-            return make_s3_error_response(
-                &RustStackError::BadRequest(e.to_string()),
-                &request_id,
-            );
+            return make_s3_error_response(&RustStackError::BadRequest(e.to_string()), &request_id);
         }
     };
 

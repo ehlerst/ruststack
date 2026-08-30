@@ -9,10 +9,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-pub async fn handle_sqs_request(
-    engine: Arc<SqsEngine>,
-    req: Request<Body>,
-) -> Response<Body> {
+pub async fn handle_sqs_request(engine: Arc<SqsEngine>, req: Request<Body>) -> Response<Body> {
     let request_id = uuid::Uuid::new_v4().to_string();
     let (parts, body) = req.into_parts();
     let method = parts.method;
@@ -42,9 +39,25 @@ pub async fn handle_sqs_request(
     };
 
     let result = if is_json_proto {
-        handle_sqs_json(engine.as_ref(), &method, &uri, &headers, &body_bytes, &request_id).await
+        handle_sqs_json(
+            engine.as_ref(),
+            &method,
+            &uri,
+            &headers,
+            &body_bytes,
+            &request_id,
+        )
+        .await
     } else {
-        handle_sqs_query(engine.as_ref(), &method, &uri, &headers, &body_bytes, &request_id).await
+        handle_sqs_query(
+            engine.as_ref(),
+            &method,
+            &uri,
+            &headers,
+            &body_bytes,
+            &request_id,
+        )
+        .await
     };
 
     match result {
