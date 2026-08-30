@@ -6,6 +6,9 @@ pub enum AwsService {
     Sqs,
     Sns,
     EventBridge,
+    Ssm,
+    SecretsManager,
+    Sts,
     Internal,
     Unknown,
 }
@@ -17,6 +20,9 @@ impl fmt::Display for AwsService {
             AwsService::Sqs => write!(f, "sqs"),
             AwsService::Sns => write!(f, "sns"),
             AwsService::EventBridge => write!(f, "events"),
+            AwsService::Ssm => write!(f, "ssm"),
+            AwsService::SecretsManager => write!(f, "secretsmanager"),
+            AwsService::Sts => write!(f, "sts"),
             AwsService::Internal => write!(f, "internal"),
             AwsService::Unknown => write!(f, "unknown"),
         }

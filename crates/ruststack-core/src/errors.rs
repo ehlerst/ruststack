@@ -40,6 +40,27 @@ pub enum RustStackError {
         message: String,
         status: StatusCode,
     },
+
+    #[error("SSM Error [{code}]: {message}")]
+    Ssm {
+        code: String,
+        message: String,
+        status: StatusCode,
+    },
+
+    #[error("SecretsManager Error [{code}]: {message}")]
+    SecretsManager {
+        code: String,
+        message: String,
+        status: StatusCode,
+    },
+
+    #[error("STS Error [{code}]: {message}")]
+    Sts {
+        code: String,
+        message: String,
+        status: StatusCode,
+    },
 }
 
 impl RustStackError {
@@ -108,6 +129,46 @@ impl RustStackError {
             code: code.into(),
             message: message.into(),
             status: StatusCode::NOT_FOUND,
+        }
+    }
+
+    pub fn ssm_bad_request(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::Ssm {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::BAD_REQUEST,
+        }
+    }
+
+    pub fn ssm_not_found(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::Ssm {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::NOT_FOUND,
+        }
+    }
+
+    pub fn secretsmanager_bad_request(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::SecretsManager {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::BAD_REQUEST,
+        }
+    }
+
+    pub fn secretsmanager_not_found(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::SecretsManager {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::NOT_FOUND,
+        }
+    }
+
+    pub fn sts_bad_request(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::Sts {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::BAD_REQUEST,
         }
     }
 
@@ -250,6 +311,71 @@ impl RustStackError {
         })
     }
 
+    pub fn to_ssm_json(&self) -> serde_json::Value {
+        let (code, message) = match self {
+            Self::Ssm { code, message, .. } => (code.as_str(), message.as_str()),
+            Self::NotFound(msg) => ("ParameterNotFound", msg.as_str()),
+            Self::BadRequest(msg) => ("ValidationException", msg.as_str()),
+            _ => ("InternalServerError", "An internal error occurred."),
+        };
+
+        serde_json::json!({
+            "__type": code,
+            "message": message
+        })
+    }
+
+    pub fn to_secretsmanager_json(&self) -> serde_json::Value {
+        let (code, message) = match self {
+            Self::SecretsManager { code, message, .. } => (code.as_str(), message.as_str()),
+            Self::NotFound(msg) => ("ResourceNotFoundException", msg.as_str()),
+            Self::BadRequest(msg) => ("InvalidParameterException", msg.as_str()),
+            _ => ("InternalServiceError", "An internal error occurred."),
+        };
+
+        serde_json::json!({
+            "__type": code,
+            "message": message
+        })
+    }
+
+    pub fn to_sts_xml(&self, request_id: &str) -> String {
+        let (code, message) = match self {
+            Self::Sts { code, message, .. } => (code.as_str(), message.as_str()),
+            Self::NotFound(msg) => ("NoSuchEntity", msg.as_str()),
+            Self::BadRequest(msg) => ("ValidationError", msg.as_str()),
+            _ => ("InternalFailure", "An internal error occurred."),
+        };
+
+        format!(
+            r#"<ErrorResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+    <Error>
+        <Type>Sender</Type>
+        <Code>{}</Code>
+        <Message>{}</Message>
+    </Error>
+    <RequestId>{}</RequestId>
+</ErrorResponse>"#,
+            quick_xml::escape::escape(code),
+            quick_xml::escape::escape(message),
+            quick_xml::escape::escape(request_id)
+        )
+    }
+
+    pub fn to_sts_json(&self) -> serde_json::Value {
+        let (code, message) = match self {
+            Self::Sts { code, message, .. } => (code.as_str(), message.as_str()),
+            Self::NotFound(msg) => ("NoSuchEntity", msg.as_str()),
+            Self::BadRequest(msg) => ("ValidationError", msg.as_str()),
+            _ => ("InternalFailure", "An internal error occurred."),
+        };
+
+        serde_json::json!({
+            "__type": code,
+            "message": message
+        })
+    }
+
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::NotFound(_) => StatusCode::NOT_FOUND,
@@ -259,6 +385,9 @@ impl RustStackError {
             Self::Sqs { status, .. } => *status,
             Self::Sns { status, .. } => *status,
             Self::EventBridge { status, .. } => *status,
+            Self::Ssm { status, .. } => *status,
+            Self::SecretsManager { status, .. } => *status,
+            Self::Sts { status, .. } => *status,
         }
     }
 }

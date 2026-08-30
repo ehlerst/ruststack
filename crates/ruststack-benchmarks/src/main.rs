@@ -2,8 +2,11 @@ use bytes::Bytes;
 use clap::Parser;
 use ruststack_eventbridge::{EventBridgeEngine, PutEventsRequestEntry, Target};
 use ruststack_s3::{CompletedPart, InMemoryStorage, S3Storage};
+use ruststack_secretsmanager::{CreateSecretRequest, SecretsManagerEngine};
 use ruststack_sns::SnsEngine;
 use ruststack_sqs::{DeleteMessageBatchEntry, SendMessageBatchEntry, SqsEngine};
+use ruststack_ssm::{PutParameterRequest, SsmEngine};
+use ruststack_sts::StsEngine;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
@@ -540,6 +543,152 @@ pub fn run_eventbridge_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     results
 }
 
+pub fn run_ssm_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let ssm = SsmEngine::new("000000000000".to_string(), "us-east-1".to_string());
+
+    for i in 0..100 {
+        ssm.put_parameter(PutParameterRequest {
+            name: format!("/app/prod/service/key_{}", i),
+            value: format!("secret_value_{}", i),
+            parameter_type: Some("SecureString".to_string()),
+            description: None,
+            overwrite: Some(true),
+            key_id: None,
+            tier: None,
+            data_type: None,
+            allowed_pattern: None,
+        })
+        .unwrap();
+    }
+
+    // 1. GetParameter
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for _ in 0..iterations {
+        let start = Instant::now();
+        ssm.get_parameter("/app/prod/service/key_42", false)
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "SSM",
+        "GetParameter",
+        Some("Exact Key"),
+    ));
+
+    // 2. GetParametersByPath (Recursive)
+    let iters_path = (iterations / 2).max(100);
+    let mut latencies = Vec::with_capacity(iters_path);
+    let start_total = Instant::now();
+    for _ in 0..iters_path {
+        let start = Instant::now();
+        ssm.get_parameters_by_path("/app/prod", true, false, Some(50))
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_path,
+        None,
+        "SSM",
+        "GetParametersByPath",
+        Some("50 Keys Recursive"),
+    ));
+
+    results
+}
+
+pub fn run_secretsmanager_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let sm = SecretsManagerEngine::new("000000000000".to_string(), "us-east-1".to_string());
+
+    for i in 0..50 {
+        sm.create_secret(CreateSecretRequest {
+            name: format!("app/prod/db_{}", i),
+            description: Some("DB credentials".to_string()),
+            kms_key_id: None,
+            secret_string: Some(r#"{"username":"admin","password":"secret_pw_123"}"#.to_string()),
+            secret_binary: None,
+            client_request_token: None,
+        })
+        .unwrap();
+    }
+
+    // 1. GetSecretValue
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for _ in 0..iterations {
+        let start = Instant::now();
+        sm.get_secret_value("app/prod/db_25", None, None).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "SecretsManager",
+        "GetSecretValue",
+        Some("JSON Payload"),
+    ));
+
+    results
+}
+
+pub fn run_sts_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let sts = StsEngine::new("000000000000".to_string(), "us-east-1".to_string());
+
+    // 1. GetCallerIdentity
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for _ in 0..iterations {
+        let start = Instant::now();
+        let _ = sts.get_caller_identity(None);
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "STS",
+        "GetCallerIdentity",
+        Some("Root Identity"),
+    ));
+
+    // 2. AssumeRole
+    let iters_role = iterations / 2;
+    let mut latencies = Vec::with_capacity(iters_role);
+    let start_total = Instant::now();
+    for _ in 0..iters_role {
+        let start = Instant::now();
+        let _ = sts.assume_role(
+            "arn:aws:iam::000000000000:role/ci-role",
+            "session",
+            Some(3600),
+        );
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_role,
+        None,
+        "STS",
+        "AssumeRole",
+        Some("Temporary Credentials"),
+    ));
+
+    results
+}
+
 fn format_markdown(results: &[BenchmarkResult]) -> String {
     let mut md = String::new();
     md.push_str("# 🚀 RustStack Performance Benchmark Report\n\n");
@@ -615,6 +764,33 @@ fn main() -> anyhow::Result<()> {
         );
         let eb_res = run_eventbridge_benchmarks(opts.iterations);
         all_results.extend(eb_res);
+    }
+
+    if opts.service == "ssm" || opts.service == "all" {
+        eprintln!(
+            "Running SSM performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let ssm_res = run_ssm_benchmarks(opts.iterations);
+        all_results.extend(ssm_res);
+    }
+
+    if opts.service == "secretsmanager" || opts.service == "all" {
+        eprintln!(
+            "Running SecretsManager performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let sm_res = run_secretsmanager_benchmarks(opts.iterations);
+        all_results.extend(sm_res);
+    }
+
+    if opts.service == "sts" || opts.service == "all" {
+        eprintln!(
+            "Running STS performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let sts_res = run_sts_benchmarks(opts.iterations);
+        all_results.extend(sts_res);
     }
 
     let output_str = if opts.format == "json" {

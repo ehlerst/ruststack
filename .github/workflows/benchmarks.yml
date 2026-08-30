@@ -179,3 +179,126 @@ jobs:
         with:
           name: eventbridge-performance-report
           path: reports/eventbridge-benchmark.*
+
+  ssm-performance:
+    name: SSM Feature Performance Rating
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run SSM Criterion Micro-benchmarks
+        run: cargo bench -p ruststack-ssm
+
+      - name: Run SSM Performance Rating Suite
+        run: |
+          mkdir -p reports
+          cargo run --release -p ruststack-benchmarks -- \
+            --service ssm \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format markdown \
+            --output reports/ssm-benchmark.md
+
+          cargo run --release -p ruststack-benchmarks -- \
+            --service ssm \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format json \
+            --output reports/ssm-benchmark.json
+
+      - name: Publish SSM Benchmark Step Summary
+        run: |
+          cat reports/ssm-benchmark.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload SSM Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssm-performance-report
+          path: reports/ssm-benchmark.*
+
+  secretsmanager-performance:
+    name: SecretsManager Feature Performance Rating
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run SecretsManager Criterion Micro-benchmarks
+        run: cargo bench -p ruststack-secretsmanager
+
+      - name: Run SecretsManager Performance Rating Suite
+        run: |
+          mkdir -p reports
+          cargo run --release -p ruststack-benchmarks -- \
+            --service secretsmanager \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format markdown \
+            --output reports/secretsmanager-benchmark.md
+
+          cargo run --release -p ruststack-benchmarks -- \
+            --service secretsmanager \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format json \
+            --output reports/secretsmanager-benchmark.json
+
+      - name: Publish SecretsManager Benchmark Step Summary
+        run: |
+          cat reports/secretsmanager-benchmark.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload SecretsManager Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: secretsmanager-performance-report
+          path: reports/secretsmanager-benchmark.*
+
+  sts-performance:
+    name: STS Feature Performance Rating
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run STS Criterion Micro-benchmarks
+        run: cargo bench -p ruststack-sts
+
+      - name: Run STS Performance Rating Suite
+        run: |
+          mkdir -p reports
+          cargo run --release -p ruststack-benchmarks -- \
+            --service sts \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format markdown \
+            --output reports/sts-benchmark.md
+
+          cargo run --release -p ruststack-benchmarks -- \
+            --service sts \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format json \
+            --output reports/sts-benchmark.json
+
+      - name: Publish STS Benchmark Step Summary
+        run: |
+          cat reports/sts-benchmark.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload STS Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sts-performance-report
+          path: reports/sts-benchmark.*

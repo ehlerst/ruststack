@@ -1044,8 +1044,11 @@ dependencies = [
  "ruststack-core",
  "ruststack-eventbridge",
  "ruststack-s3",
+ "ruststack-secretsmanager",
  "ruststack-sns",
  "ruststack-sqs",
+ "ruststack-ssm",
+ "ruststack-sts",
  "serde",
  "serde_json",
  "tokio",
@@ -1120,6 +1123,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruststack-secretsmanager"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "criterion",
+ "dashmap",
+ "http",
+ "http-body-util",
+ "parking_lot",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ruststack-server"
 version = "0.1.0"
 dependencies = [
@@ -1132,8 +1155,11 @@ dependencies = [
  "ruststack-core",
  "ruststack-eventbridge",
  "ruststack-s3",
+ "ruststack-secretsmanager",
  "ruststack-sns",
  "ruststack-sqs",
+ "ruststack-ssm",
+ "ruststack-sts",
  "serde",
  "serde_json",
  "tokio",
@@ -1184,6 +1210,46 @@ dependencies = [
  "parking_lot",
  "quick-xml",
  "regex",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "ruststack-ssm"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "criterion",
+ "dashmap",
+ "http",
+ "http-body-util",
+ "parking_lot",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "ruststack-sts"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "criterion",
+ "form_urlencoded",
+ "http",
+ "http-body-util",
+ "quick-xml",
  "ruststack-core",
  "serde",
  "serde_json",

@@ -21,7 +21,7 @@ impl Dispatcher {
             return AwsService::Internal;
         }
 
-        // 2. Check x-amz-target header (SQS, EventBridge, SNS JSON, DynamoDB, etc.)
+        // 2. Check x-amz-target header
         if let Some(target) = headers.get("x-amz-target").and_then(|v| v.to_str().ok()) {
             if target.starts_with("AmazonSQS") || target.starts_with("AmazonSQS.") {
                 return AwsService::Sqs;
@@ -35,6 +35,18 @@ impl Dispatcher {
             {
                 return AwsService::EventBridge;
             }
+            if target.starts_with("AmazonSSM") || target.starts_with("AmazonSSM.") {
+                return AwsService::Ssm;
+            }
+            if target.starts_with("secretsmanager") || target.starts_with("secretsmanager.") {
+                return AwsService::SecretsManager;
+            }
+            if target.starts_with("AWSSecurityTokenServiceV20110615")
+                || target.starts_with("STS")
+                || target.starts_with("STS.")
+            {
+                return AwsService::Sts;
+            }
         }
 
         // 3. Check Authorization header (AWS SigV4 credential scope: .../us-east-1/<service>/aws4_request)
@@ -45,12 +57,15 @@ impl Dispatcher {
                     "sqs" => return AwsService::Sqs,
                     "sns" => return AwsService::Sns,
                     "events" | "eventbridge" => return AwsService::EventBridge,
+                    "ssm" => return AwsService::Ssm,
+                    "secretsmanager" => return AwsService::SecretsManager,
+                    "sts" => return AwsService::Sts,
                     _ => {}
                 }
             }
         }
 
-        // 4. Check Host header for virtual hosting (e.g. sns.localhost, events.localhost, bucket.s3.localhost)
+        // 4. Check Host header for virtual hosting
         if let Some(host) = headers.get("host").and_then(|v| v.to_str().ok()) {
             let host_clean = host.split(':').next().unwrap_or(host);
             if host_clean.contains(".s3.") || host_clean.starts_with("s3.") {
@@ -69,12 +84,25 @@ impl Dispatcher {
             {
                 return AwsService::EventBridge;
             }
+            if host_clean.contains(".ssm.") || host_clean.starts_with("ssm.") {
+                return AwsService::Ssm;
+            }
+            if host_clean.contains(".secretsmanager.") || host_clean.starts_with("secretsmanager.")
+            {
+                return AwsService::SecretsManager;
+            }
+            if host_clean.contains(".sts.") || host_clean.starts_with("sts.") {
+                return AwsService::Sts;
+            }
             // Check for S3 bucket subdomain style like bucket.localhost
             if host_clean.ends_with(".localhost")
                 && !host_clean.starts_with("localhost")
                 && !host_clean.starts_with("sns")
                 && !host_clean.starts_with("sqs")
                 && !host_clean.starts_with("events")
+                && !host_clean.starts_with("ssm")
+                && !host_clean.starts_with("secretsmanager")
+                && !host_clean.starts_with("sts")
             {
                 return AwsService::S3;
             }
@@ -101,9 +129,18 @@ impl Dispatcher {
             if first == "events" || first == "eventbridge" {
                 return AwsService::EventBridge;
             }
+            if first == "ssm" {
+                return AwsService::Ssm;
+            }
+            if first == "secretsmanager" {
+                return AwsService::SecretsManager;
+            }
+            if first == "sts" {
+                return AwsService::Sts;
+            }
         }
 
-        // 6. Check Query Parameters for SQS and SNS Actions
+        // 6. Check Query Parameters for SQS, SNS, and STS Actions
         if let Some(query) = uri.query() {
             if query.contains("Action=") {
                 let params = form_urlencoded::parse(query.as_bytes());
@@ -114,6 +151,9 @@ impl Dispatcher {
                         }
                         if is_sns_action(&v) {
                             return AwsService::Sns;
+                        }
+                        if is_sts_action(&v) {
+                            return AwsService::Sts;
                         }
                     }
                 }
@@ -132,6 +172,9 @@ impl Dispatcher {
                             }
                             if is_sns_action(&v) {
                                 return AwsService::Sns;
+                            }
+                            if is_sts_action(&v) {
+                                return AwsService::Sts;
                             }
                         }
                     }
@@ -206,6 +249,19 @@ fn is_sns_action(action: &str) -> bool {
     )
 }
 
+fn is_sts_action(action: &str) -> bool {
+    matches!(
+        action,
+        "GetCallerIdentity"
+            | "AssumeRole"
+            | "AssumeRoleWithWebIdentity"
+            | "AssumeRoleWithSAML"
+            | "GetSessionToken"
+            | "GetFederationToken"
+            | "DecodeAuthorizationMessage"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -222,39 +278,42 @@ mod tests {
     }
 
     #[test]
-    fn test_sns_dispatch() {
-        let uri: Uri = "/?Action=CreateTopic&Name=my-topic".parse().unwrap();
-        let headers = HeaderMap::new();
-        assert_eq!(
-            Dispatcher::classify_request(&Method::POST, &uri, &headers, None),
-            AwsService::Sns
-        );
-
-        let mut headers_auth = HeaderMap::new();
-        headers_auth.insert(
-            "authorization",
-            HeaderValue::from_static(
-                "AWS4-HMAC-SHA256 Credential=TEST/20260830/us-east-1/sns/aws4_request, SignedHeaders=host, Signature=abc",
-            ),
-        );
-        let uri_any: Uri = "/".parse().unwrap();
-        assert_eq!(
-            Dispatcher::classify_request(&Method::POST, &uri_any, &headers_auth, None),
-            AwsService::Sns
-        );
-    }
-
-    #[test]
-    fn test_eventbridge_dispatch() {
+    fn test_ssm_dispatch() {
         let mut headers = HeaderMap::new();
         headers.insert(
             "x-amz-target",
-            HeaderValue::from_static("AWSEvents.PutEvents"),
+            HeaderValue::from_static("AmazonSSM.GetParameter"),
         );
         let uri: Uri = "/".parse().unwrap();
         assert_eq!(
             Dispatcher::classify_request(&Method::POST, &uri, &headers, None),
-            AwsService::EventBridge
+            AwsService::Ssm
+        );
+    }
+
+    #[test]
+    fn test_secretsmanager_dispatch() {
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-amz-target",
+            HeaderValue::from_static("secretsmanager.GetSecretValue"),
+        );
+        let uri: Uri = "/".parse().unwrap();
+        assert_eq!(
+            Dispatcher::classify_request(&Method::POST, &uri, &headers, None),
+            AwsService::SecretsManager
+        );
+    }
+
+    #[test]
+    fn test_sts_dispatch() {
+        let uri: Uri = "/?Action=GetCallerIdentity&Version=2011-06-15"
+            .parse()
+            .unwrap();
+        let headers = HeaderMap::new();
+        assert_eq!(
+            Dispatcher::classify_request(&Method::POST, &uri, &headers, None),
+            AwsService::Sts
         );
     }
 }

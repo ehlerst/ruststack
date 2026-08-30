@@ -1,9 +1,12 @@
 use clap::Parser;
 use ruststack_eventbridge::EventBridgeEngine;
 use ruststack_s3::InMemoryStorage;
+use ruststack_secretsmanager::SecretsManagerEngine;
 use ruststack_server::{create_router, AppState, Opts};
 use ruststack_sns::SnsEngine;
 use ruststack_sqs::SqsEngine;
+use ruststack_ssm::SsmEngine;
+use ruststack_sts::StsEngine;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tracing::info;
@@ -36,12 +39,21 @@ async fn main() -> anyhow::Result<()> {
         opts.account_id.clone(),
         opts.region.clone(),
     ));
+    let ssm_engine = Arc::new(SsmEngine::new(opts.account_id.clone(), opts.region.clone()));
+    let secretsmanager_engine = Arc::new(SecretsManagerEngine::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let sts_engine = Arc::new(StsEngine::new(opts.account_id.clone(), opts.region.clone()));
 
     let state = AppState {
         s3_storage,
         sqs_engine,
         sns_engine,
         eventbridge_engine,
+        ssm_engine,
+        secretsmanager_engine,
+        sts_engine,
         region: opts.region,
         account_id: opts.account_id,
     };

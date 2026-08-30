@@ -6,6 +6,9 @@ members = [
     "crates/ruststack-sqs",
     "crates/ruststack-sns",
     "crates/ruststack-eventbridge",
+    "crates/ruststack-ssm",
+    "crates/ruststack-secretsmanager",
+    "crates/ruststack-sts",
     "crates/ruststack-server",
     "crates/ruststack-benchmarks",
 ]
@@ -25,6 +28,9 @@ ruststack-s3 = { path = "crates/ruststack-s3" }
 ruststack-sqs = { path = "crates/ruststack-sqs" }
 ruststack-sns = { path = "crates/ruststack-sns" }
 ruststack-eventbridge = { path = "crates/ruststack-eventbridge" }
+ruststack-ssm = { path = "crates/ruststack-ssm" }
+ruststack-secretsmanager = { path = "crates/ruststack-secretsmanager" }
+ruststack-sts = { path = "crates/ruststack-sts" }
 
 # Async & HTTP runtime
 tokio = { version = "1.43", features = ["full"] }

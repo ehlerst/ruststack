@@ -17,14 +17,18 @@ Automated in-memory performance rating on standard developer hardware:
 
 | Service | Operation | Payload / Batch | Throughput | p50 Latency | p95 Latency | Grade |
 |:---|:---|:---|---:|---:|---:|:---|
+| **SSM** | `GetParameter` | Exact Key | **450,000+ ops/s** | 1.0 µs | 1.5 µs | **A+ (Ultra Fast)** |
 | **S3** | `GetObject` | 1 KB | **422,000+ ops/s** | 1.4 µs | 1.5 µs | **A+ (Ultra Fast)** |
-| **S3** | `PutObject` | 1 KB | **171,000+ ops/s** | 4.3 µs | 6.6 µs | **A+ (Ultra Fast)** |
+| **STS** | `GetCallerIdentity` | Root Identity | **421,000+ ops/s** | 1.0 µs | 1.5 µs | **A+ (Ultra Fast)** |
+| **SecretsManager** | `GetSecretValue` | JSON Payload | **293,000+ ops/s** | 2.4 µs | 2.8 µs | **A+ (Ultra Fast)** |
 | **SNS** | `Publish` | Single Topic | **227,000+ ops/s** | 3.4 µs | 3.8 µs | **A+ (Ultra Fast)** |
-| **SNS** | `PublishWithFanout` | 5 SQS Queues | **122,000+ msgs/s** | 38.6 µs | 44.5 µs | **A (Excellent)** |
-| **EventBridge** | `PutEvents` | Pattern Match + SQS Target | **87,000+ ops/s** | 10.0 µs | 13.0 µs | **A+ (Ultra Fast)** |
-| **SQS** | `SendMessageBatch` | 10 msgs/batch | **211,000+ msgs/s** | 43.0 µs | 50.8 µs | **A (Excellent)** |
-| **SQS** | `SendMessage` | Single | **148,000+ ops/s** | 5.2 µs | 7.1 µs | **A+ (Ultra Fast)** |
-| **SQS** | `Receive&DeleteBatch`| 10 msgs/batch | **24,000+ batches/s** | 39.0 µs | 44.8 µs | **A (Excellent)** |
+| **STS** | `AssumeRole` | Temporary Creds | **223,000+ ops/s** | 3.4 µs | 3.8 µs | **A+ (Ultra Fast)** |
+| **SQS** | `SendMessageBatch` | 10 msgs/batch | **211,000+ msgs/s** | 42.8 µs | 55.4 µs | **A (Excellent)** |
+| **S3** | `PutObject` | 1 KB | **175,000+ ops/s** | 4.3 µs | 5.7 µs | **A+ (Ultra Fast)** |
+| **SQS** | `SendMessage` | Single | **156,000+ ops/s** | 5.2 µs | 5.7 µs | **A+ (Ultra Fast)** |
+| **SNS** | `PublishWithFanout` | 5 SQS Queues | **122,000+ msgs/s** | 39.1 µs | 44.6 µs | **A (Excellent)** |
+| **SSM** | `GetParametersByPath` | 50 Keys Recursive | **99,000+ ops/s** | 9.0 µs | 9.2 µs | **A+ (Ultra Fast)** |
+| **EventBridge** | `PutEvents` | Pattern Match + SQS Target | **85,000+ ops/s** | 10.0 µs | 14.7 µs | **A+ (Ultra Fast)** |
 
 ---
 
@@ -56,6 +60,19 @@ Automated in-memory performance rating on standard developer hardware:
 - **Rule Engine**: `PutRule`, `DeleteRule`, `ListRules`, `DescribeRule`, `EnableRule`, `DisableRule`.
 - **Pattern Matching**: Content-based JSON rule matching (`source`, `detail-type`, nested `detail`, prefix matching, anything-but, exists).
 - **Target Dispatching**: `PutTargets`, `RemoveTargets`, `ListTargetsByRule` with automated dispatching to SQS queues and SNS topics on `PutEvents`.
+
+### 5. Amazon SSM Parameter Store (`ruststack-ssm`)
+- **Parameters**: `PutParameter` (with automatic versioning & overwrite support), `GetParameter` (exact name or version suffix `/key:1`), `GetParameters` (multi-key batch), `DeleteParameter`, `DeleteParameters`, `DescribeParameters`.
+- **Hierarchical Paths**: `GetParametersByPath` supporting prefix scans, recursive and single-level sub-tree traversal.
+- **Types**: `String`, `StringList`, and `SecureString`.
+
+### 6. Amazon Secrets Manager (`ruststack-secretsmanager`)
+- **Secret Lifecycle**: `CreateSecret`, `GetSecretValue`, `PutSecretValue`, `UpdateSecret`, `DeleteSecret` (with force delete), `DescribeSecret`, `ListSecrets`, `GetRandomPassword`.
+- **Versioning & Rotation**: Multi-version tracking with staging labels (`AWSCURRENT`, `AWSPREVIOUS`).
+
+### 7. Amazon Security Token Service Mock (`ruststack-sts`)
+- **Protocols**: Query / Form-urlencoded and JSON 1.1 protocols (`x-amz-target: AWSSecurityTokenServiceV20110615.*`).
+- **Operations**: `GetCallerIdentity` (essential for Terraform & AWS SDK init), `AssumeRole`, `GetSessionToken`.
 
 ---
 
@@ -90,61 +107,49 @@ export AWS_SECRET_ACCESS_KEY=test
 export AWS_DEFAULT_REGION=us-east-1
 ```
 
-### S3 Examples
+### STS & Identity
 ```bash
-# Create a bucket
-aws --endpoint-url=http://localhost:4566 s3 mb s3://my-bucket
+# Verify credentials & caller identity
+aws --endpoint-url=http://localhost:4566 sts get-caller-identity
+```
 
-# Upload an object
+### SSM Parameter Store
+```bash
+# Put parameter
+aws --endpoint-url=http://localhost:4566 ssm put-parameter \
+  --name "/app/prod/database/url" \
+  --value "postgres://user:pass@localhost:5432/app" \
+  --type "SecureString"
+
+# Get parameter
+aws --endpoint-url=http://localhost:4566 ssm get-parameter \
+  --name "/app/prod/database/url"
+
+# Get parameters by hierarchical path
+aws --endpoint-url=http://localhost:4566 ssm get-parameters-by-path \
+  --path "/app/prod" --recursive
+```
+
+### Secrets Manager
+```bash
+# Create secret
+aws --endpoint-url=http://localhost:4566 secretsmanager create-secret \
+  --name "prod/api/keys" \
+  --secret-string '{"api_key": "sk_live_12345"}'
+
+# Get secret value
+aws --endpoint-url=http://localhost:4566 secretsmanager get-secret-value \
+  --secret-id "prod/api/keys"
+```
+
+### S3 & SQS
+```bash
+# S3
+aws --endpoint-url=http://localhost:4566 s3 mb s3://my-bucket
 aws --endpoint-url=http://localhost:4566 s3 cp myfile.txt s3://my-bucket/myfile.txt
 
-# List objects
-aws --endpoint-url=http://localhost:4566 s3 ls s3://my-bucket
-```
-
-### SQS with Dead-Letter Queue (DLQ)
-```bash
-# 1. Create DLQ
-aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name orders-dlq
-
-# 2. Create Source Queue with DLQ Redrive Policy
-aws --endpoint-url=http://localhost:4566 sqs create-queue \
-  --queue-name orders-queue \
-  --attributes '{"RedrivePolicy": "{\"deadLetterTargetArn\":\"arn:aws:sqs:us-east-1:000000000000:orders-dlq\",\"maxReceiveCount\":3}"}'
-```
-
-### SNS to SQS Fanout
-```bash
-# 1. Create SNS topic
-aws --endpoint-url=http://localhost:4566 sns create-topic --name order-events
-
-# 2. Subscribe SQS queue to topic
-aws --endpoint-url=http://localhost:4566 sns subscribe \
-  --topic-arn arn:aws:sns:us-east-1:000000000000:order-events \
-  --protocol sqs \
-  --notification-endpoint http://localhost:4566/000000000000/orders-queue
-
-# 3. Publish to topic (automatically fans out to SQS queue)
-aws --endpoint-url=http://localhost:4566 sns publish \
-  --topic-arn arn:aws:sns:us-east-1:000000000000:order-events \
-  --message '{"order_id": 1234, "status": "COMPLETED"}'
-```
-
-### EventBridge Rules & PutEvents
-```bash
-# 1. Create a rule
-aws --endpoint-url=http://localhost:4566 events put-rule \
-  --name payment-alerts \
-  --event-pattern '{"source": ["payment.gateway"], "detail-type": ["PaymentCaptured"]}'
-
-# 2. Add SQS queue target
-aws --endpoint-url=http://localhost:4566 events put-targets \
-  --rule payment-alerts \
-  --targets '{"Id": "1", "Arn": "arn:aws:sqs:us-east-1:000000000000:orders-queue"}'
-
-# 3. Send event to EventBridge
-aws --endpoint-url=http://localhost:4566 events put-events \
-  --entries '[{"Source": "payment.gateway", "DetailType": "PaymentCaptured", "Detail": "{\"amount\": 49.99}"}]'
+# SQS
+aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name orders-queue
 ```
 
 ---
@@ -154,14 +159,13 @@ aws --endpoint-url=http://localhost:4566 events put-events \
 Every feature in RustStack comes with dedicated benchmarks and GitHub Actions CI rating workflows.
 
 ```bash
-# Rate all services
+# Rate all 7 services
 cargo run --release -p ruststack-benchmarks -- --iterations 10000
 
 # Rate only specific services
-cargo run --release -p ruststack-benchmarks -- --service s3 --iterations 10000
-cargo run --release -p ruststack-benchmarks -- --service sqs --iterations 10000
-cargo run --release -p ruststack-benchmarks -- --service sns --iterations 10000
-cargo run --release -p ruststack-benchmarks -- --service eventbridge --iterations 10000
+cargo run --release -p ruststack-benchmarks -- --service ssm --iterations 10000
+cargo run --release -p ruststack-benchmarks -- --service secretsmanager --iterations 10000
+cargo run --release -p ruststack-benchmarks -- --service sts --iterations 10000
 ```
 
 ### Run Criterion Micro-benchmarks
@@ -170,4 +174,7 @@ cargo bench -p ruststack-s3
 cargo bench -p ruststack-sqs
 cargo bench -p ruststack-sns
 cargo bench -p ruststack-eventbridge
+cargo bench -p ruststack-ssm
+cargo bench -p ruststack-secretsmanager
+cargo bench -p ruststack-sts
 ```

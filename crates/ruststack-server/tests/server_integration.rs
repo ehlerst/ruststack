@@ -3,9 +3,12 @@ use axum::http::{Method, Request, StatusCode};
 use http_body_util::BodyExt;
 use ruststack_eventbridge::EventBridgeEngine;
 use ruststack_s3::InMemoryStorage;
+use ruststack_secretsmanager::SecretsManagerEngine;
 use ruststack_server::{create_router, AppState};
 use ruststack_sns::SnsEngine;
 use ruststack_sqs::SqsEngine;
+use ruststack_ssm::SsmEngine;
+use ruststack_sts::StsEngine;
 use serde_json::Value;
 use std::sync::Arc;
 use tower::ServiceExt;
@@ -28,12 +31,27 @@ async fn test_server_unified_routing() {
         "000000000000".to_string(),
         "us-east-1".to_string(),
     ));
+    let ssm_engine = Arc::new(SsmEngine::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let secretsmanager_engine = Arc::new(SecretsManagerEngine::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let sts_engine = Arc::new(StsEngine::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
 
     let state = AppState {
         s3_storage,
         sqs_engine,
         sns_engine,
         eventbridge_engine,
+        ssm_engine,
+        secretsmanager_engine,
+        sts_engine,
         region: "us-east-1".to_string(),
         account_id: "000000000000".to_string(),
     };
@@ -128,7 +146,71 @@ async fn test_server_unified_routing() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+
+    // 6. SSM PutParameter via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "AmazonSSM.PutParameter")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    serde_json::json!({
+                        "Name": "/test/key",
+                        "Value": "val123",
+                        "Type": "String"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 7. SecretsManager CreateSecret via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "secretsmanager.CreateSecret")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    serde_json::json!({
+                        "Name": "test-secret",
+                        "SecretString": "sec123"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 8. STS GetCallerIdentity via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header(
+                    "x-amz-target",
+                    "AWSSecurityTokenServiceV20110615.GetCallerIdentity",
+                )
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(r#"{}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let val: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(val["FailedEntryCount"].as_u64().unwrap(), 0);
+    assert_eq!(val["Account"].as_str().unwrap(), "000000000000");
 }
