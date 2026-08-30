@@ -9,6 +9,7 @@ members = [
     "crates/ruststack-ssm",
     "crates/ruststack-secretsmanager",
     "crates/ruststack-sts",
+    "crates/ruststack-dynamodb",
     "crates/ruststack-server",
     "crates/ruststack-benchmarks",
 ]
@@ -31,6 +32,7 @@ ruststack-eventbridge = { path = "crates/ruststack-eventbridge" }
 ruststack-ssm = { path = "crates/ruststack-ssm" }
 ruststack-secretsmanager = { path = "crates/ruststack-secretsmanager" }
 ruststack-sts = { path = "crates/ruststack-sts" }
+ruststack-dynamodb = { path = "crates/ruststack-dynamodb" }
 
 # Async & HTTP runtime
 tokio = { version = "1.43", features = ["full"] }

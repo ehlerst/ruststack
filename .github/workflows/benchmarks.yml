@@ -302,3 +302,44 @@ jobs:
         with:
           name: sts-performance-report
           path: reports/sts-benchmark.*
+
+  dynamodb-performance:
+    name: DynamoDB Feature Performance Rating
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run DynamoDB Criterion Micro-benchmarks
+        run: cargo bench -p ruststack-dynamodb
+
+      - name: Run DynamoDB Performance Rating Suite
+        run: |
+          mkdir -p reports
+          cargo run --release -p ruststack-benchmarks -- \
+            --service dynamodb \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format markdown \
+            --output reports/dynamodb-benchmark.md
+
+          cargo run --release -p ruststack-benchmarks -- \
+            --service dynamodb \
+            --iterations ${{ github.event.inputs.iterations || '10000' }} \
+            --format json \
+            --output reports/dynamodb-benchmark.json
+
+      - name: Publish DynamoDB Benchmark Step Summary
+        run: |
+          cat reports/dynamodb-benchmark.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload DynamoDB Benchmark Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dynamodb-performance-report
+          path: reports/dynamodb-benchmark.*

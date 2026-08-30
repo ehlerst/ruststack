@@ -6,6 +6,7 @@ use axum::routing::{any, get};
 use axum::Router;
 use clap::Parser;
 use ruststack_core::{AwsService, Dispatcher};
+use ruststack_dynamodb::{handle_dynamodb_request, DynamoDbEngine};
 use ruststack_eventbridge::{handle_eventbridge_request, EventBridgeEngine};
 use ruststack_s3::{handle_s3_request, S3Storage};
 use ruststack_secretsmanager::{handle_secretsmanager_request, SecretsManagerEngine};
@@ -32,7 +33,7 @@ pub struct Opts {
     #[arg(
         short,
         long,
-        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts",
+        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb",
         env = "SERVICES"
     )]
     pub services: String,
@@ -49,7 +50,7 @@ impl Default for Opts {
         Self {
             port: 4566,
             host: "0.0.0.0".to_string(),
-            services: "s3,sqs,sns,events,ssm,secretsmanager,sts".to_string(),
+            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb".to_string(),
             region: "us-east-1".to_string(),
             account_id: "000000000000".to_string(),
         }
@@ -65,6 +66,7 @@ pub struct AppState {
     pub ssm_engine: Arc<SsmEngine>,
     pub secretsmanager_engine: Arc<SecretsManagerEngine>,
     pub sts_engine: Arc<StsEngine>,
+    pub dynamodb_engine: Arc<DynamoDbEngine>,
     pub region: String,
     pub account_id: String,
 }
@@ -96,7 +98,7 @@ async fn health_check() -> impl IntoResponse {
 async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
     let json_info = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "services": ["s3", "sqs", "sns", "events", "ssm", "secretsmanager", "sts"],
+        "services": ["s3", "sqs", "sns", "events", "ssm", "secretsmanager", "sts", "dynamodb"],
         "region": state.region,
         "account_id": state.account_id,
         "features": {
@@ -106,7 +108,8 @@ async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
             "events": ["event-buses", "rules", "pattern-matching", "targets-sqs-sns", "json-protocol"],
             "ssm": ["parameters", "hierarchical-paths", "versioning", "secure-string", "json-protocol"],
             "secretsmanager": ["secrets", "version-stages", "rotation", "binary-and-string", "json-protocol"],
-            "sts": ["caller-identity", "assume-role", "session-tokens", "query-and-json-protocols"]
+            "sts": ["caller-identity", "assume-role", "session-tokens", "query-and-json-protocols"],
+            "dynamodb": ["tables", "crud", "query", "scan", "key-conditions", "filter-expressions", "gsi-lsi", "batching", "json-protocol"]
         }
     });
 
@@ -137,6 +140,7 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
             handle_secretsmanager_request(state.secretsmanager_engine.clone(), req).await
         }
         AwsService::Sts => handle_sts_request(state.sts_engine.clone(), req).await,
+        AwsService::DynamoDb => handle_dynamodb_request(state.dynamodb_engine.clone(), req).await,
         AwsService::Internal => Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "application/json")

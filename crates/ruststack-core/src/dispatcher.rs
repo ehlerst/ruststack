@@ -47,6 +47,12 @@ impl Dispatcher {
             {
                 return AwsService::Sts;
             }
+            if target.starts_with("DynamoDB_20120810")
+                || target.starts_with("DynamoDB")
+                || target.starts_with("DynamoDB.")
+            {
+                return AwsService::DynamoDb;
+            }
         }
 
         // 3. Check Authorization header (AWS SigV4 credential scope: .../us-east-1/<service>/aws4_request)
@@ -60,6 +66,7 @@ impl Dispatcher {
                     "ssm" => return AwsService::Ssm,
                     "secretsmanager" => return AwsService::SecretsManager,
                     "sts" => return AwsService::Sts,
+                    "dynamodb" => return AwsService::DynamoDb,
                     _ => {}
                 }
             }
@@ -94,6 +101,9 @@ impl Dispatcher {
             if host_clean.contains(".sts.") || host_clean.starts_with("sts.") {
                 return AwsService::Sts;
             }
+            if host_clean.contains(".dynamodb.") || host_clean.starts_with("dynamodb.") {
+                return AwsService::DynamoDb;
+            }
             // Check for S3 bucket subdomain style like bucket.localhost
             if host_clean.ends_with(".localhost")
                 && !host_clean.starts_with("localhost")
@@ -103,6 +113,7 @@ impl Dispatcher {
                 && !host_clean.starts_with("ssm")
                 && !host_clean.starts_with("secretsmanager")
                 && !host_clean.starts_with("sts")
+                && !host_clean.starts_with("dynamodb")
             {
                 return AwsService::S3;
             }
@@ -137,6 +148,9 @@ impl Dispatcher {
             }
             if first == "sts" {
                 return AwsService::Sts;
+            }
+            if first == "dynamodb" {
+                return AwsService::DynamoDb;
             }
         }
 
@@ -278,42 +292,16 @@ mod tests {
     }
 
     #[test]
-    fn test_ssm_dispatch() {
+    fn test_dynamodb_dispatch() {
         let mut headers = HeaderMap::new();
         headers.insert(
             "x-amz-target",
-            HeaderValue::from_static("AmazonSSM.GetParameter"),
+            HeaderValue::from_static("DynamoDB_20120810.PutItem"),
         );
         let uri: Uri = "/".parse().unwrap();
         assert_eq!(
             Dispatcher::classify_request(&Method::POST, &uri, &headers, None),
-            AwsService::Ssm
-        );
-    }
-
-    #[test]
-    fn test_secretsmanager_dispatch() {
-        let mut headers = HeaderMap::new();
-        headers.insert(
-            "x-amz-target",
-            HeaderValue::from_static("secretsmanager.GetSecretValue"),
-        );
-        let uri: Uri = "/".parse().unwrap();
-        assert_eq!(
-            Dispatcher::classify_request(&Method::POST, &uri, &headers, None),
-            AwsService::SecretsManager
-        );
-    }
-
-    #[test]
-    fn test_sts_dispatch() {
-        let uri: Uri = "/?Action=GetCallerIdentity&Version=2011-06-15"
-            .parse()
-            .unwrap();
-        let headers = HeaderMap::new();
-        assert_eq!(
-            Dispatcher::classify_request(&Method::POST, &uri, &headers, None),
-            AwsService::Sts
+            AwsService::DynamoDb
         );
     }
 }

@@ -1,4 +1,5 @@
 use clap::Parser;
+use ruststack_dynamodb::DynamoDbEngine;
 use ruststack_eventbridge::EventBridgeEngine;
 use ruststack_s3::InMemoryStorage;
 use ruststack_secretsmanager::SecretsManagerEngine;
@@ -45,6 +46,10 @@ async fn main() -> anyhow::Result<()> {
         opts.region.clone(),
     ));
     let sts_engine = Arc::new(StsEngine::new(opts.account_id.clone(), opts.region.clone()));
+    let dynamodb_engine = Arc::new(DynamoDbEngine::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
 
     let state = AppState {
         s3_storage,
@@ -54,6 +59,7 @@ async fn main() -> anyhow::Result<()> {
         ssm_engine,
         secretsmanager_engine,
         sts_engine,
+        dynamodb_engine,
         region: opts.region,
         account_id: opts.account_id,
     };

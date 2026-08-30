@@ -1042,6 +1042,7 @@ dependencies = [
  "chrono",
  "clap",
  "ruststack-core",
+ "ruststack-dynamodb",
  "ruststack-eventbridge",
  "ruststack-s3",
  "ruststack-secretsmanager",
@@ -1065,6 +1066,27 @@ dependencies = [
  "http",
  "quick-xml",
  "regex",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "ruststack-dynamodb"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "chrono",
+ "criterion",
+ "dashmap",
+ "http",
+ "http-body-util",
+ "parking_lot",
+ "regex",
+ "ruststack-core",
  "serde",
  "serde_json",
  "thiserror",
@@ -1153,6 +1175,7 @@ dependencies = [
  "http",
  "http-body-util",
  "ruststack-core",
+ "ruststack-dynamodb",
  "ruststack-eventbridge",
  "ruststack-s3",
  "ruststack-secretsmanager",

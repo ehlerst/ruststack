@@ -18,6 +18,7 @@ ruststack-eventbridge.workspace = true
 ruststack-ssm.workspace = true
 ruststack-secretsmanager.workspace = true
 ruststack-sts.workspace = true
+ruststack-dynamodb.workspace = true
 tokio.workspace = true
 bytes.workspace = true
 serde.workspace = true

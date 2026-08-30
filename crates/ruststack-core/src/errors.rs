@@ -61,6 +61,13 @@ pub enum RustStackError {
         message: String,
         status: StatusCode,
     },
+
+    #[error("DynamoDB Error [{code}]: {message}")]
+    DynamoDb {
+        code: String,
+        message: String,
+        status: StatusCode,
+    },
 }
 
 impl RustStackError {
@@ -169,6 +176,22 @@ impl RustStackError {
             code: code.into(),
             message: message.into(),
             status: StatusCode::BAD_REQUEST,
+        }
+    }
+
+    pub fn dynamodb_bad_request(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::DynamoDb {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::BAD_REQUEST,
+        }
+    }
+
+    pub fn dynamodb_not_found(code: impl Into<String>, message: impl Into<String>) -> Self {
+        Self::DynamoDb {
+            code: code.into(),
+            message: message.into(),
+            status: StatusCode::NOT_FOUND,
         }
     }
 
@@ -376,6 +399,20 @@ impl RustStackError {
         })
     }
 
+    pub fn to_dynamodb_json(&self) -> serde_json::Value {
+        let (code, message) = match self {
+            Self::DynamoDb { code, message, .. } => (code.as_str(), message.as_str()),
+            Self::NotFound(msg) => ("ResourceNotFoundException", msg.as_str()),
+            Self::BadRequest(msg) => ("ValidationException", msg.as_str()),
+            _ => ("InternalServerError", "An internal error occurred."),
+        };
+
+        serde_json::json!({
+            "__type": format!("com.amazonaws.dynamodb.v20120810#{}", code),
+            "message": message
+        })
+    }
+
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::NotFound(_) => StatusCode::NOT_FOUND,
@@ -388,6 +425,7 @@ impl RustStackError {
             Self::Ssm { status, .. } => *status,
             Self::SecretsManager { status, .. } => *status,
             Self::Sts { status, .. } => *status,
+            Self::DynamoDb { status, .. } => *status,
         }
     }
 }

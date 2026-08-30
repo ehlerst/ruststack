@@ -9,6 +9,7 @@ pub enum AwsService {
     Ssm,
     SecretsManager,
     Sts,
+    DynamoDb,
     Internal,
     Unknown,
 }
@@ -23,6 +24,7 @@ impl fmt::Display for AwsService {
             AwsService::Ssm => write!(f, "ssm"),
             AwsService::SecretsManager => write!(f, "secretsmanager"),
             AwsService::Sts => write!(f, "sts"),
+            AwsService::DynamoDb => write!(f, "dynamodb"),
             AwsService::Internal => write!(f, "internal"),
             AwsService::Unknown => write!(f, "unknown"),
         }

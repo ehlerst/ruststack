@@ -1,5 +1,9 @@
 use bytes::Bytes;
 use clap::Parser;
+use ruststack_dynamodb::{
+    AttributeDefinition as DdbAttrDef, AttributeValue as DdbAttrVal, DynamoDbEngine,
+    KeySchemaElement as DdbKeyElem,
+};
 use ruststack_eventbridge::{EventBridgeEngine, PutEventsRequestEntry, Target};
 use ruststack_s3::{CompletedPart, InMemoryStorage, S3Storage};
 use ruststack_secretsmanager::{CreateSecretRequest, SecretsManagerEngine};
@@ -689,6 +693,131 @@ pub fn run_sts_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     results
 }
 
+pub fn run_dynamodb_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let ddb = DynamoDbEngine::new("000000000000".to_string(), "us-east-1".to_string());
+
+    ddb.create_table(
+        "BenchTable".to_string(),
+        vec![
+            DdbKeyElem {
+                attribute_name: "pk".to_string(),
+                key_type: "HASH".to_string(),
+            },
+            DdbKeyElem {
+                attribute_name: "sk".to_string(),
+                key_type: "RANGE".to_string(),
+            },
+        ],
+        vec![
+            DdbAttrDef {
+                attribute_name: "pk".to_string(),
+                attribute_type: "S".to_string(),
+            },
+            DdbAttrDef {
+                attribute_name: "sk".to_string(),
+                attribute_type: "N".to_string(),
+            },
+        ],
+        Some("PAY_PER_REQUEST".to_string()),
+        None,
+        None,
+    )
+    .unwrap();
+
+    // Pre-populate 500 items
+    for i in 0..500 {
+        let mut item = HashMap::new();
+        item.insert("pk".to_string(), DdbAttrVal::S(format!("user_{}", i % 10)));
+        item.insert("sk".to_string(), DdbAttrVal::N(i.to_string()));
+        item.insert(
+            "name".to_string(),
+            DdbAttrVal::S(format!("User Name {}", i)),
+        );
+        ddb.put_item("BenchTable", item, None, None, None).unwrap();
+    }
+
+    // 1. PutItem
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let mut item = HashMap::new();
+        item.insert("pk".to_string(), DdbAttrVal::S("user_1".to_string()));
+        item.insert("sk".to_string(), DdbAttrVal::N(format!("k_{}", i)));
+        item.insert("val".to_string(), DdbAttrVal::S("bench_val".to_string()));
+        let start = Instant::now();
+        ddb.put_item("BenchTable", item, None, None, None).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "DynamoDB",
+        "PutItem",
+        Some("Single Item"),
+    ));
+
+    // 2. GetItem
+    let mut latencies = Vec::with_capacity(iterations);
+    let mut key = HashMap::new();
+    key.insert("pk".to_string(), DdbAttrVal::S("user_0".to_string()));
+    key.insert("sk".to_string(), DdbAttrVal::N("100".to_string()));
+
+    let start_total = Instant::now();
+    for _ in 0..iterations {
+        let start = Instant::now();
+        ddb.get_item("BenchTable", &key, None, None).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "DynamoDB",
+        "GetItem",
+        Some("Point Read PK+SK"),
+    ));
+
+    // 3. Query (Range condition)
+    let iters_query = (iterations / 2).max(100);
+    let mut latencies = Vec::with_capacity(iters_query);
+    let mut attr_values = HashMap::new();
+    attr_values.insert(":pk".to_string(), DdbAttrVal::S("user_0".to_string()));
+    attr_values.insert(":sk_min".to_string(), DdbAttrVal::N("50".to_string()));
+    attr_values.insert(":sk_max".to_string(), DdbAttrVal::N("200".to_string()));
+
+    let start_total = Instant::now();
+    for _ in 0..iters_query {
+        let start = Instant::now();
+        ddb.query(
+            "BenchTable",
+            None,
+            "pk = :pk AND sk BETWEEN :sk_min AND :sk_max",
+            None,
+            Some(true),
+            Some(50),
+            None,
+            Some(&attr_values),
+        )
+        .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_query,
+        None,
+        "DynamoDB",
+        "Query",
+        Some("BETWEEN Range Scan"),
+    ));
+
+    results
+}
+
 fn format_markdown(results: &[BenchmarkResult]) -> String {
     let mut md = String::new();
     md.push_str("# 🚀 RustStack Performance Benchmark Report\n\n");
@@ -791,6 +920,15 @@ fn main() -> anyhow::Result<()> {
         );
         let sts_res = run_sts_benchmarks(opts.iterations);
         all_results.extend(sts_res);
+    }
+
+    if opts.service == "dynamodb" || opts.service == "ddb" || opts.service == "all" {
+        eprintln!(
+            "Running DynamoDB performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let ddb_res = run_dynamodb_benchmarks(opts.iterations);
+        all_results.extend(ddb_res);
     }
 
     let output_str = if opts.format == "json" {

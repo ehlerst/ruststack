@@ -1,6 +1,7 @@
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use http_body_util::BodyExt;
+use ruststack_dynamodb::DynamoDbEngine;
 use ruststack_eventbridge::EventBridgeEngine;
 use ruststack_s3::InMemoryStorage;
 use ruststack_secretsmanager::SecretsManagerEngine;
@@ -43,6 +44,10 @@ async fn test_server_unified_routing() {
         "000000000000".to_string(),
         "us-east-1".to_string(),
     ));
+    let dynamodb_engine = Arc::new(DynamoDbEngine::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
 
     let state = AppState {
         s3_storage,
@@ -52,6 +57,7 @@ async fn test_server_unified_routing() {
         ssm_engine,
         secretsmanager_engine,
         sts_engine,
+        dynamodb_engine,
         region: "us-east-1".to_string(),
         account_id: "000000000000".to_string(),
     };
@@ -210,7 +216,38 @@ async fn test_server_unified_routing() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+
+    // 9. DynamoDB CreateTable via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "DynamoDB_20120810.CreateTable")
+                .header("content-type", "application/x-amz-json-1.0")
+                .body(Body::from(
+                    serde_json::json!({
+                        "TableName": "UnifiedTable",
+                        "KeySchema": [
+                            { "AttributeName": "pk", "KeyType": "HASH" }
+                        ],
+                        "AttributeDefinitions": [
+                            { "AttributeName": "pk", "AttributeType": "S" }
+                        ],
+                        "BillingMode": "PAY_PER_REQUEST"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let val: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(val["Account"].as_str().unwrap(), "000000000000");
+    assert_eq!(
+        val["TableDescription"]["TableStatus"].as_str().unwrap(),
+        "ACTIVE"
+    );
 }
