@@ -12,6 +12,7 @@ members = [
     "crates/ruststack-dynamodb",
     "crates/ruststack-server",
     "crates/ruststack-benchmarks",
+    "crates/ruststack-compat-tests",
 ]
 
 [workspace.package]
@@ -33,6 +34,7 @@ ruststack-ssm = { path = "crates/ruststack-ssm" }
 ruststack-secretsmanager = { path = "crates/ruststack-secretsmanager" }
 ruststack-sts = { path = "crates/ruststack-sts" }
 ruststack-dynamodb = { path = "crates/ruststack-dynamodb" }
+ruststack-server = { path = "crates/ruststack-server" }
 
 # Async & HTTP runtime
 tokio = { version = "1.43", features = ["full"] }

@@ -5,6 +5,7 @@ use axum::response::IntoResponse;
 use axum::routing::{any, get};
 use axum::Router;
 use clap::Parser;
+use http_body_util::BodyExt;
 use ruststack_core::{AwsService, Dispatcher};
 use ruststack_dynamodb::{handle_dynamodb_request, DynamoDbEngine};
 use ruststack_eventbridge::{handle_eventbridge_request, EventBridgeEngine};
@@ -121,31 +122,46 @@ async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> Response<Body> {
-    let method = req.method().clone();
-    let uri = req.uri().clone();
-    let headers = req.headers().clone();
+    let (parts, body) = req.into_parts();
+    let method = parts.method.clone();
+    let uri = parts.uri.clone();
+    let headers = parts.headers.clone();
 
-    // Check service classification
-    let service = Dispatcher::classify_request(&method, &uri, &headers, None);
+    let body_bytes = match body.collect().await {
+        Ok(collected) => collected.to_bytes(),
+        Err(e) => {
+            return Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(Body::from(e.to_string()))
+                .unwrap();
+        }
+    };
+
+    // Check service classification with body peek for Form Query actions
+    let service = Dispatcher::classify_request(&method, &uri, &headers, Some(&body_bytes));
+    let reconstructed_req = Request::from_parts(parts, Body::from(body_bytes));
 
     match service {
-        AwsService::S3 => handle_s3_request(state.s3_storage.clone(), req).await,
-        AwsService::Sqs => handle_sqs_request(state.sqs_engine.clone(), req).await,
-        AwsService::Sns => handle_sns_request(state.sns_engine.clone(), req).await,
+        AwsService::S3 => handle_s3_request(state.s3_storage.clone(), reconstructed_req).await,
+        AwsService::Sqs => handle_sqs_request(state.sqs_engine.clone(), reconstructed_req).await,
+        AwsService::Sns => handle_sns_request(state.sns_engine.clone(), reconstructed_req).await,
         AwsService::EventBridge => {
-            handle_eventbridge_request(state.eventbridge_engine.clone(), req).await
+            handle_eventbridge_request(state.eventbridge_engine.clone(), reconstructed_req).await
         }
-        AwsService::Ssm => handle_ssm_request(state.ssm_engine.clone(), req).await,
+        AwsService::Ssm => handle_ssm_request(state.ssm_engine.clone(), reconstructed_req).await,
         AwsService::SecretsManager => {
-            handle_secretsmanager_request(state.secretsmanager_engine.clone(), req).await
+            handle_secretsmanager_request(state.secretsmanager_engine.clone(), reconstructed_req)
+                .await
         }
-        AwsService::Sts => handle_sts_request(state.sts_engine.clone(), req).await,
-        AwsService::DynamoDb => handle_dynamodb_request(state.dynamodb_engine.clone(), req).await,
+        AwsService::Sts => handle_sts_request(state.sts_engine.clone(), reconstructed_req).await,
+        AwsService::DynamoDb => {
+            handle_dynamodb_request(state.dynamodb_engine.clone(), reconstructed_req).await
+        }
         AwsService::Internal => Response::builder()
             .status(StatusCode::OK)
             .header("content-type", "application/json")
             .body(Body::from(r#"{"status":"healthy","service":"ruststack"}"#))
             .unwrap(),
-        AwsService::Unknown => handle_s3_request(state.s3_storage.clone(), req).await,
+        AwsService::Unknown => handle_s3_request(state.s3_storage.clone(), reconstructed_req).await,
     }
 }

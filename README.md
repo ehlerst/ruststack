@@ -181,6 +181,20 @@ aws --endpoint-url=http://localhost:4566 sqs create-queue --queue-name orders-qu
 
 ---
 
+## 🧪 Pure Rust Native AWS Compatibility Test Suite
+
+RustStack features a 100% pure Rust integration and compatibility test suite (`crates/ruststack-compat-tests`) providing full feature parity testing without any Python runtime dependencies:
+
+```bash
+# Run all workspace tests (unit tests + full integration suite)
+cargo test --workspace
+
+# Run only the AWS Compatibility test suite
+cargo test -p ruststack-compat-tests
+```
+
+---
+
 ## 📊 Performance Testing & Benchmarking
 
 Every feature in RustStack comes with dedicated benchmarks and GitHub Actions CI rating workflows.

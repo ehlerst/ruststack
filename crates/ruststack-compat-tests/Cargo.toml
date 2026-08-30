@@ -1,0 +1,30 @@
+[package]
+name = "ruststack-compat-tests"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Pure Rust AWS SDK Compatibility Test Suite for RustStack"
+
+[dependencies]
+ruststack-core = { path = "../ruststack-core" }
+ruststack-s3 = { path = "../ruststack-s3" }
+ruststack-sqs = { path = "../ruststack-sqs" }
+ruststack-sns = { path = "../ruststack-sns" }
+ruststack-eventbridge = { path = "../ruststack-eventbridge" }
+ruststack-ssm = { path = "../ruststack-ssm" }
+ruststack-secretsmanager = { path = "../ruststack-secretsmanager" }
+ruststack-sts = { path = "../ruststack-sts" }
+ruststack-dynamodb = { path = "../ruststack-dynamodb" }
+ruststack-server = { path = "../ruststack-server" }
+tokio = { workspace = true }
+axum = { workspace = true }
+tower = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+quick-xml = { workspace = true }
+uuid = { workspace = true }
+form_urlencoded = { workspace = true }
