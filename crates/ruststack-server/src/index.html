@@ -212,13 +212,15 @@
       <button class="tab-btn" onclick="switchTab('sqs')">📬 SQS & SNS</button>
       <button class="tab-btn" onclick="switchTab('ssm')">🔐 SSM & Secrets</button>
       <button class="tab-btn" onclick="switchTab('kms')">🔑 KMS</button>
+      <button class="tab-btn" onclick="switchTab('logs')">🪵 Logs</button>
+      <button class="tab-btn" onclick="switchTab('iam')">👥 IAM</button>
       <button class="tab-btn" onclick="switchTab('chaos')">🌪️ Chaos Studio</button>
       <button class="tab-btn" onclick="switchTab('snapshots')">💾 Snapshots</button>
     </div>
 
     <!-- OVERVIEW TAB -->
     <div id="tab-overview" class="tab-content active">
-      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));">
         <div class="card">
           <div class="card-title">S3 Buckets & Objects</div>
           <div class="card-value" id="card-s3-count">0 / 0</div>
@@ -238,6 +240,14 @@
         <div class="card">
           <div class="card-title">KMS Keys & Aliases</div>
           <div class="card-value" id="card-kms-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">CloudWatch Log Groups</div>
+          <div class="card-value" id="card-logs-count">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">IAM Roles & Policies</div>
+          <div class="card-value" id="card-iam-count">0 / 0</div>
         </div>
       </div>
 
@@ -420,6 +430,78 @@
       </div>
     </div>
 
+    <!-- CLOUDWATCH LOGS TAB -->
+    <div id="tab-logs" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title"><span>CloudWatch Log Groups</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Log Group Name</th>
+              <th>ARN</th>
+              <th>Retention</th>
+              <th>Stored Bytes</th>
+              <th>Streams</th>
+            </tr>
+          </thead>
+          <tbody id="table-logs-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No log groups created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- IAM TAB -->
+    <div id="tab-iam" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title"><span>IAM Roles</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Role Name</th>
+              <th>Role ID</th>
+              <th>ARN</th>
+              <th>Attached Policies</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody id="table-iam-roles-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No roles created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title"><span>IAM Policies</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Policy Name</th>
+              <th>ARN</th>
+              <th>Attachment Count</th>
+            </tr>
+          </thead>
+          <tbody id="table-iam-policies-rows">
+            <tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No policies created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="section-title"><span>IAM Users</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>User Name</th>
+              <th>User ID</th>
+              <th>ARN</th>
+            </tr>
+          </thead>
+          <tbody id="table-iam-users-rows">
+            <tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No users created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- CHAOS TAB -->
     <div id="tab-chaos" class="tab-content">
       <div class="grid" style="grid-template-columns: 1fr 2fr;">
@@ -436,6 +518,8 @@
               <option value="ssm">SSM</option>
               <option value="secretsmanager">Secrets Manager</option>
               <option value="kms">KMS</option>
+              <option value="logs">CloudWatch Logs</option>
+              <option value="iam">IAM</option>
             </select>
           </div>
           <div class="form-group">
@@ -551,6 +635,8 @@
         document.getElementById('card-sqs-count').innerText = `${(dump.sqs.queues || []).length} / ${totalMsgs}`;
         document.getElementById('card-ssm-count').innerText = `${(dump.ssm.parameters || []).length} / ${(dump.secretsmanager.secrets || []).length}`;
         document.getElementById('card-kms-count').innerText = `${(dump.kms?.keys || []).length} / ${(dump.kms?.aliases || []).length}`;
+        document.getElementById('card-logs-count').innerText = `${(dump.logs?.groups || []).length}`;
+        document.getElementById('card-iam-count').innerText = `${(dump.iam?.roles || []).length} / ${(dump.iam?.policies || []).length}`;
 
         // Populate Tables
         renderDynamoTables(dump.dynamodb.tables || []);
@@ -560,8 +646,62 @@
         renderSsm(dump.ssm.parameters || []);
         renderSecrets(dump.secretsmanager.secrets || []);
         renderKms(dump.kms?.keys || [], dump.kms?.aliases || []);
+        renderLogs(dump.logs?.groups || []);
+        renderIam(dump.iam?.roles || [], dump.iam?.policies || [], dump.iam?.users || []);
       } catch (err) {
         console.error("Failed to load state", err);
+      }
+    }
+
+    function renderLogs(groups) {
+      const tbody = document.getElementById('table-logs-rows');
+      if (!groups.length) {
+        tbody.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No log groups created yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = groups.map(g => `<tr>
+        <td><strong>${g.group.log_group_name}</strong></td>
+        <td><small style="color: var(--text-muted);">${g.group.arn}</small></td>
+        <td>${g.group.retention_in_days ? `${g.group.retention_in_days} days` : 'Never'}</td>
+        <td>${g.group.stored_bytes} bytes</td>
+        <td><span class="badge badge-primary">${Object.keys(g.streams || {}).length} streams</span></td>
+      </tr>`).join('');
+    }
+
+    function renderIam(roles, policies, users) {
+      const tbodyRoles = document.getElementById('table-iam-roles-rows');
+      if (!roles.length) {
+        tbodyRoles.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No roles created yet</td></tr>';
+      } else {
+        tbodyRoles.innerHTML = roles.map(r => `<tr>
+          <td><strong>${r.role_name}</strong></td>
+          <td><code>${r.role_id}</code></td>
+          <td><small style="color: var(--text-muted);">${r.arn}</small></td>
+          <td>${(r.attached_policies || []).length} attached</td>
+          <td>${new Date(r.create_date).toLocaleDateString()}</td>
+        </tr>`).join('');
+      }
+
+      const tbodyPol = document.getElementById('table-iam-policies-rows');
+      if (!policies.length) {
+        tbodyPol.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No policies created yet</td></tr>';
+      } else {
+        tbodyPol.innerHTML = policies.map(p => `<tr>
+          <td><strong>${p.policy_name}</strong></td>
+          <td><small style="color: var(--text-muted);">${p.arn}</small></td>
+          <td><span class="badge badge-primary">${p.attachment_count}</span></td>
+        </tr>`).join('');
+      }
+
+      const tbodyUsers = document.getElementById('table-iam-users-rows');
+      if (!users.length) {
+        tbodyUsers.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No users created yet</td></tr>';
+      } else {
+        tbodyUsers.innerHTML = users.map(u => `<tr>
+          <td><strong>${u.user_name}</strong></td>
+          <td><code>${u.user_id}</code></td>
+          <td><small style="color: var(--text-muted);">${u.arn}</small></td>
+        </tr>`).join('');
       }
     }
 

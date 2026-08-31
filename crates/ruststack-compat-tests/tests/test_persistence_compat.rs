@@ -58,6 +58,28 @@ async fn test_auto_disk_persistence_cycle() {
     assert_eq!(kms_status, StatusCode::OK);
     let key_id = kms_val["KeyMetadata"]["KeyId"].as_str().unwrap().to_string();
 
+    // Create CloudWatch Logs group
+    let (logs_status, _) = client1
+        .call_json(
+            "Logs_20140328.CreateLogGroup",
+            json!({ "logGroupName": "/aws/persist/logs" }),
+        )
+        .await;
+    assert_eq!(logs_status, StatusCode::OK);
+
+    // Create IAM Role
+    let (iam_status, _) = client1
+        .call_query(
+            "/",
+            &[
+                ("Action", "CreateRole"),
+                ("RoleName", "PersistRole"),
+                ("AssumeRolePolicyDocument", "{}"),
+            ],
+        )
+        .await;
+    assert_eq!(iam_status, StatusCode::OK);
+
     // 2. Dump State to Disk
     let dump_req = axum::http::Request::builder()
         .method(axum::http::Method::POST)
@@ -138,4 +160,21 @@ async fn test_auto_disk_persistence_cycle() {
         .await;
     assert_eq!(kms_desc_status, StatusCode::OK);
     assert_eq!(kms_desc_val["KeyMetadata"]["Description"], "Persist Master Key");
+
+    // CloudWatch Log group exists
+    let (logs_desc_status, logs_desc_val) = client2
+        .call_json(
+            "Logs_20140328.DescribeLogGroups",
+            json!({ "logGroupNamePrefix": "/aws/persist" }),
+        )
+        .await;
+    assert_eq!(logs_desc_status, StatusCode::OK);
+    assert_eq!(logs_desc_val["logGroups"].as_array().unwrap().len(), 1);
+
+    // IAM Role exists
+    let (iam_get_status, iam_get_body) = client2
+        .call_query("/", &[("Action", "GetRole"), ("RoleName", "PersistRole")])
+        .await;
+    assert_eq!(iam_get_status, StatusCode::OK);
+    assert!(iam_get_body.contains("<RoleName>PersistRole</RoleName>"));
 }

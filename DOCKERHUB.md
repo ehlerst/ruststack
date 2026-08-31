@@ -45,7 +45,7 @@ services:
     volumes:
       - ./ruststack-data:/data
     environment:
-      - SERVICES=s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms
+      - SERVICES=s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam
       - DEFAULT_REGION=us-east-1
       - ACCOUNT_ID=000000000000
       - RUSTSTACK_DATA_DIR=/data
@@ -69,6 +69,8 @@ RustStack includes a zero-dependency, dark-mode visual administration dashboard 
 - Explore **SNS Topics & Subscriptions**
 - Inspect **SSM Parameters & Secrets Manager Secrets**
 - Manage **KMS Customer & AWS Managed Master Keys & Aliases**
+- Inspect **CloudWatch Log Groups & Streams**
+- Inspect **IAM Roles, Policies, Users & Access Keys**
 - Interactively build **Chaos Engineering** rules & manage **State Snapshots**
 
 ---
@@ -125,6 +127,8 @@ All services multiplex across the single port `4566`:
 | **Secrets Manager** | AWS JSON 1.1 | Secret Lifecycle, Version Staging (`AWSCURRENT`, `AWSPREVIOUS`), GetSecretValue |
 | **Amazon STS** | Query & JSON 1.1 | `GetCallerIdentity`, `AssumeRole`, `GetSessionToken` |
 | **AWS KMS** | AWS JSON 1.1 | `CreateKey`, `DescribeKey`, `ListKeys`, `CreateAlias`, `ListAliases`, `Encrypt`, `Decrypt`, `GenerateDataKey` (AES-128/256) |
+| **CloudWatch Logs** | AWS JSON 1.1 | `CreateLogGroup`, `CreateLogStream`, `PutLogEvents`, `GetLogEvents`, `FilterLogEvents` |
+| **AWS IAM** | Query & JSON 1.1 | `CreateRole`, `GetRole`, `DeleteRole`, `ListRoles`, `CreatePolicy`, `AttachRolePolicy`, `CreateUser`, `CreateAccessKey` |
 
 ---
 

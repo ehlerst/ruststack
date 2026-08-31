@@ -17,6 +17,8 @@ ruststack-secretsmanager = { path = "../ruststack-secretsmanager" }
 ruststack-sts = { path = "../ruststack-sts" }
 ruststack-dynamodb = { path = "../ruststack-dynamodb" }
 ruststack-kms = { path = "../ruststack-kms" }
+ruststack-logs = { path = "../ruststack-logs" }
+ruststack-iam = { path = "../ruststack-iam" }
 ruststack-server = { path = "../ruststack-server" }
 tokio = { workspace = true }
 axum = { workspace = true }

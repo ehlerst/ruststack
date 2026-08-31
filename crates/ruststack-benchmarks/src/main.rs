@@ -938,6 +938,143 @@ fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     results
 }
 
+fn run_logs_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    use ruststack_logs::{
+        CreateLogGroupRequest, CreateLogStreamRequest, FilterLogEventsRequest,
+        InputLogEvent, LogsState, PutLogEventsRequest,
+    };
+
+    let mut results = Vec::new();
+    let logs = LogsState::new("000000000000".to_string(), "us-east-1".to_string());
+
+    logs.create_log_group(CreateLogGroupRequest {
+        log_group_name: "/bench/group".to_string(),
+        retention_in_days: Some(14),
+        tags: None,
+    }).unwrap();
+
+    logs.create_log_stream(CreateLogStreamRequest {
+        log_group_name: "/bench/group".to_string(),
+        log_stream_name: "bench-stream".to_string(),
+    }).unwrap();
+
+    // 1. PutLogEvents
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let start = Instant::now();
+        let _ = logs.put_log_events(PutLogEventsRequest {
+            log_group_name: "/bench/group".to_string(),
+            log_stream_name: "bench-stream".to_string(),
+            log_events: vec![
+                InputLogEvent {
+                    timestamp: 1700000000 + i as i64,
+                    message: format!("Log entry number {}", i),
+                }
+            ],
+            sequence_token: None,
+        }).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "Logs",
+        "PutLogEvents",
+        Some("Single Event"),
+    ));
+
+    // 2. FilterLogEvents
+    let iters_filter = (iterations / 2).max(100);
+    let mut latencies = Vec::with_capacity(iters_filter);
+    let start_total = Instant::now();
+    for _ in 0..iters_filter {
+        let start = Instant::now();
+        let _ = logs.filter_log_events(FilterLogEventsRequest {
+            log_group_name: "/bench/group".to_string(),
+            log_stream_names: None,
+            log_stream_name_prefix: None,
+            start_time: None,
+            end_time: None,
+            filter_pattern: Some("entry".to_string()),
+            limit: Some(50),
+            next_token: None,
+        }).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_filter,
+        None,
+        "Logs",
+        "FilterLogEvents",
+        Some("Pattern Filter"),
+    ));
+
+    results
+}
+
+fn run_iam_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    use ruststack_iam::IamState;
+
+    let mut results = Vec::new();
+    let iam = IamState::new("000000000000".to_string());
+
+    iam.create_role(
+        "BenchRole".to_string(),
+        "{}".to_string(),
+        None,
+        Some("Benchmark Role".to_string()),
+    ).unwrap();
+
+    // 1. GetRole
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for _ in 0..iterations {
+        let start = Instant::now();
+        let _ = iam.get_role("BenchRole").unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "IAM",
+        "GetRole",
+        Some("Direct Lookup"),
+    ));
+
+    // 2. CreateRole
+    let iters_role = iterations.min(500);
+    let mut latencies = Vec::with_capacity(iters_role);
+    let start_total = Instant::now();
+    for i in 0..iters_role {
+        let start = Instant::now();
+        let _ = iam.create_role(
+            format!("Role_{}", i),
+            "{}".to_string(),
+            None,
+            None,
+        ).unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_role,
+        None,
+        "IAM",
+        "CreateRole",
+        None,
+    ));
+
+    results
+}
+
 fn format_markdown(results: &[BenchmarkResult]) -> String {
     let mut md = String::new();
     md.push_str("# 🚀 RustStack Performance Benchmark Report\n\n");
@@ -1058,6 +1195,24 @@ fn main() -> anyhow::Result<()> {
         );
         let kms_res = run_kms_benchmarks(opts.iterations);
         all_results.extend(kms_res);
+    }
+
+    if opts.service == "logs" || opts.service == "all" {
+        eprintln!(
+            "Running CloudWatch Logs performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let logs_res = run_logs_benchmarks(opts.iterations);
+        all_results.extend(logs_res);
+    }
+
+    if opts.service == "iam" || opts.service == "all" {
+        eprintln!(
+            "Running IAM performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let iam_res = run_iam_benchmarks(opts.iterations);
+        all_results.extend(iam_res);
     }
 
     let output_str = if opts.format == "json" {

@@ -47,6 +47,11 @@ fn setup_test_app() -> axum::Router {
         account_id.clone(),
         region.clone(),
     ));
+    let logs_state = Arc::new(ruststack_logs::LogsState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let iam_state = Arc::new(ruststack_iam::IamState::new(account_id.clone()));
 
     let app_state = AppState {
         s3_storage,
@@ -58,6 +63,8 @@ fn setup_test_app() -> axum::Router {
         sts_engine,
         dynamodb_engine,
         kms_state,
+        logs_state,
+        iam_state,
         chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region,
         account_id,

@@ -1462,7 +1462,9 @@ dependencies = [
  "ruststack-core",
  "ruststack-dynamodb",
  "ruststack-eventbridge",
+ "ruststack-iam",
  "ruststack-kms",
+ "ruststack-logs",
  "ruststack-s3",
  "ruststack-secretsmanager",
  "ruststack-sns",
@@ -1489,7 +1491,9 @@ dependencies = [
  "ruststack-core",
  "ruststack-dynamodb",
  "ruststack-eventbridge",
+ "ruststack-iam",
  "ruststack-kms",
+ "ruststack-logs",
  "ruststack-s3",
  "ruststack-secretsmanager",
  "ruststack-server",
@@ -1571,6 +1575,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruststack-iam"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "fastrand",
+ "form_urlencoded",
+ "http",
+ "http-body-util",
+ "quick-xml",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ruststack-kms"
 version = "0.1.0"
 dependencies = [
@@ -1584,6 +1610,26 @@ dependencies = [
  "http",
  "http-body-util",
  "parking_lot",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "ruststack-logs"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "fastrand",
+ "http",
+ "http-body-util",
  "ruststack-core",
  "serde",
  "serde_json",
@@ -1657,7 +1703,9 @@ dependencies = [
  "ruststack-core",
  "ruststack-dynamodb",
  "ruststack-eventbridge",
+ "ruststack-iam",
  "ruststack-kms",
+ "ruststack-logs",
  "ruststack-s3",
  "ruststack-secretsmanager",
  "ruststack-sns",

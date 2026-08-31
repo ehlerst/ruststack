@@ -52,6 +52,11 @@ async fn test_server_unified_routing() {
         "000000000000".to_string(),
         "us-east-1".to_string(),
     ));
+    let logs_state = Arc::new(ruststack_logs::LogsState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let iam_state = Arc::new(ruststack_iam::IamState::new("000000000000".to_string()));
 
     let state = AppState {
         s3_storage,
@@ -63,6 +68,8 @@ async fn test_server_unified_routing() {
         sts_engine,
         dynamodb_engine,
         kms_state,
+        logs_state,
+        iam_state,
         chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region: "us-east-1".to_string(),
         account_id: "000000000000".to_string(),
@@ -256,4 +263,51 @@ async fn test_server_unified_routing() {
         val["TableDescription"]["TableStatus"].as_str().unwrap(),
         "ACTIVE"
     );
+
+    // 10. KMS CreateKey via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "TrentService.CreateKey")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(r#"{"Description": "unified-kms-key"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 11. CloudWatch Logs CreateLogGroup via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "Logs_20140328.CreateLogGroup")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(r#"{"logGroupName": "/aws/lambda/unified-log"}"#))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 12. IAM CreateRole via unified router (Query protocol)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("Action=CreateRole&RoleName=UnifiedRole&AssumeRolePolicyDocument=%7B%7D"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 }

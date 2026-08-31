@@ -256,8 +256,62 @@ async fn main() -> anyhow::Result<()> {
     assert_eq!(decrypted_b64, plain_b64);
     println!("   ✓ CreateKey + CreateAlias + Encrypt + Decrypt verified in {:.2} ms!", t.elapsed().as_secs_f64() * 1000.0);
 
-    // 9. Chaos Engineering Fault Injection & Auto-Healing
-    println!("\n🌪️ 9. Testing Chaos Engineering & Self-Healing...");
+    // 9. Amazon CloudWatch Logs Lifecycle
+    println!("\n🪵 9. Testing Amazon CloudWatch Logs...");
+    let t = Instant::now();
+    let resp = client.post(format!("{}/", base_url))
+        .header("x-amz-target", "Logs_20140328.CreateLogGroup")
+        .header("content-type", "application/x-amz-json-1.1")
+        .json(&json!({ "logGroupName": "/aws/lambda/live-service" }))
+        .send().await?;
+    assert_eq!(resp.status(), 200);
+
+    let resp = client.post(format!("{}/", base_url))
+        .header("x-amz-target", "Logs_20140328.CreateLogStream")
+        .header("content-type", "application/x-amz-json-1.1")
+        .json(&json!({
+            "logGroupName": "/aws/lambda/live-service",
+            "logStreamName": "live-stream-1"
+        }))
+        .send().await?;
+    assert_eq!(resp.status(), 200);
+
+    let resp = client.post(format!("{}/", base_url))
+        .header("x-amz-target", "Logs_20140328.PutLogEvents")
+        .header("content-type", "application/x-amz-json-1.1")
+        .json(&json!({
+            "logGroupName": "/aws/lambda/live-service",
+            "logStreamName": "live-stream-1",
+            "logEvents": [
+                { "timestamp": 1725000000, "message": "Transaction initiated" }
+            ]
+        }))
+        .send().await?;
+    assert_eq!(resp.status(), 200);
+    println!("   ✓ CreateLogGroup + CreateLogStream + PutLogEvents verified in {:.2} ms!", t.elapsed().as_secs_f64() * 1000.0);
+
+    // 10. AWS IAM Lifecycle
+    println!("\n👥 10. Testing AWS IAM...");
+    let t = Instant::now();
+    let resp = client.post(format!("{}/", base_url))
+        .header("content-type", "application/x-www-form-urlencoded")
+        .body("Action=CreateRole&RoleName=LiveServerlessRole&AssumeRolePolicyDocument=%7B%7D")
+        .send().await?;
+    assert_eq!(resp.status(), 200);
+    let role_xml = resp.text().await?;
+    assert!(role_xml.contains("LiveServerlessRole"));
+
+    let resp = client.post(format!("{}/", base_url))
+        .header("content-type", "application/x-www-form-urlencoded")
+        .body("Action=CreateAccessKey&UserName=LiveServerlessRole")
+        .send().await?;
+    assert_eq!(resp.status(), 200);
+    let key_xml = resp.text().await?;
+    assert!(key_xml.contains("AKIA"));
+    println!("   ✓ CreateRole + CreateAccessKey verified in {:.2} ms!", t.elapsed().as_secs_f64() * 1000.0);
+
+    // 11. Chaos Engineering Fault Injection & Auto-Healing
+    println!("\n🌪️ 11. Testing Chaos Engineering & Self-Healing...");
     let t = Instant::now();
     let resp = client.post(format!("{}/_ruststack/chaos/rules", base_url))
         .json(&json!({
@@ -279,8 +333,8 @@ async fn main() -> anyhow::Result<()> {
     assert_eq!(resp.status(), 200, "Expected 200 OK after auto-heal");
     println!("   ✓ Injected 503 SlowDown -> Triggered -> Auto-Healed on next request in {:.2} ms!", t.elapsed().as_secs_f64() * 1000.0);
 
-    // 9. State Dump & Selective Reset
-    println!("\n💾 9. Testing State Dump & Restoration...");
+    // 12. State Dump & Selective Reset
+    println!("\n💾 12. Testing State Dump & Restoration...");
     let t = Instant::now();
     let resp = client.get(format!("{}/_ruststack/state/dump", base_url)).send().await?;
     assert_eq!(resp.status(), 200);
@@ -311,8 +365,8 @@ async fn main() -> anyhow::Result<()> {
     assert_eq!(restored_dump["sqs"]["queues"].as_array().unwrap().len(), 1);
     println!("   ✓ Full State Snapshot Export + Selective Reset + Snapshot Restore verified in {:.2} ms!", t.elapsed().as_secs_f64() * 1000.0);
 
-    // 10. Web Admin UI
-    println!("\n🖥️ 10. Testing Embedded Web Admin UI...");
+    // 13. Web Admin UI
+    println!("\n🖥️ 13. Testing Embedded Web Admin UI...");
     let t = Instant::now();
     let resp = client.get(format!("{}/_ruststack/ui/", base_url)).send().await?;
     assert_eq!(resp.status(), 200);
@@ -322,7 +376,7 @@ async fn main() -> anyhow::Result<()> {
     println!("   ✓ Web Console delivered in {:.2} ms ({} bytes)", t.elapsed().as_secs_f64() * 1000.0, html.len());
 
     println!("\n==========================================================================");
-    println!("🎉 ALL 10 COMPREHENSIVE LIVE TESTS PASSED 100% AGAINST RUNNING CONTAINER!");
+    println!("🎉 ALL 13 COMPREHENSIVE LIVE TESTS PASSED 100% AGAINST RUNNING CONTAINER!");
     println!("==========================================================================");
 
     Ok(())

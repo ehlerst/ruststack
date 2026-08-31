@@ -36,24 +36,27 @@ Automated in-memory performance rating on standard developer hardware:
 
 | Service | Operation | Payload / Batch | Throughput | p50 Latency | p95 Latency | Grade |
 |:---|:---|:---|---:|---:|---:|:---|
-| **SSM** | `GetParameter` | Exact Key | **450,000+ ops/s** | **1.0 µs** | 1.5 µs | **A+ (Ultra Fast)** |
-| **S3** | `GetObject` | 1 KB | **422,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
-| **STS** | `GetCallerIdentity` | Root Identity | **421,000+ ops/s** | **1.0 µs** | 1.5 µs | **A+ (Ultra Fast)** |
-| **DynamoDB** | `GetItem` | Point Read PK+SK | **389,000+ ops/s** | **1.4 µs** | 1.9 µs | **A+ (Ultra Fast)** |
-| **DynamoDB** | `PutItem` | Single Item | **364,000+ ops/s** | **1.4 µs** | 2.0 µs | **A+ (Ultra Fast)** |
-| **KMS** | `GenerateDataKey` | AES-256 (32B) | **353,000+ ops/s** | **1.8 µs** | 2.0 µs | **A+ (Ultra Fast)** |
-| **SecretsManager** | `GetSecretValue` | JSON Payload | **293,000+ ops/s** | **2.4 µs** | 2.8 µs | **A+ (Ultra Fast)** |
-| **SNS** | `Publish` | Single Topic | **227,000+ ops/s** | **3.4 µs** | 3.8 µs | **A+ (Ultra Fast)** |
-| **STS** | `AssumeRole` | Temporary Creds | **223,000+ ops/s** | **3.4 µs** | 3.8 µs | **A+ (Ultra Fast)** |
-| **SQS** | `SendMessageBatch` | 10 msgs/batch | **211,000+ msgs/s** | **42.8 µs** | 55.4 µs | **A (Excellent)** |
-| **KMS** | `CreateKey` | Customer Key | **205,000+ ops/s** | **3.4 µs** | 5.3 µs | **A+ (Ultra Fast)** |
-| **KMS** | `Decrypt` | 1 KB Payload | **201,000+ ops/s** | **3.8 µs** | 4.3 µs | **A+ (Ultra Fast)** |
-| **S3** | `PutObject` | 1 KB | **175,000+ ops/s** | **4.3 µs** | 5.7 µs | **A+ (Ultra Fast)** |
-| **KMS** | `Encrypt` | 1 KB Payload | **165,000+ ops/s** | **4.3 µs** | 8.0 µs | **A+ (Ultra Fast)** |
-| **SQS** | `SendMessage` | Single | **156,000+ ops/s** | **5.2 µs** | 5.7 µs | **A+ (Ultra Fast)** |
-| **SNS** | `PublishWithFanout` | 5 SQS Queues | **122,000+ msgs/s** | **39.1 µs** | 44.6 µs | **A (Excellent)** |
-| **SSM** | `GetParametersByPath` | 50 Keys Recursive | **99,000+ ops/s** | **9.0 µs** | 9.2 µs | **A+ (Ultra Fast)** |
-| **EventBridge** | `PutEvents` | Pattern Match + SQS Target | **85,000+ ops/s** | **10.0 µs** | 14.7 µs | **A+ (Ultra Fast)** |
+| **STS** | `GetCallerIdentity` | Root Identity | **449,000+ ops/s** | **1.0 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **SSM** | `GetParameter` | Exact Key | **438,000+ ops/s** | **1.0 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **IAM** | `GetRole` | Direct Lookup | **421,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **S3** | `GetObject` | 1 KB | **414,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **DynamoDB** | `GetItem` | Point Read PK+SK | **399,000+ ops/s** | **1.4 µs** | 1.9 µs | **A+ (Ultra Fast)** |
+| **DynamoDB** | `PutItem` | Single Item | **384,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **KMS** | `GenerateDataKey` | AES-256 (32B) | **338,000+ ops/s** | **1.9 µs** | 2.4 µs | **A+ (Ultra Fast)** |
+| **SecretsManager** | `GetSecretValue` | JSON Payload | **299,000+ ops/s** | **2.4 µs** | 2.4 µs | **A+ (Ultra Fast)** |
+| **Logs** | `PutLogEvents` | Single Event | **261,000+ ops/s** | **2.4 µs** | 3.4 µs | **A+ (Ultra Fast)** |
+| **IAM** | `CreateRole` | Role Definition | **224,000+ ops/s** | **3.3 µs** | 4.3 µs | **A+ (Ultra Fast)** |
+| **SQS** | `SendMessageBatch` | 10 msgs/batch | **214,000+ msgs/s** | **42.5 µs** | 51.5 µs | **A (Excellent)** |
+| **SNS** | `Publish` | Single Topic | **206,000+ ops/s** | **3.4 µs** | 4.8 µs | **A+ (Ultra Fast)** |
+| **STS** | `AssumeRole` | Temporary Creds | **203,000+ ops/s** | **3.8 µs** | 4.8 µs | **A+ (Ultra Fast)** |
+| **KMS** | `CreateKey` | Customer Key | **202,000+ ops/s** | **3.4 µs** | 4.8 µs | **A+ (Ultra Fast)** |
+| **KMS** | `Decrypt` | 1 KB Payload | **196,000+ ops/s** | **3.8 µs** | 4.7 µs | **A+ (Ultra Fast)** |
+| **S3** | `PutObject` | 1 KB | **173,000+ ops/s** | **4.3 µs** | 5.8 µs | **A+ (Ultra Fast)** |
+| **KMS** | `Encrypt` | 1 KB Payload | **169,000+ ops/s** | **4.3 µs** | 7.1 µs | **A+ (Ultra Fast)** |
+| **SQS** | `SendMessage` | Single | **149,000+ ops/s** | **5.2 µs** | 6.3 µs | **A+ (Ultra Fast)** |
+| **SNS** | `PublishWithFanout` | 5 SQS Queues | **115,000+ msgs/s** | **39.5 µs** | 55.5 µs | **A (Excellent)** |
+| **SSM** | `GetParametersByPath` | 50 Keys Recursive | **89,000+ ops/s** | **9.0 µs** | 16.6 µs | **A+ (Ultra Fast)** |
+| **EventBridge** | `PutEvents` | Pattern Match + SQS Target | **82,000+ ops/s** | **10.1 µs** | 14.7 µs | **A+ (Ultra Fast)** |
 
 ---
 
@@ -113,6 +116,18 @@ Automated in-memory performance rating on standard developer hardware:
 - **Alias Operations**: `CreateAlias`, `DeleteAlias`, `ListAliases` with automatic identifier resolution (`key-id`, `arn:aws:kms:...`, `alias/name`).
 - **Cryptographic Operations**: `Encrypt`, `Decrypt` with authenticated self-describing ciphertext envelopes, and `GenerateDataKey` (AES-128 & AES-256).
 - **Default Keys**: Pre-configured default managed keys (`alias/aws/s3`, `alias/aws/dynamodb`).
+
+### 10. Amazon CloudWatch Logs (`ruststack-logs`)
+- **Protocols**: AWS JSON 1.1 protocol (`x-amz-target: Logs_20140328.*`).
+- **Log Groups & Streams**: `CreateLogGroup`, `DeleteLogGroup`, `DescribeLogGroups`, `CreateLogStream`, `DeleteLogStream`, `DescribeLogStreams`.
+- **Event Ingestion & Search**: `PutLogEvents` (with sequence token chaining), `GetLogEvents`, and `FilterLogEvents` with pattern matching.
+
+### 11. AWS Identity and Access Management (`ruststack-iam`)
+- **Protocols**: AWS Query Protocol (Form URL-encoded & Query params) and JSON protocol.
+- **Roles & Policies**: `CreateRole`, `GetRole`, `DeleteRole`, `ListRoles`, `CreatePolicy`, `GetPolicy`, `DeletePolicy`, `ListPolicies`.
+- **Policy Attachments**: `AttachRolePolicy`, `DetachRolePolicy`, `ListAttachedRolePolicies`, inline policies (`PutRolePolicy`, `GetRolePolicy`, `DeleteRolePolicy`).
+- **Users & Credentials**: `CreateUser`, `GetUser`, `DeleteUser`, `ListUsers`, `CreateAccessKey`, `ListAccessKeys`, `DeleteAccessKey`.
+- **Pre-Configured AWS Policies**: Pre-seeded default AWS managed policies (`AdministratorAccess`, `AmazonS3FullAccess`, `AmazonDynamoDBFullAccess`, `AmazonSQSFullAccess`, `AWSLambdaBasicExecutionRole`).
 
 ---
 

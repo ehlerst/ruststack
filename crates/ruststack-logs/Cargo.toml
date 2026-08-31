@@ -1,0 +1,22 @@
+[package]
+name = "ruststack-logs"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ruststack-core = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+dashmap = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+uuid = { workspace = true }
+fastrand = { workspace = true }

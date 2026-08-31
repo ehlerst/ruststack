@@ -360,6 +360,11 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         opts.account_id.clone(),
         opts.region.clone(),
     ));
+    let logs_state = Arc::new(ruststack_logs::LogsState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let iam_state = Arc::new(ruststack_iam::IamState::new(opts.account_id.clone()));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let state = AppState {
@@ -372,6 +377,8 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         sts_engine: sts_engine.clone(),
         dynamodb_engine: dynamodb_engine.clone(),
         kms_state: kms_state.clone(),
+        logs_state: logs_state.clone(),
+        iam_state: iam_state.clone(),
         chaos_engine,
         region: opts.region.clone(),
         account_id: opts.account_id.clone(),
@@ -400,6 +407,8 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
                         sts_engine.load_state(snapshot.sts);
                         dynamodb_engine.load_state(snapshot.dynamodb);
                         kms_state.import_snapshot(snapshot.kms);
+                        logs_state.import_snapshot(snapshot.logs);
+                        iam_state.import_snapshot(snapshot.iam);
                         info!("💾 Auto-loaded persistent cluster state from {}", path);
                     }
                     Err(e) => tracing::warn!("Failed to parse persistent state file {}: {}", path, e),
@@ -436,6 +445,8 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
             sts: sts_engine.dump_state(),
             dynamodb: dynamodb_engine.dump_state(),
             kms: kms_state.export_snapshot(),
+            logs: logs_state.export_snapshot(),
+            iam: iam_state.export_snapshot(),
         };
         if let Ok(json_str) = serde_json::to_string_pretty(&snapshot) {
             if let Ok(()) = std::fs::write(path, json_str) {

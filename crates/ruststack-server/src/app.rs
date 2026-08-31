@@ -9,7 +9,9 @@ use http_body_util::BodyExt;
 use ruststack_core::{AwsService, ChaosDecision, ChaosEngine, Dispatcher};
 use ruststack_dynamodb::{handle_dynamodb_request, DynamoDbEngine};
 use ruststack_eventbridge::{handle_eventbridge_request, EventBridgeEngine};
+use ruststack_iam::{handle_iam_request, IamState};
 use ruststack_kms::{handle_kms_request, KmsState};
+use ruststack_logs::{handle_logs_request, LogsState};
 use ruststack_s3::{handle_s3_request, S3NotificationTarget, S3Storage};
 use ruststack_secretsmanager::{handle_secretsmanager_request, SecretsManagerEngine};
 use ruststack_sns::{handle_sns_request, SnsEngine};
@@ -42,7 +44,7 @@ pub struct Opts {
     #[arg(
         short,
         long,
-        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms",
+        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam",
         env = "SERVICES"
     )]
     pub services: String,
@@ -65,7 +67,7 @@ impl Default for Opts {
         Self {
             port: 4566,
             host: "0.0.0.0".to_string(),
-            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms".to_string(),
+            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam".to_string(),
             region: "us-east-1".to_string(),
             account_id: "000000000000".to_string(),
             data_dir: None,
@@ -133,6 +135,8 @@ pub struct AppState {
     pub sts_engine: Arc<StsEngine>,
     pub dynamodb_engine: Arc<DynamoDbEngine>,
     pub kms_state: Arc<KmsState>,
+    pub logs_state: Arc<LogsState>,
+    pub iam_state: Arc<IamState>,
     pub chaos_engine: Arc<ChaosEngine>,
     pub region: String,
     pub account_id: String,
@@ -191,7 +195,7 @@ async fn health_check() -> impl IntoResponse {
 async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
     let json_info = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "services": ["s3", "sqs", "sns", "events", "ssm", "secretsmanager", "sts", "dynamodb"],
+        "services": ["s3", "sqs", "sns", "events", "ssm", "secretsmanager", "sts", "dynamodb", "kms", "logs", "iam"],
         "region": state.region,
         "account_id": state.account_id,
         "features": {
@@ -203,6 +207,9 @@ async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
             "secretsmanager": ["secrets", "version-stages", "rotation", "binary-and-string", "json-protocol"],
             "sts": ["caller-identity", "assume-role", "session-tokens", "query-and-json-protocols"],
             "dynamodb": ["tables", "crud", "query", "scan", "key-conditions", "filter-expressions", "gsi-lsi", "batching", "json-protocol"],
+            "kms": ["keys", "aliases", "encrypt-decrypt", "generate-data-key", "json-protocol"],
+            "logs": ["log-groups", "log-streams", "put-events", "filter-events", "json-protocol"],
+            "iam": ["roles", "policies", "users", "access-keys", "query-and-json-protocols"],
             "chaos": ["latency-injection", "jitter", "error-rate-simulation", "rule-limits", "service-filtering"]
         }
     });
@@ -334,6 +341,23 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
         AwsService::Kms => {
             handle_kms_request(
                 State((*state.kms_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Logs => {
+            handle_logs_request(
+                State((*state.logs_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Iam => {
+            handle_iam_request(
+                State((*state.iam_state).clone()),
+                uri,
                 headers,
                 body_bytes,
             )

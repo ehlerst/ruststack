@@ -45,6 +45,11 @@ fn setup_test_app() -> axum::Router {
         account_id.clone(),
         region.clone(),
     ));
+    let logs_state = Arc::new(ruststack_logs::LogsState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let iam_state = Arc::new(ruststack_iam::IamState::new(account_id.clone()));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let app_state = AppState {
@@ -57,6 +62,8 @@ fn setup_test_app() -> axum::Router {
         sts_engine,
         dynamodb_engine,
         kms_state,
+        logs_state,
+        iam_state,
         chaos_engine,
         region,
         account_id,

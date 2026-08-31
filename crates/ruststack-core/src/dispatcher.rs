@@ -60,6 +60,18 @@ impl Dispatcher {
             {
                 return AwsService::Kms;
             }
+            if target.starts_with("Logs_20140328")
+                || target.starts_with("Logs")
+                || target.starts_with("Logs.")
+            {
+                return AwsService::Logs;
+            }
+            if target.starts_with("AWSIdentityManagement")
+                || target.starts_with("IAM")
+                || target.starts_with("IAM.")
+            {
+                return AwsService::Iam;
+            }
         }
 
         // 3. Check Authorization header (AWS SigV4 credential scope: .../us-east-1/<service>/aws4_request)
@@ -75,6 +87,8 @@ impl Dispatcher {
                     "sts" => return AwsService::Sts,
                     "dynamodb" => return AwsService::DynamoDb,
                     "kms" => return AwsService::Kms,
+                    "logs" => return AwsService::Logs,
+                    "iam" => return AwsService::Iam,
                     _ => {}
                 }
             }
@@ -115,6 +129,12 @@ impl Dispatcher {
             if host_clean.contains(".kms.") || host_clean.starts_with("kms.") {
                 return AwsService::Kms;
             }
+            if host_clean.contains(".logs.") || host_clean.starts_with("logs.") {
+                return AwsService::Logs;
+            }
+            if host_clean.contains(".iam.") || host_clean.starts_with("iam.") {
+                return AwsService::Iam;
+            }
             // Check for S3 bucket subdomain style like bucket.localhost
             if host_clean.ends_with(".localhost")
                 && !host_clean.starts_with("localhost")
@@ -126,6 +146,8 @@ impl Dispatcher {
                 && !host_clean.starts_with("sts")
                 && !host_clean.starts_with("dynamodb")
                 && !host_clean.starts_with("kms")
+                && !host_clean.starts_with("logs")
+                && !host_clean.starts_with("iam")
             {
                 return AwsService::S3;
             }
@@ -181,6 +203,9 @@ impl Dispatcher {
                         if is_sts_action(&v) {
                             return AwsService::Sts;
                         }
+                        if is_iam_action(&v) {
+                            return AwsService::Iam;
+                        }
                     }
                 }
             }
@@ -201,6 +226,9 @@ impl Dispatcher {
                             }
                             if is_sts_action(&v) {
                                 return AwsService::Sts;
+                            }
+                            if is_iam_action(&v) {
+                                return AwsService::Iam;
                             }
                         }
                     }
@@ -285,6 +313,40 @@ fn is_sts_action(action: &str) -> bool {
             | "GetSessionToken"
             | "GetFederationToken"
             | "DecodeAuthorizationMessage"
+    )
+}
+
+fn is_iam_action(action: &str) -> bool {
+    matches!(
+        action,
+        "CreateRole"
+            | "GetRole"
+            | "DeleteRole"
+            | "ListRoles"
+            | "UpdateRole"
+            | "CreatePolicy"
+            | "GetPolicy"
+            | "DeletePolicy"
+            | "ListPolicies"
+            | "AttachRolePolicy"
+            | "DetachRolePolicy"
+            | "ListAttachedRolePolicies"
+            | "PutRolePolicy"
+            | "GetRolePolicy"
+            | "DeleteRolePolicy"
+            | "ListRolePolicies"
+            | "CreateUser"
+            | "GetUser"
+            | "DeleteUser"
+            | "ListUsers"
+            | "CreateAccessKey"
+            | "ListAccessKeys"
+            | "DeleteAccessKey"
+            | "UpdateAccessKey"
+            | "PutUserPolicy"
+            | "GetUserPolicy"
+            | "DeleteUserPolicy"
+            | "ListUserPolicies"
     )
 }
 

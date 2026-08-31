@@ -22,6 +22,8 @@ pub struct RustStackStateSnapshot {
     pub sts: ruststack_sts::StsSnapshot,
     pub dynamodb: ruststack_dynamodb::DynamoDbSnapshot,
     pub kms: ruststack_kms::KmsStateSnapshot,
+    pub logs: ruststack_logs::LogsStateSnapshot,
+    pub iam: ruststack_iam::IamStateSnapshot,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -70,6 +72,8 @@ pub async fn state_reset_handler(
         "sts",
         "dynamodb",
         "kms",
+        "logs",
+        "iam",
     ];
 
     let target_services = match reset_req.services {
@@ -88,6 +92,8 @@ pub async fn state_reset_handler(
             "sts" => state.sts_engine.reset(),
             "dynamodb" => state.dynamodb_engine.reset(),
             "kms" => state.kms_state.reset(),
+            "logs" => state.logs_state.reset(),
+            "iam" => state.iam_state.reset(),
             _ => {}
         }
     }
@@ -134,6 +140,8 @@ pub async fn state_dump_handler(
         sts: state.sts_engine.dump_state(),
         dynamodb: state.dynamodb_engine.dump_state(),
         kms: state.kms_state.export_snapshot(),
+        logs: state.logs_state.export_snapshot(),
+        iam: state.iam_state.export_snapshot(),
     };
 
     if let Some(file_path) = dump_req.file_path {
@@ -245,6 +253,8 @@ pub async fn state_load_handler(
     state.sts_engine.load_state(snapshot.sts);
     state.dynamodb_engine.load_state(snapshot.dynamodb);
     state.kms_state.import_snapshot(snapshot.kms);
+    state.logs_state.import_snapshot(snapshot.logs);
+    state.iam_state.import_snapshot(snapshot.iam);
 
     let resp_json = json!({
         "status": "ok",

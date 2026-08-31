@@ -19,6 +19,8 @@
 7. **Amazon Secrets Manager (`secretsmanager`)**: Secret creation, version staging (`AWSCURRENT`, `AWSPREVIOUS`), GetSecretValue.
 8. **Amazon STS Mock (`sts`)**: `GetCallerIdentity`, `AssumeRole`, `GetSessionToken`.
 9. **AWS Key Management Service (`kms`)**: `CreateKey`, `DescribeKey`, `ListKeys`, `CreateAlias`, `ListAliases`, `Encrypt`, `Decrypt`, `GenerateDataKey` (AES-128 & AES-256).
+10. **Amazon CloudWatch Logs (`logs`)**: `CreateLogGroup`, `CreateLogStream`, `PutLogEvents`, `GetLogEvents`, `FilterLogEvents`.
+11. **AWS Identity and Access Management (`iam`)**: `CreateRole`, `GetRole`, `DeleteRole`, `ListRoles`, `CreatePolicy`, `AttachRolePolicy`, `CreateUser`, `CreateAccessKey`.
 
 ## Control Plane & Extensions
 - **Web Admin UI**: `GET /_ruststack/ui/` (Zero-dependency embedded dark-mode console)
@@ -28,7 +30,7 @@
 - **State Snapshots**:
   - Dump: `GET /_ruststack/state/dump`
   - Load / Restore: `POST /_ruststack/state/load`
-  - Atomic Reset: `POST /_ruststack/state/reset` (supports `{"services": ["s3", "dynamodb", "kms"]}`)
+  - Atomic Reset: `POST /_ruststack/state/reset` (supports `{"services": ["s3", "dynamodb", "kms", "logs", "iam"]}`)
 - **Chaos Engineering**:
   - Register Rule: `POST /_ruststack/chaos/rules` (configurable service, action, probability 0.0-1.0, error_status, error_code, latency_ms, limit_times)
   - List Rules: `GET /_ruststack/chaos/rules`
