@@ -53,7 +53,10 @@ async fn test_iam_query_protocol_lifecycle() {
             &[
                 ("Action", "AttachRolePolicy"),
                 ("RoleName", "MyTestRole"),
-                ("PolicyArn", "arn:aws:iam::000000000000:policy/TestDynamoAccess"),
+                (
+                    "PolicyArn",
+                    "arn:aws:iam::000000000000:policy/TestDynamoAccess",
+                ),
             ],
         )
         .await;
@@ -76,10 +79,7 @@ async fn test_iam_query_protocol_lifecycle() {
     let (status, body) = client
         .call_query(
             "/",
-            &[
-                ("Action", "CreateUser"),
-                ("UserName", "test-user-alice"),
-            ],
+            &[("Action", "CreateUser"), ("UserName", "test-user-alice")],
         )
         .await;
     assert_eq!(status, StatusCode::OK);

@@ -44,7 +44,11 @@ async fn test_iam_lifecycle() {
 
     // 4. Inline policy on role
     state
-        .put_role_policy("LambdaExecRole", "InlineKmsPolicy", r#"{"Effect":"Allow","Action":"kms:*"}"#)
+        .put_role_policy(
+            "LambdaExecRole",
+            "InlineKmsPolicy",
+            r#"{"Effect":"Allow","Action":"kms:*"}"#,
+        )
         .expect("put role policy");
     let inline_doc = state
         .get_role_policy("LambdaExecRole", "InlineKmsPolicy")

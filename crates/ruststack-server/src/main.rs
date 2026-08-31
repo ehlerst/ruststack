@@ -365,6 +365,22 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         opts.region.clone(),
     ));
     let iam_state = Arc::new(ruststack_iam::IamState::new(opts.account_id.clone()));
+    let cloudwatch_state = Arc::new(ruststack_cloudwatch::CloudWatchState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let ses_state = Arc::new(ruststack_ses::SesState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let kinesis_state = Arc::new(ruststack_kinesis::KinesisState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let lambda_state = Arc::new(ruststack_lambda::LambdaState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let state = AppState {
@@ -379,6 +395,10 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         kms_state: kms_state.clone(),
         logs_state: logs_state.clone(),
         iam_state: iam_state.clone(),
+        cloudwatch_state: cloudwatch_state.clone(),
+        ses_state: ses_state.clone(),
+        kinesis_state: kinesis_state.clone(),
+        lambda_state: lambda_state.clone(),
         chaos_engine,
         region: opts.region.clone(),
         account_id: opts.account_id.clone(),
@@ -409,9 +429,15 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
                         kms_state.import_snapshot(snapshot.kms);
                         logs_state.import_snapshot(snapshot.logs);
                         iam_state.import_snapshot(snapshot.iam);
+                        cloudwatch_state.import_snapshot(snapshot.cloudwatch);
+                        ses_state.import_snapshot(snapshot.ses);
+                        kinesis_state.import_snapshot(snapshot.kinesis);
+                        lambda_state.import_snapshot(snapshot.lambda);
                         info!("💾 Auto-loaded persistent cluster state from {}", path);
                     }
-                    Err(e) => tracing::warn!("Failed to parse persistent state file {}: {}", path, e),
+                    Err(e) => {
+                        tracing::warn!("Failed to parse persistent state file {}: {}", path, e)
+                    }
                 },
                 Err(e) => tracing::warn!("Failed to read persistent state file {}: {}", path, e),
             }
@@ -447,6 +473,10 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
             kms: kms_state.export_snapshot(),
             logs: logs_state.export_snapshot(),
             iam: iam_state.export_snapshot(),
+            cloudwatch: cloudwatch_state.export_snapshot(),
+            ses: ses_state.export_snapshot(),
+            kinesis: kinesis_state.export_snapshot(),
+            lambda: lambda_state.export_snapshot(),
         };
         if let Ok(json_str) = serde_json::to_string_pretty(&snapshot) {
             if let Ok(()) = std::fs::write(path, json_str) {

@@ -21,6 +21,11 @@
 9. **AWS Key Management Service (`kms`)**: `CreateKey`, `DescribeKey`, `ListKeys`, `CreateAlias`, `ListAliases`, `Encrypt`, `Decrypt`, `GenerateDataKey` (AES-128 & AES-256).
 10. **Amazon CloudWatch Logs (`logs`)**: `CreateLogGroup`, `CreateLogStream`, `PutLogEvents`, `GetLogEvents`, `FilterLogEvents`.
 11. **AWS Identity and Access Management (`iam`)**: `CreateRole`, `GetRole`, `DeleteRole`, `ListRoles`, `CreatePolicy`, `AttachRolePolicy`, `CreateUser`, `CreateAccessKey`.
+12. **Amazon Simple Email Service (`ses`)**: `VerifyEmailIdentity`, `ListIdentities`, `SendEmail`, `SendRawEmail`, `GetSendQuota`, `GetSendStatistics`, local email outbox.
+13. **Amazon Kinesis Data Streams (`kinesis`)**: `CreateStream`, `DescribeStream`, `PutRecord`, `PutRecords`, `GetShardIterator`, `GetRecords`, MD5 partition hashing.
+14. **AWS Lambda Mock (`lambda`)**: `CreateFunction`, `GetFunction`, `ListFunctions`, `DeleteFunction`, `Invoke` (sync/async/dryrun), `CreateEventSourceMapping`.
+15. **Amazon CloudWatch Metrics & Alarms (`cloudwatch`)**: `PutMetricData`, `ListMetrics`, `GetMetricData`, `GetMetricStatistics`, `PutMetricAlarm`, `DescribeAlarms`.
+16. **Amazon DynamoDB Streams (`dynamodbstreams`)**: `ListStreams`, `DescribeStream`, `GetShardIterator`, `GetRecords`, automated CDC change capture (`INSERT`/`MODIFY`/`REMOVE`).
 
 ## Control Plane & Extensions
 - **Web Admin UI**: `GET /_ruststack/ui/` (Zero-dependency embedded dark-mode console)

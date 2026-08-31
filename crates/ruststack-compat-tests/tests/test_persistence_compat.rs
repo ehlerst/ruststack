@@ -56,7 +56,10 @@ async fn test_auto_disk_persistence_cycle() {
         )
         .await;
     assert_eq!(kms_status, StatusCode::OK);
-    let key_id = kms_val["KeyMetadata"]["KeyId"].as_str().unwrap().to_string();
+    let key_id = kms_val["KeyMetadata"]["KeyId"]
+        .as_str()
+        .unwrap()
+        .to_string();
 
     // Create CloudWatch Logs group
     let (logs_status, _) = client1
@@ -149,17 +152,20 @@ async fn test_auto_disk_persistence_cycle() {
         )
         .await;
     assert_eq!(sqs_url_status, StatusCode::OK);
-    assert!(sqs_url_val["QueueUrl"].as_str().unwrap().contains("persist-tasks"));
+    assert!(sqs_url_val["QueueUrl"]
+        .as_str()
+        .unwrap()
+        .contains("persist-tasks"));
 
     // KMS key exists
     let (kms_desc_status, kms_desc_val) = client2
-        .call_json(
-            "TrentService.DescribeKey",
-            json!({ "KeyId": key_id }),
-        )
+        .call_json("TrentService.DescribeKey", json!({ "KeyId": key_id }))
         .await;
     assert_eq!(kms_desc_status, StatusCode::OK);
-    assert_eq!(kms_desc_val["KeyMetadata"]["Description"], "Persist Master Key");
+    assert_eq!(
+        kms_desc_val["KeyMetadata"]["Description"],
+        "Persist Master Key"
+    );
 
     // CloudWatch Log group exists
     let (logs_desc_status, logs_desc_val) = client2

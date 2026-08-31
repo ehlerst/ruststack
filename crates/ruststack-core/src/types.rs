@@ -13,6 +13,11 @@ pub enum AwsService {
     Kms,
     Logs,
     Iam,
+    Ses,
+    Kinesis,
+    Lambda,
+    CloudWatch,
+    DynamoDbStreams,
     Internal,
     Unknown,
 }
@@ -31,6 +36,11 @@ impl fmt::Display for AwsService {
             AwsService::Kms => write!(f, "kms"),
             AwsService::Logs => write!(f, "logs"),
             AwsService::Iam => write!(f, "iam"),
+            AwsService::Ses => write!(f, "ses"),
+            AwsService::Kinesis => write!(f, "kinesis"),
+            AwsService::Lambda => write!(f, "lambda"),
+            AwsService::CloudWatch => write!(f, "cloudwatch"),
+            AwsService::DynamoDbStreams => write!(f, "dynamodbstreams"),
             AwsService::Internal => write!(f, "internal"),
             AwsService::Unknown => write!(f, "unknown"),
         }

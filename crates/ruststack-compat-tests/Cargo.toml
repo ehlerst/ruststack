@@ -19,6 +19,10 @@ ruststack-dynamodb = { path = "../ruststack-dynamodb" }
 ruststack-kms = { path = "../ruststack-kms" }
 ruststack-logs = { path = "../ruststack-logs" }
 ruststack-iam = { path = "../ruststack-iam" }
+ruststack-cloudwatch = { path = "../ruststack-cloudwatch" }
+ruststack-ses = { path = "../ruststack-ses" }
+ruststack-kinesis = { path = "../ruststack-kinesis" }
+ruststack-lambda = { path = "../ruststack-lambda" }
 ruststack-server = { path = "../ruststack-server" }
 tokio = { workspace = true }
 axum = { workspace = true }

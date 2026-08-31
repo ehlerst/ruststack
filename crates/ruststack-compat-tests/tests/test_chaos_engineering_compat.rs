@@ -52,6 +52,22 @@ fn setup_test_app() -> axum::Router {
         region.clone(),
     ));
     let iam_state = Arc::new(ruststack_iam::IamState::new(account_id.clone()));
+    let cloudwatch_state = Arc::new(ruststack_cloudwatch::CloudWatchState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let ses_state = Arc::new(ruststack_ses::SesState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let kinesis_state = Arc::new(ruststack_kinesis::KinesisState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let lambda_state = Arc::new(ruststack_lambda::LambdaState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let app_state = AppState {
@@ -66,6 +82,10 @@ fn setup_test_app() -> axum::Router {
         kms_state,
         logs_state,
         iam_state,
+        cloudwatch_state,
+        ses_state,
+        kinesis_state,
+        lambda_state,
         chaos_engine,
         region,
         account_id,

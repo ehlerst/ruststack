@@ -1,12 +1,20 @@
 use bytes::Bytes;
 use clap::Parser;
+use ruststack_cloudwatch::types::*;
+use ruststack_cloudwatch::CloudWatchState;
 use ruststack_dynamodb::{
     AttributeDefinition as DdbAttrDef, AttributeValue as DdbAttrVal, DynamoDbEngine,
     KeySchemaElement as DdbKeyElem,
 };
 use ruststack_eventbridge::{EventBridgeEngine, PutEventsRequestEntry, Target};
+use ruststack_kinesis::types::*;
+use ruststack_kinesis::KinesisState;
+use ruststack_lambda::types::*;
+use ruststack_lambda::LambdaState;
 use ruststack_s3::{CompletedPart, InMemoryStorage, S3Storage};
 use ruststack_secretsmanager::{CreateSecretRequest, SecretsManagerEngine};
+use ruststack_ses::types::*;
+use ruststack_ses::SesState;
 use ruststack_sns::SnsEngine;
 use ruststack_sqs::{DeleteMessageBatchEntry, SendMessageBatchEntry, SqsEngine};
 use ruststack_ssm::{PutParameterRequest, SsmEngine};
@@ -722,6 +730,7 @@ pub fn run_dynamodb_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
         Some("PAY_PER_REQUEST".to_string()),
         None,
         None,
+        None,
     )
     .unwrap();
 
@@ -819,10 +828,10 @@ pub fn run_dynamodb_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
 }
 
 fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    use base64::Engine;
     use ruststack_kms::{
         CreateKeyRequest, DecryptRequest, EncryptRequest, GenerateDataKeyRequest, KmsState,
     };
-    use base64::Engine;
 
     let mut results = Vec::new();
     let kms = KmsState::new("000000000000".to_string(), "us-east-1".to_string());
@@ -833,13 +842,15 @@ fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     let start_total = Instant::now();
     for i in 0..iters_create {
         let start = Instant::now();
-        let _ = kms.create_key(CreateKeyRequest {
-            description: Some(format!("Bench Key {}", i)),
-            key_usage: "ENCRYPT_DECRYPT".to_string(),
-            key_spec: "SYMMETRIC_DEFAULT".to_string(),
-            customer_master_key_spec: "SYMMETRIC_DEFAULT".to_string(),
-            tags: None,
-        }).unwrap();
+        let _ = kms
+            .create_key(CreateKeyRequest {
+                description: Some(format!("Bench Key {}", i)),
+                key_usage: "ENCRYPT_DECRYPT".to_string(),
+                key_spec: "SYMMETRIC_DEFAULT".to_string(),
+                customer_master_key_spec: "SYMMETRIC_DEFAULT".to_string(),
+                tags: None,
+            })
+            .unwrap();
         latencies.push(start.elapsed());
     }
     results.push(calculate_percentiles(
@@ -853,13 +864,15 @@ fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     ));
 
     // Master key for crypto benchmarks
-    let master_key = kms.create_key(CreateKeyRequest {
-        description: Some("Master Bench Key".to_string()),
-        key_usage: "ENCRYPT_DECRYPT".to_string(),
-        key_spec: "SYMMETRIC_DEFAULT".to_string(),
-        customer_master_key_spec: "SYMMETRIC_DEFAULT".to_string(),
-        tags: None,
-    }).unwrap();
+    let master_key = kms
+        .create_key(CreateKeyRequest {
+            description: Some("Master Bench Key".to_string()),
+            key_usage: "ENCRYPT_DECRYPT".to_string(),
+            key_spec: "SYMMETRIC_DEFAULT".to_string(),
+            customer_master_key_spec: "SYMMETRIC_DEFAULT".to_string(),
+            tags: None,
+        })
+        .unwrap();
 
     let raw_payload = vec![0x42u8; 1024]; // 1KB
     let plain_b64 = base64::engine::general_purpose::STANDARD.encode(&raw_payload);
@@ -870,12 +883,14 @@ fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     let start_total = Instant::now();
     for _ in 0..iterations {
         let start = Instant::now();
-        let (cipher, _) = kms.encrypt(EncryptRequest {
-            key_id: master_key.key_id.clone(),
-            plaintext: plain_b64.clone(),
-            encryption_algorithm: "SYMMETRIC_DEFAULT".to_string(),
-            encryption_context: None,
-        }).unwrap();
+        let (cipher, _) = kms
+            .encrypt(EncryptRequest {
+                key_id: master_key.key_id.clone(),
+                plaintext: plain_b64.clone(),
+                encryption_algorithm: "SYMMETRIC_DEFAULT".to_string(),
+                encryption_context: None,
+            })
+            .unwrap();
         latencies.push(start.elapsed());
         ciphertexts.push(cipher);
     }
@@ -894,12 +909,14 @@ fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     let start_total = Instant::now();
     for i in 0..iterations {
         let start = Instant::now();
-        let _ = kms.decrypt(DecryptRequest {
-            ciphertext_blob: ciphertexts[i].clone(),
-            key_id: None,
-            encryption_algorithm: "SYMMETRIC_DEFAULT".to_string(),
-            encryption_context: None,
-        }).unwrap();
+        let _ = kms
+            .decrypt(DecryptRequest {
+                ciphertext_blob: ciphertexts[i].clone(),
+                key_id: None,
+                encryption_algorithm: "SYMMETRIC_DEFAULT".to_string(),
+                encryption_context: None,
+            })
+            .unwrap();
         latencies.push(start.elapsed());
     }
     results.push(calculate_percentiles(
@@ -917,12 +934,14 @@ fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     let start_total = Instant::now();
     for _ in 0..iterations {
         let start = Instant::now();
-        let _ = kms.generate_data_key(GenerateDataKeyRequest {
-            key_id: master_key.key_id.clone(),
-            key_spec: "AES_256".to_string(),
-            number_of_bytes: Some(32),
-            encryption_context: None,
-        }).unwrap();
+        let _ = kms
+            .generate_data_key(GenerateDataKeyRequest {
+                key_id: master_key.key_id.clone(),
+                key_spec: "AES_256".to_string(),
+                number_of_bytes: Some(32),
+                encryption_context: None,
+            })
+            .unwrap();
         latencies.push(start.elapsed());
     }
     results.push(calculate_percentiles(
@@ -940,8 +959,8 @@ fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
 
 fn run_logs_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     use ruststack_logs::{
-        CreateLogGroupRequest, CreateLogStreamRequest, FilterLogEventsRequest,
-        InputLogEvent, LogsState, PutLogEventsRequest,
+        CreateLogGroupRequest, CreateLogStreamRequest, FilterLogEventsRequest, InputLogEvent,
+        LogsState, PutLogEventsRequest,
     };
 
     let mut results = Vec::new();
@@ -951,29 +970,31 @@ fn run_logs_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
         log_group_name: "/bench/group".to_string(),
         retention_in_days: Some(14),
         tags: None,
-    }).unwrap();
+    })
+    .unwrap();
 
     logs.create_log_stream(CreateLogStreamRequest {
         log_group_name: "/bench/group".to_string(),
         log_stream_name: "bench-stream".to_string(),
-    }).unwrap();
+    })
+    .unwrap();
 
     // 1. PutLogEvents
     let mut latencies = Vec::with_capacity(iterations);
     let start_total = Instant::now();
     for i in 0..iterations {
         let start = Instant::now();
-        let _ = logs.put_log_events(PutLogEventsRequest {
-            log_group_name: "/bench/group".to_string(),
-            log_stream_name: "bench-stream".to_string(),
-            log_events: vec![
-                InputLogEvent {
+        let _ = logs
+            .put_log_events(PutLogEventsRequest {
+                log_group_name: "/bench/group".to_string(),
+                log_stream_name: "bench-stream".to_string(),
+                log_events: vec![InputLogEvent {
                     timestamp: 1700000000 + i as i64,
                     message: format!("Log entry number {}", i),
-                }
-            ],
-            sequence_token: None,
-        }).unwrap();
+                }],
+                sequence_token: None,
+            })
+            .unwrap();
         latencies.push(start.elapsed());
     }
     results.push(calculate_percentiles(
@@ -992,16 +1013,18 @@ fn run_logs_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     let start_total = Instant::now();
     for _ in 0..iters_filter {
         let start = Instant::now();
-        let _ = logs.filter_log_events(FilterLogEventsRequest {
-            log_group_name: "/bench/group".to_string(),
-            log_stream_names: None,
-            log_stream_name_prefix: None,
-            start_time: None,
-            end_time: None,
-            filter_pattern: Some("entry".to_string()),
-            limit: Some(50),
-            next_token: None,
-        }).unwrap();
+        let _ = logs
+            .filter_log_events(FilterLogEventsRequest {
+                log_group_name: "/bench/group".to_string(),
+                log_stream_names: None,
+                log_stream_name_prefix: None,
+                start_time: None,
+                end_time: None,
+                filter_pattern: Some("entry".to_string()),
+                limit: Some(50),
+                next_token: None,
+            })
+            .unwrap();
         latencies.push(start.elapsed());
     }
     results.push(calculate_percentiles(
@@ -1028,7 +1051,8 @@ fn run_iam_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
         "{}".to_string(),
         None,
         Some("Benchmark Role".to_string()),
-    ).unwrap();
+    )
+    .unwrap();
 
     // 1. GetRole
     let mut latencies = Vec::with_capacity(iterations);
@@ -1054,12 +1078,9 @@ fn run_iam_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     let start_total = Instant::now();
     for i in 0..iters_role {
         let start = Instant::now();
-        let _ = iam.create_role(
-            format!("Role_{}", i),
-            "{}".to_string(),
-            None,
-            None,
-        ).unwrap();
+        let _ = iam
+            .create_role(format!("Role_{}", i), "{}".to_string(), None, None)
+            .unwrap();
         latencies.push(start.elapsed());
     }
     results.push(calculate_percentiles(
@@ -1070,6 +1091,361 @@ fn run_iam_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
         "IAM",
         "CreateRole",
         None,
+    ));
+
+    results
+}
+
+fn run_cloudwatch_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let cw = CloudWatchState::new("000000000000".to_string(), "us-east-1".to_string());
+
+    // 1. PutMetricData
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let start = Instant::now();
+        cw.put_metric_data(PutMetricDataRequest {
+            namespace: "AWS/EC2".to_string(),
+            metric_data: vec![MetricDatum {
+                metric_name: "CPUUtilization".to_string(),
+                dimensions: Some(vec![Dimension {
+                    name: "InstanceId".to_string(),
+                    value: format!("i-{}", i % 50),
+                }]),
+                timestamp: None,
+                value: Some((i % 100) as f64),
+                values: None,
+                counts: None,
+                unit: Some("Percent".to_string()),
+                statistic_values: None,
+                storage_resolution: None,
+            }],
+        })
+        .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "CloudWatch",
+        "PutMetricData",
+        Some("Single Datum"),
+    ));
+
+    // 2. ListMetrics
+    let iters_list = (iterations / 2).max(100);
+    let mut latencies = Vec::with_capacity(iters_list);
+    let start_total = Instant::now();
+    for _ in 0..iters_list {
+        let start = Instant::now();
+        let _ = cw
+            .list_metrics(ListMetricsRequest {
+                namespace: Some("AWS/EC2".to_string()),
+                metric_name: None,
+                dimensions: None,
+                next_token: None,
+                recently_active: None,
+            })
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_list,
+        None,
+        "CloudWatch",
+        "ListMetrics",
+        Some("Namespace Query"),
+    ));
+
+    results
+}
+
+fn run_ses_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let ses = SesState::new("000000000000".to_string(), "us-east-1".to_string());
+    ses.verify_email_identity(VerifyEmailIdentityRequest {
+        email_address: "bench@example.com".to_string(),
+    })
+    .unwrap();
+
+    // 1. SendEmail
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let start = Instant::now();
+        let _ = ses
+            .send_email(SendEmailRequest {
+                source: "bench@example.com".to_string(),
+                destination: Destination {
+                    to_addresses: vec![format!("user_{}@example.com", i)],
+                    cc_addresses: Vec::new(),
+                    bcc_addresses: Vec::new(),
+                },
+                message: Message {
+                    subject: Content {
+                        data: format!("Benchmark Email {}", i),
+                        charset: None,
+                    },
+                    body: BodyContent {
+                        text: Some(Content {
+                            data: "Hello from RustStack benchmark!".to_string(),
+                            charset: None,
+                        }),
+                        html: None,
+                    },
+                },
+                reply_to_addresses: None,
+                return_path: None,
+                source_arn: None,
+                return_path_arn: None,
+                tags: None,
+                configuration_set_name: None,
+            })
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "SES",
+        "SendEmail",
+        Some("Outbox Record"),
+    ));
+
+    // 2. ListIdentities
+    let iters_list = (iterations / 2).max(100);
+    let mut latencies = Vec::with_capacity(iters_list);
+    let start_total = Instant::now();
+    for _ in 0..iters_list {
+        let start = Instant::now();
+        let _ = ses
+            .list_identities(ListIdentitiesRequest::default())
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_list,
+        None,
+        "SES",
+        "ListIdentities",
+        None,
+    ));
+
+    results
+}
+
+fn run_kinesis_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let kinesis = KinesisState::new("000000000000".to_string(), "us-east-1".to_string());
+
+    kinesis
+        .create_stream(CreateStreamRequest {
+            stream_name: "bench-stream".to_string(),
+            shard_count: Some(1),
+            stream_mode_details: None,
+        })
+        .unwrap();
+
+    let payload_bytes = "{\"event\": \"kinesis_payload_128b_data_record_test\"}".as_bytes();
+
+    // 1. PutRecord
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let start = Instant::now();
+        let _ = kinesis
+            .put_record(PutRecordRequest {
+                stream_name: Some("bench-stream".to_string()),
+                stream_arn: None,
+                data: base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    payload_bytes,
+                ),
+                partition_key: format!("pk_{}", i % 20),
+                explicit_hash_key: None,
+                sequence_number_for_ordering: None,
+            })
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    let duration = start_total.elapsed();
+    let mut res = calculate_percentiles(
+        latencies,
+        duration,
+        iterations,
+        Some(128),
+        "Kinesis",
+        "PutRecord",
+        Some("Single Ingestion"),
+    );
+    res.payload_size = Some("128 B".to_string());
+    results.push(res);
+
+    // 2. GetRecords via ShardIterator
+    let iter = kinesis
+        .get_shard_iterator(GetShardIteratorRequest {
+            stream_name: Some("bench-stream".to_string()),
+            stream_arn: None,
+            shard_id: "shardId-000000000000".to_string(),
+            shard_iterator_type: ShardIteratorType::TrimHorizon,
+            starting_sequence_number: None,
+            timestamp: None,
+        })
+        .unwrap();
+
+    let iters_get = (iterations / 2).max(100);
+    let mut latencies = Vec::with_capacity(iters_get);
+    let start_total = Instant::now();
+    for _ in 0..iters_get {
+        let start = Instant::now();
+        let _ = kinesis
+            .get_records(GetRecordsRequest {
+                shard_iterator: iter.shard_iterator.clone().unwrap(),
+                limit: Some(25),
+                stream_arn: None,
+            })
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_get,
+        None,
+        "Kinesis",
+        "GetRecords",
+        Some("Limit 25"),
+    ));
+
+    results
+}
+
+fn run_lambda_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let lambda = LambdaState::new("000000000000".to_string(), "us-east-1".to_string());
+
+    lambda
+        .create_function(CreateFunctionRequest {
+            function_name: "bench-func".to_string(),
+            runtime: Some("nodejs18.x".to_string()),
+            role: "arn:aws:iam::000000000000:role/bench-role".to_string(),
+            handler: Some("index.handler".to_string()),
+            code: Some(FunctionCode::default()),
+            description: Some("Benchmark function".to_string()),
+            timeout: Some(15),
+            memory_size: Some(128),
+            publish: Some(true),
+            environment: None,
+            tags: None,
+            architectures: None,
+            ephemeral_storage: None,
+            package_type: None,
+            tracing_config: None,
+        })
+        .unwrap();
+
+    // 1. InvokeFunction (Sync)
+    let payload = serde_json::json!({ "ping": "pong" })
+        .to_string()
+        .into_bytes();
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for _ in 0..iterations {
+        let start = Instant::now();
+        let _ = lambda
+            .invoke_function(
+                "bench-func",
+                Some(payload.clone()),
+                Some(InvocationType::RequestResponse),
+            )
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "Lambda",
+        "InvokeFunction",
+        Some("RequestResponse"),
+    ));
+
+    // 2. GetFunction
+    let iters_get = (iterations / 2).max(100);
+    let mut latencies = Vec::with_capacity(iters_get);
+    let start_total = Instant::now();
+    for _ in 0..iters_get {
+        let start = Instant::now();
+        let _ = lambda.get_function("bench-func").unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iters_get,
+        None,
+        "Lambda",
+        "GetFunction",
+        None,
+    ));
+
+    results
+}
+
+fn run_dynamodb_streams_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
+    let mut results = Vec::new();
+    let ddb = DynamoDbEngine::new("000000000000".to_string(), "us-east-1".to_string());
+
+    ddb.create_table(
+        "BenchStreamTable".to_string(),
+        vec![DdbKeyElem {
+            attribute_name: "pk".to_string(),
+            key_type: "HASH".to_string(),
+        }],
+        vec![DdbAttrDef {
+            attribute_name: "pk".to_string(),
+            attribute_type: "S".to_string(),
+        }],
+        Some("PAY_PER_REQUEST".to_string()),
+        None,
+        None,
+        Some(ruststack_dynamodb::types::StreamSpecification {
+            stream_enabled: true,
+            stream_view_type: Some("NEW_AND_OLD_IMAGES".to_string()),
+        }),
+    )
+    .unwrap();
+
+    let mut latencies = Vec::with_capacity(iterations);
+    let start_total = Instant::now();
+    for i in 0..iterations {
+        let start = Instant::now();
+        let mut item = HashMap::new();
+        item.insert("pk".to_string(), DdbAttrVal::S(format!("item_{}", i)));
+        item.insert("val".to_string(), DdbAttrVal::N(i.to_string()));
+        let _ = ddb
+            .put_item("BenchStreamTable", item, None, None, None)
+            .unwrap();
+        latencies.push(start.elapsed());
+    }
+    results.push(calculate_percentiles(
+        latencies,
+        start_total.elapsed(),
+        iterations,
+        None,
+        "DynamoDB Streams",
+        "PutItem (Capture)",
+        Some("Stream CDC"),
     ));
 
     results
@@ -1186,6 +1562,8 @@ fn main() -> anyhow::Result<()> {
         );
         let ddb_res = run_dynamodb_benchmarks(opts.iterations);
         all_results.extend(ddb_res);
+        let ddb_stream_res = run_dynamodb_streams_benchmarks(opts.iterations);
+        all_results.extend(ddb_stream_res);
     }
 
     if opts.service == "kms" || opts.service == "all" {
@@ -1213,6 +1591,42 @@ fn main() -> anyhow::Result<()> {
         );
         let iam_res = run_iam_benchmarks(opts.iterations);
         all_results.extend(iam_res);
+    }
+
+    if opts.service == "cloudwatch" || opts.service == "all" {
+        eprintln!(
+            "Running CloudWatch Metrics performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let cw_res = run_cloudwatch_benchmarks(opts.iterations);
+        all_results.extend(cw_res);
+    }
+
+    if opts.service == "ses" || opts.service == "all" {
+        eprintln!(
+            "Running SES performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let ses_res = run_ses_benchmarks(opts.iterations);
+        all_results.extend(ses_res);
+    }
+
+    if opts.service == "kinesis" || opts.service == "all" {
+        eprintln!(
+            "Running Kinesis performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let kin_res = run_kinesis_benchmarks(opts.iterations);
+        all_results.extend(kin_res);
+    }
+
+    if opts.service == "lambda" || opts.service == "all" {
+        eprintln!(
+            "Running Lambda performance benchmarks (iterations: {})...",
+            opts.iterations
+        );
+        let lam_res = run_lambda_benchmarks(opts.iterations);
+        all_results.extend(lam_res);
     }
 
     let output_str = if opts.format == "json" {

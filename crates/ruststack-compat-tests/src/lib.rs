@@ -48,9 +48,31 @@ impl RustStackTestClient {
         ));
         let sts_engine = Arc::new(StsEngine::new(account_id.clone(), region.clone()));
         let dynamodb_engine = Arc::new(DynamoDbEngine::new(account_id.clone(), region.clone()));
-        let kms_state = Arc::new(ruststack_kms::KmsState::new(account_id.clone(), region.clone()));
-        let logs_state = Arc::new(ruststack_logs::LogsState::new(account_id.clone(), region.clone()));
+        let kms_state = Arc::new(ruststack_kms::KmsState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
+        let logs_state = Arc::new(ruststack_logs::LogsState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
         let iam_state = Arc::new(ruststack_iam::IamState::new(account_id.clone()));
+        let cloudwatch_state = Arc::new(ruststack_cloudwatch::CloudWatchState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
+        let ses_state = Arc::new(ruststack_ses::SesState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
+        let kinesis_state = Arc::new(ruststack_kinesis::KinesisState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
+        let lambda_state = Arc::new(ruststack_lambda::LambdaState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
 
         let state = AppState {
             s3_storage,
@@ -64,6 +86,10 @@ impl RustStackTestClient {
             kms_state,
             logs_state,
             iam_state,
+            cloudwatch_state,
+            ses_state,
+            kinesis_state,
+            lambda_state,
             chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
             region: region.clone(),
             account_id: account_id.clone(),

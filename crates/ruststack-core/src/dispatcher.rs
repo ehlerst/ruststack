@@ -72,6 +72,37 @@ impl Dispatcher {
             {
                 return AwsService::Iam;
             }
+            if target.starts_with("Kinesis_20131202")
+                || target.starts_with("Kinesis")
+                || target.starts_with("Kinesis.")
+            {
+                return AwsService::Kinesis;
+            }
+            if target.starts_with("DynamoDBStreams_20120810")
+                || target.starts_with("DynamoDBStreams")
+                || target.starts_with("DynamoDBStreams.")
+            {
+                return AwsService::DynamoDbStreams;
+            }
+            if target.starts_with("GraniteServiceVersion20100801")
+                || target.starts_with("CloudWatch_20100801")
+                || target.starts_with("CloudWatch")
+                || target.starts_with("CloudWatch.")
+            {
+                return AwsService::CloudWatch;
+            }
+            if target.starts_with("SimpleEmailService")
+                || target.starts_with("SES")
+                || target.starts_with("SES.")
+            {
+                return AwsService::Ses;
+            }
+            if target.starts_with("AWSLambda")
+                || target.starts_with("Lambda")
+                || target.starts_with("Lambda.")
+            {
+                return AwsService::Lambda;
+            }
         }
 
         // 3. Check Authorization header (AWS SigV4 credential scope: .../us-east-1/<service>/aws4_request)
@@ -89,6 +120,11 @@ impl Dispatcher {
                     "kms" => return AwsService::Kms,
                     "logs" => return AwsService::Logs,
                     "iam" => return AwsService::Iam,
+                    "ses" | "email" => return AwsService::Ses,
+                    "kinesis" => return AwsService::Kinesis,
+                    "lambda" => return AwsService::Lambda,
+                    "monitoring" | "cloudwatch" => return AwsService::CloudWatch,
+                    "dynamodbstreams" => return AwsService::DynamoDbStreams,
                     _ => {}
                 }
             }
@@ -135,6 +171,26 @@ impl Dispatcher {
             if host_clean.contains(".iam.") || host_clean.starts_with("iam.") {
                 return AwsService::Iam;
             }
+            if host_clean.contains(".email.")
+                || host_clean.starts_with("email.")
+                || host_clean.contains(".ses.")
+                || host_clean.starts_with("ses.")
+            {
+                return AwsService::Ses;
+            }
+            if host_clean.contains(".kinesis.") || host_clean.starts_with("kinesis.") {
+                return AwsService::Kinesis;
+            }
+            if host_clean.contains(".lambda.") || host_clean.starts_with("lambda.") {
+                return AwsService::Lambda;
+            }
+            if host_clean.contains(".monitoring.")
+                || host_clean.starts_with("monitoring.")
+                || host_clean.contains(".cloudwatch.")
+                || host_clean.starts_with("cloudwatch.")
+            {
+                return AwsService::CloudWatch;
+            }
             // Check for S3 bucket subdomain style like bucket.localhost
             if host_clean.ends_with(".localhost")
                 && !host_clean.starts_with("localhost")
@@ -148,12 +204,22 @@ impl Dispatcher {
                 && !host_clean.starts_with("kms")
                 && !host_clean.starts_with("logs")
                 && !host_clean.starts_with("iam")
+                && !host_clean.starts_with("ses")
+                && !host_clean.starts_with("email")
+                && !host_clean.starts_with("kinesis")
+                && !host_clean.starts_with("lambda")
+                && !host_clean.starts_with("monitoring")
+                && !host_clean.starts_with("cloudwatch")
             {
                 return AwsService::S3;
             }
         }
 
         // 5. Check URL path patterns
+        if path.starts_with("/2015-03-31/functions") {
+            return AwsService::Lambda;
+        }
+
         let segments: Vec<&str> = path
             .trim_matches('/')
             .split('/')
@@ -186,9 +252,21 @@ impl Dispatcher {
             if first == "dynamodb" {
                 return AwsService::DynamoDb;
             }
+            if first == "ses" {
+                return AwsService::Ses;
+            }
+            if first == "kinesis" {
+                return AwsService::Kinesis;
+            }
+            if first == "lambda" {
+                return AwsService::Lambda;
+            }
+            if first == "cloudwatch" || first == "monitoring" {
+                return AwsService::CloudWatch;
+            }
         }
 
-        // 6. Check Query Parameters for SQS, SNS, and STS Actions
+        // 6. Check Query Parameters for SQS, SNS, STS, IAM, SES, CloudWatch Actions
         if let Some(query) = uri.query() {
             if query.contains("Action=") {
                 let params = form_urlencoded::parse(query.as_bytes());
@@ -205,6 +283,12 @@ impl Dispatcher {
                         }
                         if is_iam_action(&v) {
                             return AwsService::Iam;
+                        }
+                        if is_ses_action(&v) {
+                            return AwsService::Ses;
+                        }
+                        if is_cloudwatch_action(&v) {
+                            return AwsService::CloudWatch;
                         }
                     }
                 }
@@ -229,6 +313,12 @@ impl Dispatcher {
                             }
                             if is_iam_action(&v) {
                                 return AwsService::Iam;
+                            }
+                            if is_ses_action(&v) {
+                                return AwsService::Ses;
+                            }
+                            if is_cloudwatch_action(&v) {
+                                return AwsService::CloudWatch;
                             }
                         }
                     }
@@ -347,6 +437,42 @@ fn is_iam_action(action: &str) -> bool {
             | "GetUserPolicy"
             | "DeleteUserPolicy"
             | "ListUserPolicies"
+    )
+}
+
+fn is_ses_action(action: &str) -> bool {
+    matches!(
+        action,
+        "SendEmail"
+            | "SendRawEmail"
+            | "SendBulkTemplatedEmail"
+            | "SendCustomVerificationEmail"
+            | "VerifyEmailIdentity"
+            | "VerifyDomainIdentity"
+            | "VerifyDomainDkim"
+            | "DeleteIdentity"
+            | "ListIdentities"
+            | "GetIdentityVerificationAttributes"
+            | "GetSendQuota"
+            | "GetSendStatistics"
+            | "GetAccount"
+    )
+}
+
+fn is_cloudwatch_action(action: &str) -> bool {
+    matches!(
+        action,
+        "PutMetricData"
+            | "GetMetricData"
+            | "GetMetricStatistics"
+            | "ListMetrics"
+            | "PutMetricAlarm"
+            | "DescribeAlarms"
+            | "DescribeAlarmsForMetric"
+            | "DeleteAlarms"
+            | "SetAlarmState"
+            | "EnableAlarmActions"
+            | "DisableAlarmActions"
     )
 }
 

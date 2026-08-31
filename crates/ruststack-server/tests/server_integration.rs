@@ -57,6 +57,22 @@ async fn test_server_unified_routing() {
         "us-east-1".to_string(),
     ));
     let iam_state = Arc::new(ruststack_iam::IamState::new("000000000000".to_string()));
+    let cloudwatch_state = Arc::new(ruststack_cloudwatch::CloudWatchState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let ses_state = Arc::new(ruststack_ses::SesState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let kinesis_state = Arc::new(ruststack_kinesis::KinesisState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let lambda_state = Arc::new(ruststack_lambda::LambdaState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
 
     let state = AppState {
         s3_storage,
@@ -70,6 +86,10 @@ async fn test_server_unified_routing() {
         kms_state,
         logs_state,
         iam_state,
+        cloudwatch_state,
+        ses_state,
+        kinesis_state,
+        lambda_state,
         chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region: "us-east-1".to_string(),
         account_id: "000000000000".to_string(),
@@ -304,10 +324,85 @@ async fn test_server_unified_routing() {
                 .method(Method::POST)
                 .uri("/")
                 .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from("Action=CreateRole&RoleName=UnifiedRole&AssumeRolePolicyDocument=%7B%7D"))
+                .body(Body::from(
+                    "Action=CreateRole&RoleName=UnifiedRole&AssumeRolePolicyDocument=%7B%7D",
+                ))
                 .unwrap(),
         )
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::OK);
+
+    // 13. CloudWatch PutMetricData via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from("Action=PutMetricData&Namespace=System&MetricData.member.1.MetricName=CPUUtilization&MetricData.member.1.Value=12.5"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 14. SES VerifyEmailIdentity via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "Action=VerifyEmailIdentity&EmailAddress=admin@example.com",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 15. Kinesis CreateStream via unified router
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "Kinesis_20131202.CreateStream")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    r#"{"StreamName": "unified-stream", "ShardCount": 1}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 16. Lambda CreateFunction via unified router (REST JSON)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/2015-03-31/functions")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "FunctionName": "unified-func",
+                        "Runtime": "python3.11",
+                        "Role": "arn:aws:iam::000000000000:role/service-role",
+                        "Handler": "index.handler"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
 }

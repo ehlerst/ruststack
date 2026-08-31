@@ -45,7 +45,7 @@ services:
     volumes:
       - ./ruststack-data:/data
     environment:
-      - SERVICES=s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam
+      - SERVICES=s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda
       - DEFAULT_REGION=us-east-1
       - ACCOUNT_ID=000000000000
       - RUSTSTACK_DATA_DIR=/data
@@ -64,13 +64,17 @@ RustStack includes a zero-dependency, dark-mode visual administration dashboard 
 
 👉 Open **`http://localhost:4566/_ruststack/ui/`** in your browser to:
 - Browse **S3 Buckets & Objects**
-- Inspect **DynamoDB Tables, Key Schemas & Items**
+- Inspect **DynamoDB Tables, Key Schemas, Items & CDC Streams**
 - View **SQS Queues, Messages & DLQ Redrive Policies**
 - Explore **SNS Topics & Subscriptions**
 - Inspect **SSM Parameters & Secrets Manager Secrets**
 - Manage **KMS Customer & AWS Managed Master Keys & Aliases**
 - Inspect **CloudWatch Log Groups & Streams**
 - Inspect **IAM Roles, Policies, Users & Access Keys**
+- Monitor **CloudWatch Metrics & Alarms**
+- Inspect **SES Sent Emails Outbox & Verified Identities**
+- View **Kinesis Shards & Ingested Data Streams**
+- Inspect **Lambda Functions & Event Source Mappings**
 - Interactively build **Chaos Engineering** rules & manage **State Snapshots**
 
 ---

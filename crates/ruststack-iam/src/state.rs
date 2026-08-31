@@ -83,7 +83,10 @@ impl IamState {
         description: Option<String>,
     ) -> Result<IamRole, IamError> {
         if self.roles.contains_key(&role_name) {
-            return Err(IamError::AlreadyExists(format!("Role {} already exists", role_name)));
+            return Err(IamError::AlreadyExists(format!(
+                "Role {} already exists",
+                role_name
+            )));
         }
 
         let role_id = format!("AROA{}", Uuid::new_v4().simple().to_string().to_uppercase());
@@ -119,7 +122,10 @@ impl IamState {
         if self.roles.remove(role_name).is_some() {
             Ok(())
         } else {
-            Err(IamError::NotFound(format!("Role {} does not exist", role_name)))
+            Err(IamError::NotFound(format!(
+                "Role {} does not exist",
+                role_name
+            )))
         }
     }
 
@@ -138,7 +144,10 @@ impl IamState {
     ) -> Result<IamPolicy, IamError> {
         let arn = self.policy_arn(&policy_name);
         if self.policies.contains_key(&arn) {
-            return Err(IamError::AlreadyExists(format!("Policy {} already exists", policy_name)));
+            return Err(IamError::AlreadyExists(format!(
+                "Policy {} already exists",
+                policy_name
+            )));
         }
 
         let policy_id = format!("ANPA{}", Uuid::new_v4().simple().to_string().to_uppercase());
@@ -173,7 +182,10 @@ impl IamState {
         if self.policies.remove(policy_arn).is_some() {
             Ok(())
         } else {
-            Err(IamError::NotFound(format!("Policy {} does not exist", policy_arn)))
+            Err(IamError::NotFound(format!(
+                "Policy {} does not exist",
+                policy_arn
+            )))
         }
     }
 
@@ -184,9 +196,10 @@ impl IamState {
     }
 
     pub fn attach_role_policy(&self, role_name: &str, policy_arn: &str) -> Result<(), IamError> {
-        let mut role = self.roles.get_mut(role_name).ok_or_else(|| {
-            IamError::NotFound(format!("Role {} does not exist", role_name))
-        })?;
+        let mut role = self
+            .roles
+            .get_mut(role_name)
+            .ok_or_else(|| IamError::NotFound(format!("Role {} does not exist", role_name)))?;
 
         if !role.attached_policies.contains(&policy_arn.to_string()) {
             role.attached_policies.push(policy_arn.to_string());
@@ -200,9 +213,10 @@ impl IamState {
     }
 
     pub fn detach_role_policy(&self, role_name: &str, policy_arn: &str) -> Result<(), IamError> {
-        let mut role = self.roles.get_mut(role_name).ok_or_else(|| {
-            IamError::NotFound(format!("Role {} does not exist", role_name))
-        })?;
+        let mut role = self
+            .roles
+            .get_mut(role_name)
+            .ok_or_else(|| IamError::NotFound(format!("Role {} does not exist", role_name)))?;
 
         role.attached_policies.retain(|a| a != policy_arn);
 
@@ -213,60 +227,89 @@ impl IamState {
         Ok(())
     }
 
-    pub fn list_attached_role_policies(&self, role_name: &str) -> Result<Vec<(String, String)>, IamError> {
-        let role = self.roles.get(role_name).ok_or_else(|| {
-            IamError::NotFound(format!("Role {} does not exist", role_name))
-        })?;
+    pub fn list_attached_role_policies(
+        &self,
+        role_name: &str,
+    ) -> Result<Vec<(String, String)>, IamError> {
+        let role = self
+            .roles
+            .get(role_name)
+            .ok_or_else(|| IamError::NotFound(format!("Role {} does not exist", role_name)))?;
 
         let mut list = Vec::new();
         for arn in &role.attached_policies {
-            let name = self.policies.get(arn).map(|p| p.policy_name.clone()).unwrap_or_else(|| {
-                arn.split('/').last().unwrap_or("policy").to_string()
-            });
+            let name = self
+                .policies
+                .get(arn)
+                .map(|p| p.policy_name.clone())
+                .unwrap_or_else(|| arn.split('/').last().unwrap_or("policy").to_string());
             list.push((name, arn.clone()));
         }
         Ok(list)
     }
 
-    pub fn put_role_policy(&self, role_name: &str, policy_name: &str, policy_document: &str) -> Result<(), IamError> {
-        let mut role = self.roles.get_mut(role_name).ok_or_else(|| {
-            IamError::NotFound(format!("Role {} does not exist", role_name))
-        })?;
+    pub fn put_role_policy(
+        &self,
+        role_name: &str,
+        policy_name: &str,
+        policy_document: &str,
+    ) -> Result<(), IamError> {
+        let mut role = self
+            .roles
+            .get_mut(role_name)
+            .ok_or_else(|| IamError::NotFound(format!("Role {} does not exist", role_name)))?;
 
-        role.inline_policies.insert(policy_name.to_string(), policy_document.to_string());
+        role.inline_policies
+            .insert(policy_name.to_string(), policy_document.to_string());
         Ok(())
     }
 
     pub fn get_role_policy(&self, role_name: &str, policy_name: &str) -> Result<String, IamError> {
-        let role = self.roles.get(role_name).ok_or_else(|| {
-            IamError::NotFound(format!("Role {} does not exist", role_name))
-        })?;
+        let role = self
+            .roles
+            .get(role_name)
+            .ok_or_else(|| IamError::NotFound(format!("Role {} does not exist", role_name)))?;
 
-        role.inline_policies.get(policy_name).cloned().ok_or_else(|| {
-            IamError::NotFound(format!("Policy {} does not exist for role {}", policy_name, role_name))
-        })
+        role.inline_policies
+            .get(policy_name)
+            .cloned()
+            .ok_or_else(|| {
+                IamError::NotFound(format!(
+                    "Policy {} does not exist for role {}",
+                    policy_name, role_name
+                ))
+            })
     }
 
     pub fn delete_role_policy(&self, role_name: &str, policy_name: &str) -> Result<(), IamError> {
-        let mut role = self.roles.get_mut(role_name).ok_or_else(|| {
-            IamError::NotFound(format!("Role {} does not exist", role_name))
-        })?;
+        let mut role = self
+            .roles
+            .get_mut(role_name)
+            .ok_or_else(|| IamError::NotFound(format!("Role {} does not exist", role_name)))?;
 
         role.inline_policies.remove(policy_name);
         Ok(())
     }
 
     pub fn list_role_policies(&self, role_name: &str) -> Result<Vec<String>, IamError> {
-        let role = self.roles.get(role_name).ok_or_else(|| {
-            IamError::NotFound(format!("Role {} does not exist", role_name))
-        })?;
+        let role = self
+            .roles
+            .get(role_name)
+            .ok_or_else(|| IamError::NotFound(format!("Role {} does not exist", role_name)))?;
 
         Ok(role.inline_policies.keys().cloned().collect())
     }
 
-    pub fn create_user(&self, user_name: String, path: Option<String>) -> Result<IamUser, IamError> {
+    pub fn create_user(
+        &self,
+        user_name: String,
+        path: Option<String>,
+    ) -> Result<IamUser, IamError> {
         if self.users.contains_key(&user_name) {
-            return Err(IamError::AlreadyExists(format!("User {} already exists", user_name)));
+            return Err(IamError::AlreadyExists(format!(
+                "User {} already exists",
+                user_name
+            )));
         }
 
         let user_id = format!("AIDA{}", Uuid::new_v4().simple().to_string().to_uppercase());
@@ -299,7 +342,10 @@ impl IamState {
         if self.users.remove(user_name).is_some() {
             Ok(())
         } else {
-            Err(IamError::NotFound(format!("User {} does not exist", user_name)))
+            Err(IamError::NotFound(format!(
+                "User {} does not exist",
+                user_name
+            )))
         }
     }
 
@@ -311,7 +357,10 @@ impl IamState {
 
     pub fn create_access_key(&self, user_name: &str) -> Result<IamAccessKey, IamError> {
         if !self.users.contains_key(user_name) {
-            return Err(IamError::NotFound(format!("User {} does not exist", user_name)));
+            return Err(IamError::NotFound(format!(
+                "User {} does not exist",
+                user_name
+            )));
         }
 
         let access_key_id = format!("AKIA{}", Uuid::new_v4().simple().to_string().to_uppercase());
@@ -346,7 +395,10 @@ impl IamState {
         if self.access_keys.remove(access_key_id).is_some() {
             Ok(())
         } else {
-            Err(IamError::NotFound(format!("AccessKey {} does not exist", access_key_id)))
+            Err(IamError::NotFound(format!(
+                "AccessKey {} does not exist",
+                access_key_id
+            )))
         }
     }
 

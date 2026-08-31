@@ -268,3 +268,154 @@ async fn test_dynamodb_query_and_scan() {
     let items = val["Items"].as_array().unwrap();
     assert_eq!(items.len(), 2);
 }
+
+#[tokio::test]
+async fn test_dynamodb_streams_lifecycle() {
+    let ddb = setup_dynamodb();
+
+    // 1. Create Table with Streams Enabled
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.CreateTable")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "StreamedTable",
+                "KeySchema": [
+                    { "AttributeName": "pk", "KeyType": "HASH" }
+                ],
+                "AttributeDefinitions": [
+                    { "AttributeName": "pk", "AttributeType": "S" }
+                ],
+                "StreamSpecification": {
+                    "StreamEnabled": true,
+                    "StreamViewType": "NEW_AND_OLD_IMAGES"
+                }
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let stream_arn = val["TableDescription"]["LatestStreamArn"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // 2. Put Item
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.PutItem")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "StreamedTable",
+                "Item": {
+                    "pk": { "S": "item-1" },
+                    "data": { "S": "initial" }
+                }
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let _ = handle_dynamodb_request(ddb.clone(), req).await;
+
+    // 3. Update Item
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.PutItem")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "StreamedTable",
+                "Item": {
+                    "pk": { "S": "item-1" },
+                    "data": { "S": "updated" }
+                }
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let _ = handle_dynamodb_request(ddb.clone(), req).await;
+
+    // 4. List Streams
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDBStreams_20120810.ListStreams")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({ "TableName": "StreamedTable" }).to_string(),
+        ))
+        .unwrap();
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(val["Streams"].as_array().unwrap().len(), 1);
+
+    // 5. Describe Stream
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDBStreams_20120810.DescribeStream")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({ "StreamArn": stream_arn }).to_string(),
+        ))
+        .unwrap();
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let shard_id = val["StreamDescription"]["Shards"][0]["ShardId"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // 6. Get Shard Iterator
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDBStreams_20120810.GetShardIterator")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "StreamArn": stream_arn,
+                "ShardId": shard_id,
+                "ShardIteratorType": "TRIM_HORIZON"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let iterator = val["ShardIterator"].as_str().unwrap();
+
+    // 7. Get Records
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDBStreams_20120810.GetRecords")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({ "ShardIterator": iterator }).to_string(),
+        ))
+        .unwrap();
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let records = val["Records"].as_array().unwrap();
+    assert_eq!(records.len(), 2);
+    assert_eq!(records[0]["eventName"].as_str().unwrap(), "INSERT");
+    assert_eq!(records[1]["eventName"].as_str().unwrap(), "MODIFY");
+}

@@ -82,6 +82,8 @@ async fn handle_dynamodb_json(
     let action = target
         .strip_prefix("DynamoDB_20120810.")
         .or_else(|| target.strip_prefix("DynamoDB."))
+        .or_else(|| target.strip_prefix("DynamoDBStreams_20120810."))
+        .or_else(|| target.strip_prefix("DynamoDBStreams."))
         .unwrap_or(target);
 
     let json_val: Value = if body.is_empty() {
@@ -108,7 +110,7 @@ async fn handle_dynamodb_json(
                 .and_then(|v| serde_json::from_value(v.clone()).ok())
                 .unwrap_or_default();
 
-            let attr_defs: Vec<AttributeDefinition> = json_val
+            let attribute_definitions: Vec<AttributeDefinition> = json_val
                 .get("AttributeDefinitions")
                 .and_then(|v| serde_json::from_value(v.clone()).ok())
                 .unwrap_or_default();
@@ -126,10 +128,21 @@ async fn handle_dynamodb_json(
                 .get("LocalSecondaryIndexes")
                 .and_then(|v| serde_json::from_value(v.clone()).ok());
 
-            let desc =
-                engine.create_table(table_name, key_schema, attr_defs, billing_mode, gsis, lsis)?;
+            let stream_specification: Option<crate::types::StreamSpecification> = json_val
+                .get("StreamSpecification")
+                .and_then(|v| serde_json::from_value(v.clone()).ok());
 
-            make_json_response(json!({ "TableDescription": desc }), StatusCode::OK)
+            let table_desc = engine.create_table(
+                table_name,
+                key_schema,
+                attribute_definitions,
+                billing_mode,
+                gsis,
+                lsis,
+                stream_specification,
+            )?;
+
+            make_json_response(json!({ "TableDescription": table_desc }), StatusCode::OK)
         }
 
         "DeleteTable" => {
@@ -520,6 +533,78 @@ async fn handle_dynamodb_json(
                 }),
                 StatusCode::OK,
             )
+        }
+
+        "ListStreams" => {
+            let table_name = json_val.get("TableName").and_then(|v| v.as_str());
+            let streams = engine.list_streams(table_name)?;
+            make_json_response(json!({ "Streams": streams }), StatusCode::OK)
+        }
+
+        "DescribeStream" => {
+            let stream_arn = json_val
+                .get("StreamArn")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::dynamodb_bad_request(
+                        "ValidationException",
+                        "StreamArn is required.",
+                    )
+                })?;
+            let desc = engine.describe_stream(stream_arn)?;
+            make_json_response(json!({ "StreamDescription": desc }), StatusCode::OK)
+        }
+
+        "GetShardIterator" => {
+            let stream_arn = json_val
+                .get("StreamArn")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::dynamodb_bad_request(
+                        "ValidationException",
+                        "StreamArn is required.",
+                    )
+                })?;
+            let shard_id = json_val
+                .get("ShardId")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::dynamodb_bad_request(
+                        "ValidationException",
+                        "ShardId is required.",
+                    )
+                })?;
+            let iterator_type = json_val
+                .get("ShardIteratorType")
+                .and_then(|v| v.as_str())
+                .unwrap_or("TRIM_HORIZON");
+            let seq = json_val.get("SequenceNumber").and_then(|v| v.as_str());
+
+            let iter = engine.get_shard_iterator(stream_arn, shard_id, iterator_type, seq)?;
+            make_json_response(json!({ "ShardIterator": iter }), StatusCode::OK)
+        }
+
+        "GetRecords" => {
+            let shard_iterator = json_val
+                .get("ShardIterator")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::dynamodb_bad_request(
+                        "ValidationException",
+                        "ShardIterator is required.",
+                    )
+                })?;
+            let limit = json_val
+                .get("Limit")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+
+            let (records, next_iter) = engine.get_records(shard_iterator, limit)?;
+            let mut res = json!({ "Records": records });
+            if let Some(next) = next_iter {
+                res["NextShardIterator"] = json!(next);
+            }
+            make_json_response(res, StatusCode::OK)
         }
 
         _ => Err(RustStackError::dynamodb_bad_request(

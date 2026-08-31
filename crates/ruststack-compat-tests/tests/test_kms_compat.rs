@@ -22,7 +22,10 @@ async fn test_kms_http_protocol_compat() {
     assert_eq!(status, StatusCode::OK);
     let key_id = val["KeyMetadata"]["KeyId"].as_str().unwrap().to_string();
     let key_arn = val["KeyMetadata"]["Arn"].as_str().unwrap().to_string();
-    assert_eq!(val["KeyMetadata"]["Description"], "Production Encryption Key");
+    assert_eq!(
+        val["KeyMetadata"]["Description"],
+        "Production Encryption Key"
+    );
 
     // 2. CreateAlias via HTTP TrentService.CreateAlias
     let (status, _) = client

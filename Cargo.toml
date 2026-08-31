@@ -13,6 +13,9 @@ members = [
     "crates/ruststack-kms",
     "crates/ruststack-logs",
     "crates/ruststack-iam",
+    "crates/ruststack-cloudwatch",
+    "crates/ruststack-ses",
+    "crates/ruststack-kinesis",
     "crates/ruststack-server",
     "crates/ruststack-benchmarks",
     "crates/ruststack-compat-tests",
@@ -40,6 +43,10 @@ ruststack-dynamodb = { path = "crates/ruststack-dynamodb" }
 ruststack-kms = { path = "crates/ruststack-kms" }
 ruststack-logs = { path = "crates/ruststack-logs" }
 ruststack-iam = { path = "crates/ruststack-iam" }
+ruststack-cloudwatch = { path = "crates/ruststack-cloudwatch" }
+ruststack-ses = { path = "crates/ruststack-ses" }
+ruststack-kinesis = { path = "crates/ruststack-kinesis" }
+ruststack-lambda = { path = "crates/ruststack-lambda" }
 ruststack-server = { path = "crates/ruststack-server" }
 
 # Async & HTTP runtime

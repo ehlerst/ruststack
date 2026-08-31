@@ -214,6 +214,10 @@
       <button class="tab-btn" onclick="switchTab('kms')">🔑 KMS</button>
       <button class="tab-btn" onclick="switchTab('logs')">🪵 Logs</button>
       <button class="tab-btn" onclick="switchTab('iam')">👥 IAM</button>
+      <button class="tab-btn" onclick="switchTab('ses')">📧 SES</button>
+      <button class="tab-btn" onclick="switchTab('kinesis')">🌊 Kinesis</button>
+      <button class="tab-btn" onclick="switchTab('lambda')">λ Lambda</button>
+      <button class="tab-btn" onclick="switchTab('cloudwatch')">📈 CloudWatch</button>
       <button class="tab-btn" onclick="switchTab('chaos')">🌪️ Chaos Studio</button>
       <button class="tab-btn" onclick="switchTab('snapshots')">💾 Snapshots</button>
     </div>
@@ -248,6 +252,22 @@
         <div class="card">
           <div class="card-title">IAM Roles & Policies</div>
           <div class="card-value" id="card-iam-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">SES Sent Outbox</div>
+          <div class="card-value" id="card-ses-count">0 msgs</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Kinesis Streams</div>
+          <div class="card-value" id="card-kinesis-count">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Lambda Functions</div>
+          <div class="card-value" id="card-lambda-count">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">CloudWatch Metrics & Alarms</div>
+          <div class="card-value" id="card-cw-count">0 / 0</div>
         </div>
       </div>
 
@@ -502,6 +522,123 @@
       </div>
     </div>
 
+    <!-- SES TAB -->
+    <div id="tab-ses" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title"><span>📧 SES Verified Identities</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Identity</th>
+              <th>Type</th>
+              <th>Verification Status</th>
+            </tr>
+          </thead>
+          <tbody id="table-ses-identities-rows">
+            <tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No identities registered</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="section-title"><span>📬 Sent Messages Outbox</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Message ID</th>
+              <th>Source (From)</th>
+              <th>To Destination</th>
+              <th>Subject</th>
+              <th>Timestamp</th>
+            </tr>
+          </thead>
+          <tbody id="table-ses-outbox-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No emails sent yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- KINESIS TAB -->
+    <div id="tab-kinesis" class="tab-content">
+      <div class="card">
+        <div class="section-title"><span>🌊 Kinesis Data Streams</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Stream Name</th>
+              <th>Status</th>
+              <th>Shards</th>
+              <th>Retention</th>
+              <th>Records Ingested</th>
+              <th>Stream ARN</th>
+            </tr>
+          </thead>
+          <tbody id="table-kinesis-rows">
+            <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No streams created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LAMBDA TAB -->
+    <div id="tab-lambda" class="tab-content">
+      <div class="card">
+        <div class="section-title"><span>λ Lambda Functions</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Function Name</th>
+              <th>Runtime</th>
+              <th>Handler</th>
+              <th>Memory (MB)</th>
+              <th>Timeout (s)</th>
+              <th>Last Modified</th>
+            </tr>
+          </thead>
+          <tbody id="table-lambda-rows">
+            <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No functions deployed yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- CLOUDWATCH TAB -->
+    <div id="tab-cloudwatch" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title"><span>📈 CloudWatch Metric Series</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Namespace</th>
+              <th>Metric Name</th>
+              <th>Dimensions</th>
+              <th>Datapoints</th>
+            </tr>
+          </thead>
+          <tbody id="table-cw-metrics-rows">
+            <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No metric datapoints recorded yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <div class="section-title"><span>🔔 CloudWatch Metric Alarms</span></div>
+        <table>
+          <thead>
+            <tr>
+              <th>Alarm Name</th>
+              <th>Metric</th>
+              <th>State</th>
+              <th>Threshold</th>
+              <th>Evaluation Periods</th>
+            </tr>
+          </thead>
+          <tbody id="table-cw-alarms-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No alarms configured yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- CHAOS TAB -->
     <div id="tab-chaos" class="tab-content">
       <div class="grid" style="grid-template-columns: 1fr 2fr;">
@@ -637,6 +774,10 @@
         document.getElementById('card-kms-count').innerText = `${(dump.kms?.keys || []).length} / ${(dump.kms?.aliases || []).length}`;
         document.getElementById('card-logs-count').innerText = `${(dump.logs?.groups || []).length}`;
         document.getElementById('card-iam-count').innerText = `${(dump.iam?.roles || []).length} / ${(dump.iam?.policies || []).length}`;
+        document.getElementById('card-ses-count').innerText = `${(dump.ses?.outbox || []).length} msgs`;
+        document.getElementById('card-kinesis-count').innerText = `${(dump.kinesis?.streams || []).length}`;
+        document.getElementById('card-lambda-count').innerText = `${(dump.lambda?.functions || []).length}`;
+        document.getElementById('card-cw-count').innerText = `${(dump.cloudwatch?.metrics || []).length} / ${(dump.cloudwatch?.alarms || []).length}`;
 
         // Populate Tables
         renderDynamoTables(dump.dynamodb.tables || []);
@@ -648,8 +789,97 @@
         renderKms(dump.kms?.keys || [], dump.kms?.aliases || []);
         renderLogs(dump.logs?.groups || []);
         renderIam(dump.iam?.roles || [], dump.iam?.policies || [], dump.iam?.users || []);
+        renderSes(dump.ses?.identities || [], dump.ses?.outbox || []);
+        renderKinesis(dump.kinesis?.streams || []);
+        renderLambda(dump.lambda?.functions || []);
+        renderCloudWatch(dump.cloudwatch?.metrics || [], dump.cloudwatch?.alarms || []);
       } catch (err) {
         console.error("Failed to load state", err);
+      }
+    }
+
+    function renderSes(identities, outbox) {
+      const tbodyId = document.getElementById('table-ses-identities-rows');
+      if (!identities.length) {
+        tbodyId.innerHTML = '<tr><td colspan="3" style="text-align:center; color: var(--text-muted);">No identities registered</td></tr>';
+      } else {
+        tbodyId.innerHTML = identities.map(id => `<tr>
+          <td><strong>${id}</strong></td>
+          <td>${id.includes('@') ? 'EmailAddress' : 'Domain'}</td>
+          <td><span class="badge badge-success">Success</span></td>
+        </tr>`).join('');
+      }
+
+      const tbodyOut = document.getElementById('table-ses-outbox-rows');
+      if (!outbox.length) {
+        tbodyOut.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No emails sent yet</td></tr>';
+      } else {
+        tbodyOut.innerHTML = outbox.map(m => `<tr>
+          <td><code>${m.message_id}</code></td>
+          <td>${m.source}</td>
+          <td>${(m.destination?.to_addresses || []).join(', ')}</td>
+          <td><strong>${m.message?.subject?.data || '-'}</strong></td>
+          <td>${new Date(m.timestamp * 1000).toLocaleTimeString()}</td>
+        </tr>`).join('');
+      }
+    }
+
+    function renderKinesis(streams) {
+      const tbody = document.getElementById('table-kinesis-rows');
+      if (!streams.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No streams created yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = streams.map(s => `<tr>
+        <td><strong>${s.stream_name}</strong></td>
+        <td><span class="badge badge-success">${s.stream_status}</span></td>
+        <td>${(s.shards || []).length}</td>
+        <td>${s.retention_period_hours} hrs</td>
+        <td>${(s.records || []).length} records</td>
+        <td><small style="color: var(--text-muted);">${s.stream_arn}</small></td>
+      </tr>`).join('');
+    }
+
+    function renderLambda(functions) {
+      const tbody = document.getElementById('table-lambda-rows');
+      if (!functions.length) {
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">No functions deployed yet</td></tr>';
+        return;
+      }
+      tbody.innerHTML = functions.map(f => `<tr>
+        <td><strong>${f.function_name}</strong></td>
+        <td><span class="badge badge-primary">${f.runtime || 'custom'}</span></td>
+        <td><code>${f.handler || 'main'}</code></td>
+        <td>${f.memory_size || 128} MB</td>
+        <td>${f.timeout || 3}s</td>
+        <td>${f.last_modified || '-'}</td>
+      </tr>`).join('');
+    }
+
+    function renderCloudWatch(metrics, alarms) {
+      const tbodyMetrics = document.getElementById('table-cw-metrics-rows');
+      if (!metrics.length) {
+        tbodyMetrics.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No metric datapoints recorded yet</td></tr>';
+      } else {
+        tbodyMetrics.innerHTML = metrics.map(m => `<tr>
+          <td><span class="badge badge-primary">${m.namespace}</span></td>
+          <td><strong>${m.metric_name}</strong></td>
+          <td>${(m.dimensions || []).map(d => `${d.name}=${d.value}`).join(', ') || '-'}</td>
+          <td>${(m.datapoints || []).length} points</td>
+        </tr>`).join('');
+      }
+
+      const tbodyAlarms = document.getElementById('table-cw-alarms-rows');
+      if (!alarms.length) {
+        tbodyAlarms.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No alarms configured yet</td></tr>';
+      } else {
+        tbodyAlarms.innerHTML = alarms.map(a => `<tr>
+          <td><strong>${a.alarm_name}</strong></td>
+          <td>${a.namespace}/${a.metric_name}</td>
+          <td><span class="badge ${a.state_value === 'OK' ? 'badge-success' : 'badge-danger'}">${a.state_value || 'OK'}</span></td>
+          <td>${a.comparison_operator} ${a.threshold}</td>
+          <td>${a.evaluation_periods} periods</td>
+        </tr>`).join('');
       }
     }
 

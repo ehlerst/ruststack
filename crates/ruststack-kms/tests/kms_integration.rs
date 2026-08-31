@@ -1,7 +1,7 @@
 use base64::Engine;
 use ruststack_kms::{
-    CreateAliasRequest, CreateKeyRequest, DecryptRequest, DescribeKeyRequest, EncryptRequest,
-    GenerateDataKeyRequest, KmsState, ListAliasesRequest, ListKeysRequest, ScheduleKeyDeletionRequest,
+    CreateKeyRequest, DecryptRequest, DescribeKeyRequest, EncryptRequest, GenerateDataKeyRequest,
+    KmsState, ListAliasesRequest, ListKeysRequest, ScheduleKeyDeletionRequest,
 };
 
 #[test]
@@ -45,12 +45,25 @@ fn test_kms_key_lifecycle() {
     assert_eq!(by_alias.key_id, meta.key_id);
 
     // 5. List Keys
-    let (keys, _) = state.list_keys(ListKeysRequest { limit: None, marker: None }).unwrap();
+    let (keys, _) = state
+        .list_keys(ListKeysRequest {
+            limit: None,
+            marker: None,
+        })
+        .unwrap();
     assert!(keys.len() >= 3); // 2 default AWS keys + 1 custom key
 
     // 6. List Aliases
-    let aliases = state.list_aliases(ListAliasesRequest { key_id: None, limit: None, marker: None }).unwrap();
-    assert!(aliases.iter().any(|a| a.alias_name == "alias/my-app/db-key"));
+    let aliases = state
+        .list_aliases(ListAliasesRequest {
+            key_id: None,
+            limit: None,
+            marker: None,
+        })
+        .unwrap();
+    assert!(aliases
+        .iter()
+        .any(|a| a.alias_name == "alias/my-app/db-key"));
 }
 
 #[test]
@@ -100,7 +113,9 @@ fn test_kms_encrypt_decrypt_and_data_key() {
     assert_eq!(decrypted_b64, plain_b64);
     assert_eq!(dec_arn, meta.arn);
 
-    let decoded_bytes = base64::engine::general_purpose::STANDARD.decode(decrypted_b64).unwrap();
+    let decoded_bytes = base64::engine::general_purpose::STANDARD
+        .decode(decrypted_b64)
+        .unwrap();
     let recovered_string = String::from_utf8(decoded_bytes).unwrap();
     assert_eq!(recovered_string, secret_plaintext);
 

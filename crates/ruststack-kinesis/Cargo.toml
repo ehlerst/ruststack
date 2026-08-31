@@ -1,0 +1,28 @@
+[package]
+name = "ruststack-kinesis"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "High-performance Amazon Kinesis engine for RustStack"
+
+[dependencies]
+ruststack-core = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+bytes = { workspace = true }
+base64 = { workspace = true }
+md-5 = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

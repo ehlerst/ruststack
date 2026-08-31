@@ -189,6 +189,12 @@ pub struct TableDescription {
     pub local_secondary_indexes: Option<Vec<LocalSecondaryIndexDescription>>,
     #[serde(rename = "BillingModeSummary")]
     pub billing_mode_summary: Option<BillingModeSummary>,
+    #[serde(rename = "StreamSpecification")]
+    pub stream_specification: Option<StreamSpecification>,
+    #[serde(rename = "LatestStreamArn")]
+    pub latest_stream_arn: Option<String>,
+    #[serde(rename = "LatestStreamLabel")]
+    pub latest_stream_label: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -197,6 +203,88 @@ pub struct BillingModeSummary {
     pub billing_mode: String,
     #[serde(rename = "LastUpdateToPayPerRequestDateTime")]
     pub last_update_to_pay_per_request_date_time: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamSpecification {
+    #[serde(rename = "StreamEnabled")]
+    pub stream_enabled: bool,
+    #[serde(rename = "StreamViewType")]
+    pub stream_view_type: Option<String>, // "NEW_IMAGE", "OLD_IMAGE", "NEW_AND_OLD_IMAGES", "KEYS_ONLY"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Shard {
+    #[serde(rename = "ShardId")]
+    pub shard_id: String,
+    #[serde(rename = "SequenceNumberRange")]
+    pub sequence_number_range: SequenceNumberRange,
+    #[serde(rename = "ParentShardId")]
+    pub parent_shard_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SequenceNumberRange {
+    #[serde(rename = "StartingSequenceNumber")]
+    pub starting_sequence_number: String,
+    #[serde(rename = "EndingSequenceNumber")]
+    pub ending_sequence_number: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamDescription {
+    #[serde(rename = "StreamArn")]
+    pub stream_arn: String,
+    #[serde(rename = "StreamLabel")]
+    pub stream_label: String,
+    #[serde(rename = "StreamStatus")]
+    pub stream_status: String,
+    #[serde(rename = "StreamViewType")]
+    pub stream_view_type: String,
+    #[serde(rename = "CreationRequestDateTime")]
+    pub creation_request_date_time: f64,
+    #[serde(rename = "TableName")]
+    pub table_name: String,
+    #[serde(rename = "KeySchema")]
+    pub key_schema: Vec<KeySchemaElement>,
+    #[serde(rename = "Shards")]
+    pub shards: Vec<Shard>,
+    #[serde(rename = "LastEvaluatedShardId")]
+    pub last_evaluated_shard_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamRecord {
+    #[serde(rename = "ApproximateCreationDateTime")]
+    pub approximate_creation_date_time: Option<f64>,
+    #[serde(rename = "Keys")]
+    pub keys: HashMap<String, AttributeValue>,
+    #[serde(rename = "NewImage")]
+    pub new_image: Option<HashMap<String, AttributeValue>>,
+    #[serde(rename = "OldImage")]
+    pub old_image: Option<HashMap<String, AttributeValue>>,
+    #[serde(rename = "SequenceNumber")]
+    pub sequence_number: String,
+    #[serde(rename = "SizeBytes")]
+    pub size_bytes: i64,
+    #[serde(rename = "StreamViewType")]
+    pub stream_view_type: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DynamoDbStreamRecord {
+    #[serde(rename = "eventID")]
+    pub event_id: String,
+    #[serde(rename = "eventName")]
+    pub event_name: String, // "INSERT", "MODIFY", "REMOVE"
+    #[serde(rename = "eventVersion")]
+    pub event_version: String,
+    #[serde(rename = "eventSource")]
+    pub event_source: String,
+    #[serde(rename = "awsRegion")]
+    pub aws_region: String,
+    #[serde(rename = "dynamodb")]
+    pub dynamodb: StreamRecord,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -211,6 +299,8 @@ pub struct QueryOutput {
 pub struct TableSnapshot {
     pub description: TableDescription,
     pub items: Vec<HashMap<String, AttributeValue>>,
+    #[serde(default)]
+    pub stream_records: Vec<DynamoDbStreamRecord>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

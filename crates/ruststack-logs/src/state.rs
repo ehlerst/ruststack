@@ -119,15 +119,12 @@ impl LogsState {
     }
 
     pub fn create_log_stream(&self, req: CreateLogStreamRequest) -> Result<(), LogsError> {
-        let mut group_entry = self
-            .groups
-            .get_mut(&req.log_group_name)
-            .ok_or_else(|| {
-                LogsError::NotFound(format!(
-                    "The specified log group does not exist: {}",
-                    req.log_group_name
-                ))
-            })?;
+        let mut group_entry = self.groups.get_mut(&req.log_group_name).ok_or_else(|| {
+            LogsError::NotFound(format!(
+                "The specified log group does not exist: {}",
+                req.log_group_name
+            ))
+        })?;
 
         if group_entry.streams.contains_key(&req.log_stream_name) {
             return Err(LogsError::AlreadyExists(format!(
@@ -160,15 +157,12 @@ impl LogsState {
     }
 
     pub fn delete_log_stream(&self, req: DeleteLogStreamRequest) -> Result<(), LogsError> {
-        let mut group_entry = self
-            .groups
-            .get_mut(&req.log_group_name)
-            .ok_or_else(|| {
-                LogsError::NotFound(format!(
-                    "The specified log group does not exist: {}",
-                    req.log_group_name
-                ))
-            })?;
+        let mut group_entry = self.groups.get_mut(&req.log_group_name).ok_or_else(|| {
+            LogsError::NotFound(format!(
+                "The specified log group does not exist: {}",
+                req.log_group_name
+            ))
+        })?;
 
         if group_entry.streams.remove(&req.log_stream_name).is_some() {
             Ok(())
@@ -184,15 +178,12 @@ impl LogsState {
         &self,
         req: DescribeLogStreamsRequest,
     ) -> Result<(Vec<LogStream>, Option<String>), LogsError> {
-        let group_entry = self
-            .groups
-            .get(&req.log_group_name)
-            .ok_or_else(|| {
-                LogsError::NotFound(format!(
-                    "The specified log group does not exist: {}",
-                    req.log_group_name
-                ))
-            })?;
+        let group_entry = self.groups.get(&req.log_group_name).ok_or_else(|| {
+            LogsError::NotFound(format!(
+                "The specified log group does not exist: {}",
+                req.log_group_name
+            ))
+        })?;
 
         let mut list = Vec::new();
         for (_, stored) in &group_entry.streams {
@@ -234,15 +225,12 @@ impl LogsState {
     }
 
     pub fn put_log_events(&self, req: PutLogEventsRequest) -> Result<String, LogsError> {
-        let mut group_entry = self
-            .groups
-            .get_mut(&req.log_group_name)
-            .ok_or_else(|| {
-                LogsError::NotFound(format!(
-                    "The specified log group does not exist: {}",
-                    req.log_group_name
-                ))
-            })?;
+        let mut group_entry = self.groups.get_mut(&req.log_group_name).ok_or_else(|| {
+            LogsError::NotFound(format!(
+                "The specified log group does not exist: {}",
+                req.log_group_name
+            ))
+        })?;
 
         let next_token = {
             let stream_entry = group_entry
@@ -263,14 +251,16 @@ impl LogsState {
                 added_bytes += msg_len;
 
                 let ts = event.timestamp;
-                stream_entry.stream.first_event_timestamp = Some(match stream_entry.stream.first_event_timestamp {
-                    Some(prev) => prev.min(ts),
-                    None => ts,
-                });
-                stream_entry.stream.last_event_timestamp = Some(match stream_entry.stream.last_event_timestamp {
-                    Some(prev) => prev.max(ts),
-                    None => ts,
-                });
+                stream_entry.stream.first_event_timestamp =
+                    Some(match stream_entry.stream.first_event_timestamp {
+                        Some(prev) => prev.min(ts),
+                        None => ts,
+                    });
+                stream_entry.stream.last_event_timestamp =
+                    Some(match stream_entry.stream.last_event_timestamp {
+                        Some(prev) => prev.max(ts),
+                        None => ts,
+                    });
                 stream_entry.stream.last_ingress_time = Some(now);
 
                 stream_entry.events.push(StoredLogEvent {
@@ -303,15 +293,12 @@ impl LogsState {
         &self,
         req: GetLogEventsRequest,
     ) -> Result<Vec<OutputLogEvent>, LogsError> {
-        let group_entry = self
-            .groups
-            .get(&req.log_group_name)
-            .ok_or_else(|| {
-                LogsError::NotFound(format!(
-                    "The specified log group does not exist: {}",
-                    req.log_group_name
-                ))
-            })?;
+        let group_entry = self.groups.get(&req.log_group_name).ok_or_else(|| {
+            LogsError::NotFound(format!(
+                "The specified log group does not exist: {}",
+                req.log_group_name
+            ))
+        })?;
 
         let stream_entry = group_entry
             .streams
@@ -360,15 +347,12 @@ impl LogsState {
         &self,
         req: FilterLogEventsRequest,
     ) -> Result<Vec<FilteredLogEvent>, LogsError> {
-        let group_entry = self
-            .groups
-            .get(&req.log_group_name)
-            .ok_or_else(|| {
-                LogsError::NotFound(format!(
-                    "The specified log group does not exist: {}",
-                    req.log_group_name
-                ))
-            })?;
+        let group_entry = self.groups.get(&req.log_group_name).ok_or_else(|| {
+            LogsError::NotFound(format!(
+                "The specified log group does not exist: {}",
+                req.log_group_name
+            ))
+        })?;
 
         let mut results = Vec::new();
 

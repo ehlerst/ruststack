@@ -24,6 +24,10 @@ pub struct RustStackStateSnapshot {
     pub kms: ruststack_kms::KmsStateSnapshot,
     pub logs: ruststack_logs::LogsStateSnapshot,
     pub iam: ruststack_iam::IamStateSnapshot,
+    pub cloudwatch: ruststack_cloudwatch::CloudWatchSnapshot,
+    pub ses: ruststack_ses::SesStateSnapshot,
+    pub kinesis: ruststack_kinesis::KinesisStateSnapshot,
+    pub lambda: ruststack_lambda::LambdaStateSnapshot,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -74,6 +78,10 @@ pub async fn state_reset_handler(
         "kms",
         "logs",
         "iam",
+        "cloudwatch",
+        "ses",
+        "kinesis",
+        "lambda",
     ];
 
     let target_services = match reset_req.services {
@@ -94,6 +102,10 @@ pub async fn state_reset_handler(
             "kms" => state.kms_state.reset(),
             "logs" => state.logs_state.reset(),
             "iam" => state.iam_state.reset(),
+            "cloudwatch" => state.cloudwatch_state.reset(),
+            "ses" => state.ses_state.reset(),
+            "kinesis" => state.kinesis_state.reset(),
+            "lambda" => state.lambda_state.reset(),
             _ => {}
         }
     }
@@ -142,6 +154,10 @@ pub async fn state_dump_handler(
         kms: state.kms_state.export_snapshot(),
         logs: state.logs_state.export_snapshot(),
         iam: state.iam_state.export_snapshot(),
+        cloudwatch: state.cloudwatch_state.export_snapshot(),
+        ses: state.ses_state.export_snapshot(),
+        kinesis: state.kinesis_state.export_snapshot(),
+        lambda: state.lambda_state.export_snapshot(),
     };
 
     if let Some(file_path) = dump_req.file_path {
@@ -241,7 +257,7 @@ pub async fn state_load_handler(
                 .unwrap();
         };
 
-    // Restore state to all 8 services
+    // Restore state to all services
     state.s3_storage.load_state(snapshot.s3);
     state.sqs_engine.load_state(snapshot.sqs);
     state.sns_engine.load_state(snapshot.sns);
@@ -255,6 +271,10 @@ pub async fn state_load_handler(
     state.kms_state.import_snapshot(snapshot.kms);
     state.logs_state.import_snapshot(snapshot.logs);
     state.iam_state.import_snapshot(snapshot.iam);
+    state.cloudwatch_state.import_snapshot(snapshot.cloudwatch);
+    state.ses_state.import_snapshot(snapshot.ses);
+    state.kinesis_state.import_snapshot(snapshot.kinesis);
+    state.lambda_state.import_snapshot(snapshot.lambda);
 
     let resp_json = json!({
         "status": "ok",

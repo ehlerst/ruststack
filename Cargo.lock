@@ -1459,14 +1459,18 @@ dependencies = [
  "bytes",
  "chrono",
  "clap",
+ "ruststack-cloudwatch",
  "ruststack-core",
  "ruststack-dynamodb",
  "ruststack-eventbridge",
  "ruststack-iam",
+ "ruststack-kinesis",
  "ruststack-kms",
+ "ruststack-lambda",
  "ruststack-logs",
  "ruststack-s3",
  "ruststack-secretsmanager",
+ "ruststack-ses",
  "ruststack-sns",
  "ruststack-sqs",
  "ruststack-ssm",
@@ -1474,6 +1478,31 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "ruststack-cloudwatch"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "fastrand",
+ "form_urlencoded",
+ "http",
+ "http-body-util",
+ "parking_lot",
+ "quick-xml",
+ "reqwest",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
 ]
 
 [[package]]
@@ -1488,15 +1517,19 @@ dependencies = [
  "http",
  "http-body-util",
  "quick-xml",
+ "ruststack-cloudwatch",
  "ruststack-core",
  "ruststack-dynamodb",
  "ruststack-eventbridge",
  "ruststack-iam",
+ "ruststack-kinesis",
  "ruststack-kms",
+ "ruststack-lambda",
  "ruststack-logs",
  "ruststack-s3",
  "ruststack-secretsmanager",
  "ruststack-server",
+ "ruststack-ses",
  "ruststack-sns",
  "ruststack-sqs",
  "ruststack-ssm",
@@ -1535,6 +1568,7 @@ name = "ruststack-dynamodb"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "base64",
  "chrono",
  "criterion",
  "dashmap",
@@ -1597,6 +1631,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruststack-kinesis"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "http",
+ "md-5",
+ "parking_lot",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ruststack-kms"
 version = "0.1.0"
 dependencies = [
@@ -1607,6 +1663,29 @@ dependencies = [
  "criterion",
  "dashmap",
  "fastrand",
+ "http",
+ "http-body-util",
+ "parking_lot",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "ruststack-lambda"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "form_urlencoded",
  "http",
  "http-body-util",
  "parking_lot",
@@ -1700,14 +1779,18 @@ dependencies = [
  "http",
  "http-body-util",
  "reqwest",
+ "ruststack-cloudwatch",
  "ruststack-core",
  "ruststack-dynamodb",
  "ruststack-eventbridge",
  "ruststack-iam",
+ "ruststack-kinesis",
  "ruststack-kms",
+ "ruststack-lambda",
  "ruststack-logs",
  "ruststack-s3",
  "ruststack-secretsmanager",
+ "ruststack-ses",
  "ruststack-sns",
  "ruststack-sqs",
  "ruststack-ssm",
@@ -1719,6 +1802,31 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "ruststack-ses"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "base64",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "fastrand",
+ "form_urlencoded",
+ "http",
+ "http-body-util",
+ "parking_lot",
+ "quick-xml",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
  "uuid",
 ]
 

@@ -21,6 +21,7 @@ pub struct Table {
     pub items: BTreeMap<PrimaryKey, HashMap<String, AttributeValue>>,
     pub gsis: HashMap<String, SecondaryIndex>,
     pub lsis: HashMap<String, SecondaryIndex>,
+    pub stream_records: Vec<crate::types::DynamoDbStreamRecord>,
 }
 
 impl Table {
@@ -124,6 +125,9 @@ impl Table {
             global_secondary_indexes: gsis_desc,
             local_secondary_indexes: lsis_desc,
             billing_mode_summary,
+            stream_specification: None,
+            latest_stream_arn: None,
+            latest_stream_label: None,
         };
 
         Ok(Self {
@@ -133,6 +137,7 @@ impl Table {
             items: BTreeMap::new(),
             gsis,
             lsis,
+            stream_records: Vec::new(),
         })
     }
 
@@ -168,13 +173,68 @@ impl Table {
         })
     }
 
+    pub fn extract_key_attributes(
+        &self,
+        item: &HashMap<String, AttributeValue>,
+    ) -> HashMap<String, AttributeValue> {
+        let mut keys = HashMap::new();
+        if let Some(val) = item.get(&self.hash_key_name) {
+            keys.insert(self.hash_key_name.clone(), val.clone());
+        }
+        if let Some(ref r_name) = self.range_key_name {
+            if let Some(val) = item.get(r_name) {
+                keys.insert(r_name.clone(), val.clone());
+            }
+        }
+        keys
+    }
+
     pub fn put_item(
         &mut self,
         item: HashMap<String, AttributeValue>,
     ) -> Result<Option<HashMap<String, AttributeValue>>, RustStackError> {
         let pk = self.extract_primary_key(&item)?;
-        let old = self.items.insert(pk, item);
+        let keys = self.extract_key_attributes(&item);
+        let old = self.items.insert(pk, item.clone());
         self.description.item_count = self.items.len() as i64;
+
+        if let Some(ref spec) = self.description.stream_specification {
+            if spec.stream_enabled {
+                let event_name = if old.is_some() { "MODIFY" } else { "INSERT" };
+                let view_type = spec
+                    .stream_view_type
+                    .as_deref()
+                    .unwrap_or("NEW_AND_OLD_IMAGES");
+                let seq = (self.stream_records.len() + 1).to_string();
+                let now = Utc::now().timestamp() as f64;
+
+                let (new_img, old_img) = match view_type {
+                    "NEW_IMAGE" => (Some(item), None),
+                    "OLD_IMAGE" => (None, old.clone()),
+                    "KEYS_ONLY" => (None, None),
+                    _ => (Some(item), old.clone()),
+                };
+
+                self.stream_records
+                    .push(crate::types::DynamoDbStreamRecord {
+                        event_id: uuid::Uuid::new_v4().to_string(),
+                        event_name: event_name.to_string(),
+                        event_version: "1.1".to_string(),
+                        event_source: "aws:dynamodb".to_string(),
+                        aws_region: "us-east-1".to_string(),
+                        dynamodb: crate::types::StreamRecord {
+                            approximate_creation_date_time: Some(now),
+                            keys,
+                            new_image: new_img,
+                            old_image: old_img,
+                            sequence_number: seq,
+                            size_bytes: 128,
+                            stream_view_type: view_type.to_string(),
+                        },
+                    });
+            }
+        }
+
         Ok(old)
     }
 
@@ -193,6 +253,44 @@ impl Table {
         let pk = self.extract_primary_key(key)?;
         let old = self.items.remove(&pk);
         self.description.item_count = self.items.len() as i64;
+
+        if let Some(ref old_item) = old {
+            if let Some(ref spec) = self.description.stream_specification {
+                if spec.stream_enabled {
+                    let keys = self.extract_key_attributes(old_item);
+                    let view_type = spec
+                        .stream_view_type
+                        .as_deref()
+                        .unwrap_or("NEW_AND_OLD_IMAGES");
+                    let seq = (self.stream_records.len() + 1).to_string();
+                    let now = Utc::now().timestamp() as f64;
+
+                    let old_img = match view_type {
+                        "NEW_IMAGE" | "KEYS_ONLY" => None,
+                        _ => Some(old_item.clone()),
+                    };
+
+                    self.stream_records
+                        .push(crate::types::DynamoDbStreamRecord {
+                            event_id: uuid::Uuid::new_v4().to_string(),
+                            event_name: "REMOVE".to_string(),
+                            event_version: "1.1".to_string(),
+                            event_source: "aws:dynamodb".to_string(),
+                            aws_region: "us-east-1".to_string(),
+                            dynamodb: crate::types::StreamRecord {
+                                approximate_creation_date_time: Some(now),
+                                keys,
+                                new_image: None,
+                                old_image: old_img,
+                                sequence_number: seq,
+                                size_bytes: 128,
+                                stream_view_type: view_type.to_string(),
+                            },
+                        });
+                }
+            }
+        }
+
         Ok(old)
     }
 }

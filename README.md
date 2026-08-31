@@ -36,27 +36,37 @@ Automated in-memory performance rating on standard developer hardware:
 
 | Service | Operation | Payload / Batch | Throughput | p50 Latency | p95 Latency | Grade |
 |:---|:---|:---|---:|---:|---:|:---|
-| **STS** | `GetCallerIdentity` | Root Identity | **449,000+ ops/s** | **1.0 µs** | 1.5 µs | **A+ (Ultra Fast)** |
-| **SSM** | `GetParameter` | Exact Key | **438,000+ ops/s** | **1.0 µs** | 1.5 µs | **A+ (Ultra Fast)** |
-| **IAM** | `GetRole` | Direct Lookup | **421,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
-| **S3** | `GetObject` | 1 KB | **414,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
-| **DynamoDB** | `GetItem` | Point Read PK+SK | **399,000+ ops/s** | **1.4 µs** | 1.9 µs | **A+ (Ultra Fast)** |
-| **DynamoDB** | `PutItem` | Single Item | **384,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
-| **KMS** | `GenerateDataKey` | AES-256 (32B) | **338,000+ ops/s** | **1.9 µs** | 2.4 µs | **A+ (Ultra Fast)** |
-| **SecretsManager** | `GetSecretValue` | JSON Payload | **299,000+ ops/s** | **2.4 µs** | 2.4 µs | **A+ (Ultra Fast)** |
-| **Logs** | `PutLogEvents` | Single Event | **261,000+ ops/s** | **2.4 µs** | 3.4 µs | **A+ (Ultra Fast)** |
-| **IAM** | `CreateRole` | Role Definition | **224,000+ ops/s** | **3.3 µs** | 4.3 µs | **A+ (Ultra Fast)** |
-| **SQS** | `SendMessageBatch` | 10 msgs/batch | **214,000+ msgs/s** | **42.5 µs** | 51.5 µs | **A (Excellent)** |
-| **SNS** | `Publish` | Single Topic | **206,000+ ops/s** | **3.4 µs** | 4.8 µs | **A+ (Ultra Fast)** |
-| **STS** | `AssumeRole` | Temporary Creds | **203,000+ ops/s** | **3.8 µs** | 4.8 µs | **A+ (Ultra Fast)** |
-| **KMS** | `CreateKey` | Customer Key | **202,000+ ops/s** | **3.4 µs** | 4.8 µs | **A+ (Ultra Fast)** |
-| **KMS** | `Decrypt` | 1 KB Payload | **196,000+ ops/s** | **3.8 µs** | 4.7 µs | **A+ (Ultra Fast)** |
-| **S3** | `PutObject` | 1 KB | **173,000+ ops/s** | **4.3 µs** | 5.8 µs | **A+ (Ultra Fast)** |
-| **KMS** | `Encrypt` | 1 KB Payload | **169,000+ ops/s** | **4.3 µs** | 7.1 µs | **A+ (Ultra Fast)** |
-| **SQS** | `SendMessage` | Single | **149,000+ ops/s** | **5.2 µs** | 6.3 µs | **A+ (Ultra Fast)** |
-| **SNS** | `PublishWithFanout` | 5 SQS Queues | **115,000+ msgs/s** | **39.5 µs** | 55.5 µs | **A (Excellent)** |
-| **SSM** | `GetParametersByPath` | 50 Keys Recursive | **89,000+ ops/s** | **9.0 µs** | 16.6 µs | **A+ (Ultra Fast)** |
-| **EventBridge** | `PutEvents` | Pattern Match + SQS Target | **82,000+ ops/s** | **10.1 µs** | 14.7 µs | **A+ (Ultra Fast)** |
+| **STS** | `GetCallerIdentity` | Root Identity | **457,000+ ops/s** | **1.0 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **SSM** | `GetParameter` | Exact Key | **425,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **IAM** | `GetRole` | Direct Lookup | **413,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **DynamoDB** | `GetItem` | Point Read PK+SK | **410,000+ ops/s** | **1.4 µs** | 1.9 µs | **A+ (Ultra Fast)** |
+| **Lambda** | `InvokeFunction` | RequestResponse | **408,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **Lambda** | `GetFunction` | Direct Lookup | **397,000+ ops/s** | **1.4 µs** | 1.8 µs | **A+ (Ultra Fast)** |
+| **S3** | `GetObject` | 1 KB | **393,000+ ops/s** | **1.4 µs** | 1.5 µs | **A+ (Ultra Fast)** |
+| **KMS** | `GenerateDataKey` | AES-256 (32B) | **353,000+ ops/s** | **1.8 µs** | 2.0 µs | **A+ (Ultra Fast)** |
+| **DynamoDB** | `PutItem` | Single Item | **332,000+ ops/s** | **1.9 µs** | 2.0 µs | **A+ (Ultra Fast)** |
+| **SecretsManager** | `GetSecretValue` | JSON Payload | **325,000+ ops/s** | **2.0 µs** | 2.4 µs | **A+ (Ultra Fast)** |
+| **SES** | `ListIdentities` | Direct Lookup | **324,000+ ops/s** | **1.9 µs** | 2.4 µs | **A+ (Ultra Fast)** |
+| **CloudWatch** | `PutMetricData` | Single Datum | **276,000+ ops/s** | **2.4 µs** | 3.4 µs | **A+ (Ultra Fast)** |
+| **Logs** | `PutLogEvents` | Single Event | **262,000+ ops/s** | **2.4 µs** | 3.4 µs | **A+ (Ultra Fast)** |
+| **Kinesis** | `PutRecord` | 128 B (31.7 MB/s) | **259,000+ ops/s** | **2.9 µs** | 3.4 µs | **A+ (Ultra Fast)** |
+| **SES** | `SendEmail` | Outbox Record | **242,000+ ops/s** | **2.9 µs** | 3.4 µs | **A+ (Ultra Fast)** |
+| **DynamoDB Streams** | `PutItem (Capture)` | Stream CDC Event | **240,000+ ops/s** | **2.9 µs** | 3.8 µs | **A+ (Ultra Fast)** |
+| **KMS** | `CreateKey` | Customer Key | **233,000+ ops/s** | **3.3 µs** | 4.2 µs | **A+ (Ultra Fast)** |
+| **STS** | `AssumeRole` | Temporary Creds | **225,000+ ops/s** | **3.4 µs** | 3.8 µs | **A+ (Ultra Fast)** |
+| **SQS** | `SendMessageBatch` | 10 msgs/batch | **224,000+ msgs/s** | **41.4 µs** | 50.1 µs | **A (Excellent)** |
+| **SNS** | `Publish` | Single Topic | **212,000+ ops/s** | **3.4 µs** | 4.8 µs | **A+ (Ultra Fast)** |
+| **IAM** | `CreateRole` | Role Definition | **204,000+ ops/s** | **3.4 µs** | 5.2 µs | **A+ (Ultra Fast)** |
+| **KMS** | `Decrypt` | 1 KB Payload | **182,000+ ops/s** | **4.3 µs** | 5.2 µs | **A+ (Ultra Fast)** |
+| **KMS** | `Encrypt` | 1 KB Payload | **179,000+ ops/s** | **4.3 µs** | 4.8 µs | **A+ (Ultra Fast)** |
+| **S3** | `PutObject` | 1 KB | **168,000+ ops/s** | **4.3 µs** | 7.3 µs | **A+ (Ultra Fast)** |
+| **SQS** | `SendMessage` | Single | **154,000+ ops/s** | **5.2 µs** | 5.7 µs | **A+ (Ultra Fast)** |
+| **Kinesis** | `GetRecords` | Limit 25 | **152,000+ ops/s** | **5.2 µs** | 6.6 µs | **A+ (Ultra Fast)** |
+| **SNS** | `PublishWithFanout` | 5 SQS Queues | **111,000+ msgs/s** | **40.5 µs** | 55.7 µs | **A (Excellent)** |
+| **CloudWatch** | `ListMetrics` | Namespace Query | **98,000+ ops/s** | **8.9 µs** | 9.7 µs | **A+ (Ultra Fast)** |
+| **EventBridge** | `PutEvents` | Pattern Match + SQS Target | **86,000+ ops/s** | **10.1 µs** | 12.4 µs | **A+ (Ultra Fast)** |
+| **SQS** | `SendFifoMessage` | With Dedup Window | **86,000+ ops/s** | **10.1 µs** | 13.9 µs | **A+ (Ultra Fast)** |
+| **SSM** | `GetParametersByPath` | 50 Keys Recursive | **72,000+ ops/s** | **13.7 µs** | 16.6 µs | **A+ (Ultra Fast)** |
 
 ---
 
@@ -128,6 +138,36 @@ Automated in-memory performance rating on standard developer hardware:
 - **Policy Attachments**: `AttachRolePolicy`, `DetachRolePolicy`, `ListAttachedRolePolicies`, inline policies (`PutRolePolicy`, `GetRolePolicy`, `DeleteRolePolicy`).
 - **Users & Credentials**: `CreateUser`, `GetUser`, `DeleteUser`, `ListUsers`, `CreateAccessKey`, `ListAccessKeys`, `DeleteAccessKey`.
 - **Pre-Configured AWS Policies**: Pre-seeded default AWS managed policies (`AdministratorAccess`, `AmazonS3FullAccess`, `AmazonDynamoDBFullAccess`, `AmazonSQSFullAccess`, `AWSLambdaBasicExecutionRole`).
+
+### 12. Amazon Simple Email Service (`ruststack-ses`)
+- **Protocols**: AWS Query Protocol and JSON Protocols.
+- **Identity Verification**: `VerifyEmailIdentity`, `VerifyDomainIdentity`, `ListIdentities`, `DeleteIdentity`, `GetIdentityVerificationAttributes`.
+- **Email Dispatching**: `SendEmail`, `SendRawEmail` with automatic base64 MIME payload decoding, HTML & Text body capture, and subject extraction.
+- **Local Outbox**: Integrated inspection outbox for testing transactional emails without external network dependencies.
+- **Quota & Statistics**: `GetSendQuota`, `GetSendStatistics`.
+
+### 13. Amazon Kinesis Data Streams (`ruststack-kinesis`)
+- **Protocols**: AWS JSON 1.1 protocol (`x-amz-target: Kinesis_20131202.*`).
+- **Stream Lifecycle**: `CreateStream`, `DeleteStream`, `DescribeStream`, `DescribeStreamSummary`, `ListStreams`, `AddTagsToStream`, `ListTagsForStream`.
+- **Record Ingestion**: `PutRecord`, `PutRecords` (atomic multi-record batching) with deterministic MD5 partition key hashing across active shards.
+- **Data Consumption**: `GetShardIterator` (`TRIM_HORIZON`, `LATEST`, `AT_SEQUENCE_NUMBER`, `AFTER_SEQUENCE_NUMBER`, `AT_TIMESTAMP`) and `GetRecords` (with continuation iterators and millisecond behind latest tracking).
+
+### 14. AWS Lambda Mock & Function Registry (`ruststack-lambda`)
+- **Protocols**: REST / JSON API (`/2015-03-31/functions/*`).
+- **Function Management**: `CreateFunction`, `GetFunction`, `GetFunctionConfiguration`, `ListFunctions`, `DeleteFunction`, `UpdateFunctionCode`, `UpdateFunctionConfiguration`.
+- **Invocation Engine**: `Invoke` supporting synchronous (`RequestResponse`), asynchronous (`Event`), and `DryRun` invocations with mock response payload generation.
+- **Event Source Mappings**: `CreateEventSourceMapping`, `ListEventSourceMappings`, `DeleteEventSourceMapping` for DynamoDB Streams and Kinesis stream trigger bindings.
+
+### 15. Amazon CloudWatch Metrics & Alarms (`ruststack-cloudwatch`)
+- **Protocols**: Query Protocol and AWS JSON protocols.
+- **Metric Ingestion**: `PutMetricData` (with high-resolution timestamps, custom dimensions, units, and values/counts).
+- **Metric Retrieval**: `ListMetrics` (namespace/metric filtering), `GetMetricData`, `GetMetricStatistics` (bucketing by `Average`, `Sum`, `SampleCount`, `Minimum`, `Maximum`).
+- **Metric Alarms**: `PutMetricAlarm`, `DescribeAlarms`, `DescribeAlarmsForMetric`, `DeleteAlarms`, `SetAlarmState`.
+
+### 16. Amazon DynamoDB Streams (`ruststack-dynamodb`)
+- **Protocols**: AWS JSON 1.0 protocol (`x-amz-target: DynamoDBStreams_20120810.*`).
+- **Stream Lifecycle**: Automatic stream creation when `StreamSpecification.StreamEnabled = true` with view types (`NEW_IMAGE`, `OLD_IMAGE`, `NEW_AND_OLD_IMAGES`, `KEYS_ONLY`).
+- **CDC Operations**: `ListStreams`, `DescribeStream`, `GetShardIterator`, `GetRecords` with real-time `INSERT`, `MODIFY`, `REMOVE` change data capture records.
 
 ---
 

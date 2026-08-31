@@ -57,17 +57,26 @@ impl KmsState {
             "AWS".to_string(),
             None,
         );
-        let _ = state.create_alias("alias/aws/dynamodb".to_string(), default_ddb_key.metadata.key_id);
+        let _ = state.create_alias(
+            "alias/aws/dynamodb".to_string(),
+            default_ddb_key.metadata.key_id,
+        );
 
         state
     }
 
     fn key_arn(&self, key_id: &str) -> String {
-        format!("arn:aws:kms:{}:{}:key/{}", self.region, self.account_id, key_id)
+        format!(
+            "arn:aws:kms:{}:{}:key/{}",
+            self.region, self.account_id, key_id
+        )
     }
 
     fn alias_arn(&self, alias_name: &str) -> String {
-        format!("arn:aws:kms:{}:{}:{}", self.region, self.account_id, alias_name)
+        format!(
+            "arn:aws:kms:{}:{}:{}",
+            self.region, self.account_id, alias_name
+        )
     }
 
     pub fn resolve_key_id(&self, identifier: &str) -> Result<String, KmsError> {
@@ -101,7 +110,10 @@ impl KmsState {
             }
         }
 
-        Err(KmsError::NotFound(format!("Key '{}' does not exist", identifier)))
+        Err(KmsError::NotFound(format!(
+            "Key '{}' does not exist",
+            identifier
+        )))
     }
 
     fn create_key_internal(
@@ -168,13 +180,17 @@ impl KmsState {
 
     pub fn describe_key(&self, req: DescribeKeyRequest) -> Result<KeyMetadata, KmsError> {
         let key_id = self.resolve_key_id(&req.key_id)?;
-        let entry = self.keys.get(&key_id).ok_or_else(|| {
-            KmsError::NotFound(format!("Key '{}' does not exist", req.key_id))
-        })?;
+        let entry = self
+            .keys
+            .get(&key_id)
+            .ok_or_else(|| KmsError::NotFound(format!("Key '{}' does not exist", req.key_id)))?;
         Ok(entry.metadata.clone())
     }
 
-    pub fn list_keys(&self, _req: ListKeysRequest) -> Result<(Vec<serde_json::Value>, bool), KmsError> {
+    pub fn list_keys(
+        &self,
+        _req: ListKeysRequest,
+    ) -> Result<(Vec<serde_json::Value>, bool), KmsError> {
         let mut keys_list = Vec::new();
         for item in self.keys.iter() {
             keys_list.push(serde_json::json!({
@@ -187,7 +203,9 @@ impl KmsState {
 
     pub fn create_alias(&self, alias_name: String, target_key_id: String) -> Result<(), KmsError> {
         if !alias_name.starts_with("alias/") {
-            return Err(KmsError::Validation("Alias name must start with 'alias/'".to_string()));
+            return Err(KmsError::Validation(
+                "Alias name must start with 'alias/'".to_string(),
+            ));
         }
         let resolved_id = self.resolve_key_id(&target_key_id)?;
         let alias_arn = self.alias_arn(&alias_name);
@@ -209,7 +227,10 @@ impl KmsState {
         if self.aliases.remove(alias_name).is_some() {
             Ok(())
         } else {
-            Err(KmsError::NotFound(format!("Alias '{}' does not exist", alias_name)))
+            Err(KmsError::NotFound(format!(
+                "Alias '{}' does not exist",
+                alias_name
+            )))
         }
     }
 
@@ -234,17 +255,18 @@ impl KmsState {
 
     pub fn encrypt(&self, req: EncryptRequest) -> Result<(String, String), KmsError> {
         let key_id = self.resolve_key_id(&req.key_id)?;
-        let entry = self.keys.get(&key_id).ok_or_else(|| {
-            KmsError::NotFound(format!("Key '{}' does not exist", req.key_id))
-        })?;
+        let entry = self
+            .keys
+            .get(&key_id)
+            .ok_or_else(|| KmsError::NotFound(format!("Key '{}' does not exist", req.key_id)))?;
 
         if !entry.metadata.enabled || entry.metadata.key_state != "Enabled" {
             return Err(KmsError::Disabled(format!("Key '{}' is disabled", key_id)));
         }
 
-        let raw_bytes = BASE64.decode(&req.plaintext).map_err(|e| {
-            KmsError::Validation(format!("Invalid base64 plaintext: {}", e))
-        })?;
+        let raw_bytes = BASE64
+            .decode(&req.plaintext)
+            .map_err(|e| KmsError::Validation(format!("Invalid base64 plaintext: {}", e)))?;
 
         // Fast authenticated envelope: [KEY_ID_LEN(2)][KEY_ID(UTF-8)][NONCE(8)][CIPHERTEXT_XOR]
         let mut envelope = Vec::new();
@@ -276,12 +298,16 @@ impl KmsState {
         })?;
 
         if envelope.len() < 10 {
-            return Err(KmsError::InvalidCiphertext("Ciphertext blob too short".to_string()));
+            return Err(KmsError::InvalidCiphertext(
+                "Ciphertext blob too short".to_string(),
+            ));
         }
 
         let kid_len = u16::from_be_bytes([envelope[0], envelope[1]]) as usize;
         if envelope.len() < 2 + kid_len + 8 {
-            return Err(KmsError::InvalidCiphertext("Malformed ciphertext header".to_string()));
+            return Err(KmsError::InvalidCiphertext(
+                "Malformed ciphertext header".to_string(),
+            ));
         }
 
         let kid_str = std::str::from_utf8(&envelope[2..2 + kid_len]).map_err(|_| {
@@ -289,7 +315,10 @@ impl KmsState {
         })?;
 
         let entry = self.keys.get(kid_str).ok_or_else(|| {
-            KmsError::NotFound(format!("Key '{}' used to encrypt ciphertext does not exist", kid_str))
+            KmsError::NotFound(format!(
+                "Key '{}' used to encrypt ciphertext does not exist",
+                kid_str
+            ))
         })?;
 
         if !entry.metadata.enabled || entry.metadata.key_state != "Enabled" {
@@ -310,7 +339,10 @@ impl KmsState {
         Ok((plaintext_b64, entry.metadata.arn.clone()))
     }
 
-    pub fn generate_data_key(&self, req: GenerateDataKeyRequest) -> Result<(String, String, String), KmsError> {
+    pub fn generate_data_key(
+        &self,
+        req: GenerateDataKeyRequest,
+    ) -> Result<(String, String, String), KmsError> {
         let num_bytes = match (req.number_of_bytes, req.key_spec.as_str()) {
             (Some(n), _) => n,
             (_, "AES_128") => 16,
@@ -340,7 +372,10 @@ impl KmsState {
             entry.metadata.key_state = "Disabled".to_string();
             Ok(())
         } else {
-            Err(KmsError::NotFound(format!("Key '{}' does not exist", key_id)))
+            Err(KmsError::NotFound(format!(
+                "Key '{}' does not exist",
+                key_id
+            )))
         }
     }
 
@@ -351,20 +386,31 @@ impl KmsState {
             entry.metadata.key_state = "Enabled".to_string();
             Ok(())
         } else {
-            Err(KmsError::NotFound(format!("Key '{}' does not exist", key_id)))
+            Err(KmsError::NotFound(format!(
+                "Key '{}' does not exist",
+                key_id
+            )))
         }
     }
 
-    pub fn schedule_key_deletion(&self, req: ScheduleKeyDeletionRequest) -> Result<(String, f64), KmsError> {
+    pub fn schedule_key_deletion(
+        &self,
+        req: ScheduleKeyDeletionRequest,
+    ) -> Result<(String, f64), KmsError> {
         let resolved_id = self.resolve_key_id(&req.key_id)?;
         if let Some(mut entry) = self.keys.get_mut(&resolved_id) {
-            let deletion_date = (Utc::now() + chrono::Duration::days(req.pending_window_in_days as i64)).timestamp() as f64;
+            let deletion_date = (Utc::now()
+                + chrono::Duration::days(req.pending_window_in_days as i64))
+            .timestamp() as f64;
             entry.metadata.enabled = false;
             entry.metadata.key_state = "PendingDeletion".to_string();
             entry.metadata.deletion_date = Some(deletion_date);
             Ok((entry.metadata.arn.clone(), deletion_date))
         } else {
-            Err(KmsError::NotFound(format!("Key '{}' does not exist", req.key_id)))
+            Err(KmsError::NotFound(format!(
+                "Key '{}' does not exist",
+                req.key_id
+            )))
         }
     }
 
