@@ -23,6 +23,7 @@ http = { workspace = true }
 http-body-util = { workspace = true }
 form_urlencoded = { workspace = true }
 thiserror = { workspace = true }
+reqwest = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

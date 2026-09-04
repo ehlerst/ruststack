@@ -24,6 +24,8 @@ bytes = { workspace = true }
 axum = { workspace = true }
 form_urlencoded = { workspace = true }
 fastrand = { workspace = true }
+ruststack-sns = { path = "../ruststack-sns" }
 
 [dev-dependencies]
 reqwest = { workspace = true }
+ruststack-sqs = { path = "../ruststack-sqs" }

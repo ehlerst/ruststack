@@ -160,6 +160,8 @@ pub struct QueueSnapshot {
     pub arn: String,
     pub attributes: QueueAttributes,
     pub messages: Vec<SqsMessageSnapshot>,
+    #[serde(default)]
+    pub tags: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

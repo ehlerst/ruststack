@@ -16,6 +16,24 @@ members = [
     "crates/ruststack-cloudwatch",
     "crates/ruststack-ses",
     "crates/ruststack-kinesis",
+    "crates/ruststack-cognito",
+    "crates/ruststack-apigateway",
+    "crates/ruststack-route53",
+    "crates/ruststack-stepfunctions",
+    "crates/ruststack-cloudformation",
+    "crates/ruststack-ecr",
+    "crates/ruststack-ecs",
+    "crates/ruststack-ec2",
+    "crates/ruststack-elbv2",
+    "crates/ruststack-bedrock",
+    "crates/ruststack-opensearch",
+    "crates/ruststack-athena",
+    "crates/ruststack-rds",
+    "crates/ruststack-elasticache",
+    "crates/ruststack-redshift",
+    "crates/ruststack-acm",
+    "crates/ruststack-wafv2",
+    "crates/ruststack-organizations",
     "crates/ruststack-server",
     "crates/ruststack-benchmarks",
     "crates/ruststack-compat-tests",
@@ -47,6 +65,24 @@ ruststack-cloudwatch = { path = "crates/ruststack-cloudwatch" }
 ruststack-ses = { path = "crates/ruststack-ses" }
 ruststack-kinesis = { path = "crates/ruststack-kinesis" }
 ruststack-lambda = { path = "crates/ruststack-lambda" }
+ruststack-cognito = { path = "crates/ruststack-cognito" }
+ruststack-apigateway = { path = "crates/ruststack-apigateway" }
+ruststack-route53 = { path = "crates/ruststack-route53" }
+ruststack-stepfunctions = { path = "crates/ruststack-stepfunctions" }
+ruststack-cloudformation = { path = "crates/ruststack-cloudformation" }
+ruststack-ecr = { path = "crates/ruststack-ecr" }
+ruststack-ecs = { path = "crates/ruststack-ecs" }
+ruststack-ec2 = { path = "crates/ruststack-ec2" }
+ruststack-elbv2 = { path = "crates/ruststack-elbv2" }
+ruststack-bedrock = { path = "crates/ruststack-bedrock" }
+ruststack-opensearch = { path = "crates/ruststack-opensearch" }
+ruststack-athena = { path = "crates/ruststack-athena" }
+ruststack-rds = { path = "crates/ruststack-rds" }
+ruststack-elasticache = { path = "crates/ruststack-elasticache" }
+ruststack-redshift = { path = "crates/ruststack-redshift" }
+ruststack-acm = { path = "crates/ruststack-acm" }
+ruststack-wafv2 = { path = "crates/ruststack-wafv2" }
+ruststack-organizations = { path = "crates/ruststack-organizations" }
 ruststack-server = { path = "crates/ruststack-server" }
 
 # Async & HTTP runtime

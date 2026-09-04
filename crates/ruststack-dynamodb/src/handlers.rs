@@ -607,6 +607,165 @@ async fn handle_dynamodb_json(
             make_json_response(res, StatusCode::OK)
         }
 
+        "TransactWriteItems" => {
+            let items_val = json_val.get("TransactItems").ok_or_else(|| {
+                RustStackError::dynamodb_bad_request(
+                    "ValidationException",
+                    "TransactItems is required.",
+                )
+            })?;
+            let transact_items: Vec<crate::types::TransactWriteItem> =
+                serde_json::from_value(items_val.clone()).map_err(|e| {
+                    RustStackError::dynamodb_bad_request("ValidationException", e.to_string())
+                })?;
+
+            engine.transact_write_items(&transact_items)?;
+            make_json_response(
+                json!({
+                    "ItemCollectionMetrics": {},
+                    "ConsumedCapacity": []
+                }),
+                StatusCode::OK,
+            )
+        }
+
+        "TransactGetItems" => {
+            let items_val = json_val.get("TransactItems").ok_or_else(|| {
+                RustStackError::dynamodb_bad_request(
+                    "ValidationException",
+                    "TransactItems is required.",
+                )
+            })?;
+            let transact_items: Vec<crate::types::TransactGetItem> =
+                serde_json::from_value(items_val.clone()).map_err(|e| {
+                    RustStackError::dynamodb_bad_request("ValidationException", e.to_string())
+                })?;
+
+            let results = engine.transact_get_items(&transact_items)?;
+            let responses: Vec<Value> = results
+                .into_iter()
+                .map(|opt| {
+                    if let Some(item) = opt {
+                        json!({ "Item": item })
+                    } else {
+                        json!({})
+                    }
+                })
+                .collect();
+
+            make_json_response(
+                json!({
+                    "Responses": responses,
+                    "ConsumedCapacity": []
+                }),
+                StatusCode::OK,
+            )
+        }
+
+        "UpdateTimeToLive" => {
+            let table_name = json_val
+                .get("TableName")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::dynamodb_bad_request(
+                        "ValidationException",
+                        "TableName is required.",
+                    )
+                })?;
+            let spec_val = json_val
+                .get("TimeToLiveSpecification")
+                .ok_or_else(|| {
+                    RustStackError::dynamodb_bad_request(
+                        "ValidationException",
+                        "TimeToLiveSpecification is required.",
+                    )
+                })?;
+            let spec: crate::types::TimeToLiveSpecification = serde_json::from_value(spec_val.clone())
+                .map_err(|e| {
+                    RustStackError::dynamodb_bad_request("ValidationException", e.to_string())
+                })?;
+
+            let res = engine.update_time_to_live(table_name, spec)?;
+            make_json_response(json!({ "TimeToLiveSpecification": res }), StatusCode::OK)
+        }
+
+        "DescribeTimeToLive" => {
+            let table_name = json_val
+                .get("TableName")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::dynamodb_bad_request(
+                        "ValidationException",
+                        "TableName is required.",
+                    )
+                })?;
+            let desc = engine.describe_time_to_live(table_name)?;
+            make_json_response(json!({ "TimeToLiveDescription": desc }), StatusCode::OK)
+        }
+
+        "DescribeLimits" => {
+            make_json_response(
+                json!({
+                    "AccountMaxReadCapacityUnits": 80000,
+                    "AccountMaxWriteCapacityUnits": 80000,
+                    "TableMaxReadCapacityUnits": 40000,
+                    "TableMaxWriteCapacityUnits": 40000
+                }),
+                StatusCode::OK,
+            )
+        }
+
+        "DescribeEndpoints" => {
+            make_json_response(
+                json!({
+                    "Endpoints": [
+                        {
+                            "Address": "localhost:4566",
+                            "CachePeriodInMinutes": 1440
+                        }
+                    ]
+                }),
+                StatusCode::OK,
+            )
+        }
+
+        "ListGlobalTables" => {
+            make_json_response(
+                json!({
+                    "GlobalTables": []
+                }),
+                StatusCode::OK,
+            )
+        }
+
+        "DescribeContinuousBackups" => {
+            make_json_response(
+                json!({
+                    "ContinuousBackupsDescription": {
+                        "ContinuousBackupsStatus": "ENABLED",
+                        "PointInTimeRecoveryDescription": {
+                            "PointInTimeRecoveryStatus": "DISABLED"
+                        }
+                    }
+                }),
+                StatusCode::OK,
+            )
+        }
+
+        "UpdateContinuousBackups" => {
+            make_json_response(
+                json!({
+                    "ContinuousBackupsDescription": {
+                        "ContinuousBackupsStatus": "ENABLED",
+                        "PointInTimeRecoveryDescription": {
+                            "PointInTimeRecoveryStatus": "ENABLED"
+                        }
+                    }
+                }),
+                StatusCode::OK,
+            )
+        }
+
         _ => Err(RustStackError::dynamodb_bad_request(
             "InvalidAction",
             format!("Action {} is not supported by DynamoDB.", action),

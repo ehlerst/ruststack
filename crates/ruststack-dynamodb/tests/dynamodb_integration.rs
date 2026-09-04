@@ -419,3 +419,256 @@ async fn test_dynamodb_streams_lifecycle() {
     assert_eq!(records[0]["eventName"].as_str().unwrap(), "INSERT");
     assert_eq!(records[1]["eventName"].as_str().unwrap(), "MODIFY");
 }
+
+#[tokio::test]
+async fn test_dynamodb_transactions_and_ttl() {
+    let ddb = setup_dynamodb();
+
+    // 1. Create AccountsTable
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.CreateTable")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "AccountsTable",
+                "KeySchema": [{ "AttributeName": "accountId", "KeyType": "HASH" }],
+                "AttributeDefinitions": [{ "AttributeName": "accountId", "AttributeType": "S" }],
+                "BillingMode": "PAY_PER_REQUEST"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let _ = handle_dynamodb_request(ddb.clone(), req).await;
+
+    // 2. Put initial accounts A ($100) and B ($50)
+    for (acc, bal) in [("acc_A", "100"), ("acc_B", "50")] {
+        let req = Request::builder()
+            .method(Method::POST)
+            .uri("/")
+            .header("x-amz-target", "DynamoDB_20120810.PutItem")
+            .header("content-type", "application/x-amz-json-1.0")
+            .body(Body::from(
+                serde_json::json!({
+                    "TableName": "AccountsTable",
+                    "Item": {
+                        "accountId": { "S": acc },
+                        "balance": { "N": bal }
+                    }
+                })
+                .to_string(),
+            ))
+            .unwrap();
+        let _ = handle_dynamodb_request(ddb.clone(), req).await;
+    }
+
+    // 3. TransactWriteItems: Transfer $30 from A to B with condition balance >= 30
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.TransactWriteItems")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TransactItems": [
+                    {
+                        "Update": {
+                            "TableName": "AccountsTable",
+                            "Key": { "accountId": { "S": "acc_A" } },
+                            "UpdateExpression": "SET balance = :bal",
+                            "ConditionExpression": "balance >= :req",
+                            "ExpressionAttributeValues": {
+                                ":bal": { "N": "70" },
+                                ":req": { "N": "30" }
+                            }
+                        }
+                    },
+                    {
+                        "Update": {
+                            "TableName": "AccountsTable",
+                            "Key": { "accountId": { "S": "acc_B" } },
+                            "UpdateExpression": "SET balance = :bal",
+                            "ExpressionAttributeValues": {
+                                ":bal": { "N": "80" }
+                            }
+                        }
+                    }
+                ]
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 4. TransactGetItems: Read both accounts
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.TransactGetItems")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TransactItems": [
+                    {
+                        "Get": {
+                            "TableName": "AccountsTable",
+                            "Key": { "accountId": { "S": "acc_A" } }
+                        }
+                    },
+                    {
+                        "Get": {
+                            "TableName": "AccountsTable",
+                            "Key": { "accountId": { "S": "acc_B" } }
+                        }
+                    }
+                ]
+            })
+            .to_string(),
+        ))
+        .unwrap();
+
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let responses = val["Responses"].as_array().unwrap();
+    assert_eq!(responses[0]["Item"]["balance"]["N"].as_str().unwrap(), "70");
+    assert_eq!(responses[1]["Item"]["balance"]["N"].as_str().unwrap(), "80");
+
+    // 5. UpdateTimeToLive & DescribeTimeToLive
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.UpdateTimeToLive")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "AccountsTable",
+                "TimeToLiveSpecification": {
+                    "AttributeName": "ttl_expires_at",
+                    "Enabled": true
+                }
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.DescribeTimeToLive")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "AccountsTable"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(val["TimeToLiveDescription"]["TimeToLiveStatus"].as_str().unwrap(), "ENABLED");
+}
+
+#[tokio::test]
+async fn test_dynamodb_update_expressions_add_delete() {
+    let ddb = setup_dynamodb();
+
+    // Create ItemsTable
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.CreateTable")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "ItemsTable",
+                "KeySchema": [{ "AttributeName": "id", "KeyType": "HASH" }],
+                "AttributeDefinitions": [{ "AttributeName": "id", "AttributeType": "S" }],
+                "BillingMode": "PAY_PER_REQUEST"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let _ = handle_dynamodb_request(ddb.clone(), req).await;
+
+    // Put item with initial score = 10, tags = ["rust", "fast"]
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.PutItem")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "ItemsTable",
+                "Item": {
+                    "id": { "S": "item_1" },
+                    "score": { "N": "10" },
+                    "tags": { "SS": ["rust", "fast"] }
+                }
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let _ = handle_dynamodb_request(ddb.clone(), req).await;
+
+    // UpdateItem: ADD score :inc, tags :new_tags
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.UpdateItem")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "ItemsTable",
+                "Key": { "id": { "S": "item_1" } },
+                "UpdateExpression": "ADD score :inc, tags :new_tags",
+                "ExpressionAttributeValues": {
+                    ":inc": { "N": "5" },
+                    ":new_tags": { "SS": ["reliable"] }
+                },
+                "ReturnValues": "ALL_NEW"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(val["Attributes"]["score"]["N"].as_str().unwrap(), "15");
+
+    // UpdateItem: DELETE tags :rem_tags
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/")
+        .header("x-amz-target", "DynamoDB_20120810.UpdateItem")
+        .header("content-type", "application/x-amz-json-1.0")
+        .body(Body::from(
+            serde_json::json!({
+                "TableName": "ItemsTable",
+                "Key": { "id": { "S": "item_1" } },
+                "UpdateExpression": "DELETE tags :rem_tags",
+                "ExpressionAttributeValues": {
+                    ":rem_tags": { "SS": ["fast"] }
+                },
+                "ReturnValues": "ALL_NEW"
+            })
+            .to_string(),
+        ))
+        .unwrap();
+    let resp = handle_dynamodb_request(ddb.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    let val: Value = serde_json::from_slice(&body).unwrap();
+    let tags = val["Attributes"]["tags"]["SS"].as_array().unwrap();
+    assert_eq!(tags.len(), 2);
+    assert!(!tags.iter().any(|t| t.as_str() == Some("fast")));
+}

@@ -384,6 +384,50 @@ pub struct ListTagsForStreamResponse {
     pub has_more_tags: bool,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SplitShardRequest {
+    #[serde(default)]
+    pub stream_name: Option<String>,
+    #[serde(rename = "StreamARN", default)]
+    pub stream_arn: Option<String>,
+    pub shard_to_split: String,
+    pub new_starting_hash_key: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct MergeShardsRequest {
+    #[serde(default)]
+    pub stream_name: Option<String>,
+    #[serde(rename = "StreamARN", default)]
+    pub stream_arn: Option<String>,
+    pub shard_to_merge: String,
+    pub adjacent_shard_to_merge: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct UpdateShardCountRequest {
+    #[serde(default)]
+    pub stream_name: Option<String>,
+    #[serde(rename = "StreamARN", default)]
+    pub stream_arn: Option<String>,
+    pub target_shard_count: usize,
+    pub scaling_type: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct UpdateShardCountResponse {
+    #[serde(rename = "StreamARN", skip_serializing_if = "Option::is_none")]
+    pub stream_arn: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub stream_name: Option<String>,
+    pub current_shard_count: usize,
+    pub target_shard_count: usize,
+}
+
 // ----------------------------------------------------------------------------
 // Internal storage and Snapshot models
 // ----------------------------------------------------------------------------

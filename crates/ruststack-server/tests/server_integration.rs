@@ -73,6 +73,78 @@ async fn test_server_unified_routing() {
         "000000000000".to_string(),
         "us-east-1".to_string(),
     ));
+    let cognito_state = Arc::new(ruststack_cognito::CognitoState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let apigateway_state = Arc::new(ruststack_apigateway::ApiGatewayState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let route53_state = Arc::new(ruststack_route53::Route53State::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let stepfunctions_state = Arc::new(ruststack_stepfunctions::StepFunctionsState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let cloudformation_state = Arc::new(ruststack_cloudformation::CloudFormationState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let ecr_state = Arc::new(ruststack_ecr::EcrState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let ecs_state = Arc::new(ruststack_ecs::EcsState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let ec2_state = Arc::new(ruststack_ec2::Ec2State::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let elbv2_state = Arc::new(ruststack_elbv2::Elbv2State::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let bedrock_state = Arc::new(ruststack_bedrock::BedrockState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let opensearch_state = Arc::new(ruststack_opensearch::OpenSearchState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let athena_state = Arc::new(ruststack_athena::AthenaState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let rds_state = Arc::new(ruststack_rds::RdsState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let elasticache_state = Arc::new(ruststack_elasticache::ElastiCacheState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let redshift_state = Arc::new(ruststack_redshift::RedshiftState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let acm_state = Arc::new(ruststack_acm::AcmState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let wafv2_state = Arc::new(ruststack_wafv2::Wafv2State::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let organizations_state = Arc::new(ruststack_organizations::OrganizationsState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
 
     let state = AppState {
         s3_storage,
@@ -90,6 +162,24 @@ async fn test_server_unified_routing() {
         ses_state,
         kinesis_state,
         lambda_state,
+        cognito_state,
+        apigateway_state,
+        route53_state,
+        stepfunctions_state,
+        cloudformation_state,
+        ecr_state,
+        ecs_state,
+        ec2_state,
+        elbv2_state,
+        bedrock_state,
+        opensearch_state,
+        athena_state,
+        rds_state,
+        elasticache_state,
+        redshift_state,
+        acm_state,
+        wafv2_state,
+        organizations_state,
         chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region: "us-east-1".to_string(),
         account_id: "000000000000".to_string(),
@@ -405,4 +495,354 @@ async fn test_server_unified_routing() {
         .await
         .unwrap();
     assert_eq!(resp.status(), StatusCode::CREATED);
+
+    // 17. Cognito CreateUserPool via unified router (JSON target)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "AWSCognitoIdentityProviderService.CreateUserPool")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    serde_json::json!({
+                        "PoolName": "unified-pool"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 18. API Gateway CreateRestApi via unified router (REST JSON)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/restapis")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "name": "unified-api"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+
+    // 19. Route53 CreateHostedZone via unified router (REST JSON)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/2013-04-01/hostedzone")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "Name": "example.internal.",
+                        "CallerReference": "ref-unified-123"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::CREATED);
+
+    // 20. StepFunctions CreateStateMachine via unified router (JSON 1.0 target)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "AWSStepFunctions.CreateStateMachine")
+                .header("content-type", "application/x-amz-json-1.0")
+                .body(Body::from(
+                    serde_json::json!({
+                        "Name": "unified-state-machine",
+                        "Definition": "{\"StartAt\":\"PassState\",\"States\":{\"PassState\":{\"Type\":\"Pass\",\"End\":true}}}",
+                        "RoleArn": "arn:aws:iam::000000000000:role/SFNRole"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 21. CloudFormation CreateStack via unified router (Query Protocol)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "Action=CreateStack&StackName=unified-stack&TemplateBody=%7B%22Resources%22%3A%7B%7D%7D",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 22. ECR CreateRepository via unified router (JSON 1.1 target)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "AmazonEC2ContainerRegistry_V20150921.CreateRepository")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    serde_json::json!({
+                        "repositoryName": "unified-repo"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 23. ECS CreateCluster via unified router (JSON 1.1 target)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "AmazonEC2ContainerServiceV20141113.CreateCluster")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    serde_json::json!({
+                        "clusterName": "unified-ecs-cluster"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 24. EC2 CreateVpc via unified router (Query Protocol)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "Action=CreateVpc&CidrBlock=192.168.0.0/16",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 25. ELBv2 CreateTargetGroup via unified router (Query Protocol)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "Action=CreateTargetGroup&Name=unified-tg&Protocol=HTTP&Port=8080",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 26. Bedrock ListFoundationModels via unified router (REST)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::GET)
+                .uri("/foundation-models")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 27. OpenSearch CreateDomain via unified router (REST)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/2021-01-01/opensearch/domain")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "DomainName": "unified-domain"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 28. Athena StartQueryExecution via unified router (JSON 1.1)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "AmazonAthena.StartQueryExecution")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    serde_json::json!({
+                        "QueryString": "SELECT 1"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 29. RDS CreateDBInstance via unified router (Query Protocol)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "Action=CreateDBInstance&DBInstanceIdentifier=router-db&Engine=postgres&DBInstanceClass=db.t3.micro&MasterUsername=root",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 30. ElastiCache CreateCacheCluster via unified router (Query Protocol)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "Action=CreateCacheCluster&CacheClusterIdentifier=router-cache&Engine=redis",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 31. Redshift CreateCluster via unified router (Query Protocol)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("content-type", "application/x-www-form-urlencoded")
+                .body(Body::from(
+                    "Action=CreateCluster&ClusterIdentifier=router-redshift&NodeType=dc2.large&MasterUsername=admin&DBName=analytics",
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 32. ACM RequestCertificate via unified router (JSON 1.1)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "CertificateManager.RequestCertificate")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    serde_json::json!({
+                        "DomainName": "unified.example.com",
+                        "ValidationMethod": "DNS"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 33. WAFv2 CreateWebACL via unified router (JSON 1.1)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "AWSWAF_20190729.CreateWebACL")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from(
+                    serde_json::json!({
+                        "Name": "router-waf",
+                        "Scope": "REGIONAL",
+                        "DefaultAction": { "Allow": {} },
+                        "VisibilityConfig": {
+                            "SampledRequestsEnabled": true,
+                            "CloudWatchMetricsEnabled": true,
+                            "MetricName": "RouterWafMetric"
+                        }
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 34. Organizations CreateOrganization via unified router (JSON 1.1)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/")
+                .header("x-amz-target", "AWSOrganizationsV20161128.CreateOrganization")
+                .header("content-type", "application/x-amz-json-1.1")
+                .body(Body::from("{}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
 }

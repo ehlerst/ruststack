@@ -51,6 +51,10 @@ impl KinesisState {
         }
     }
 
+    fn next_seq_number(&self) -> u64 {
+        self.global_seq_counter.fetch_add(1, Ordering::SeqCst)
+    }
+
     pub fn stream_arn(&self, stream_name: &str) -> String {
         format!(
             "arn:aws:kinesis:{}:{}:stream/{}",
@@ -268,7 +272,11 @@ impl KinesisState {
             }],
             encryption_type: stream.encryption_type,
             key_id: stream.key_id.clone(),
-            open_shard_count: stream.shards.len() as u32,
+            open_shard_count: stream
+                .shards
+                .iter()
+                .filter(|s| s.ending_sequence_number.is_none())
+                .count() as u32,
             consumer_count: 0,
         })
     }
@@ -683,6 +691,219 @@ impl KinesisState {
         Ok(ListTagsForStreamResponse {
             tags,
             has_more_tags: has_more,
+        })
+    }
+
+    pub fn split_shard(&self, req: SplitShardRequest) -> Result<(), KinesisError> {
+        let name =
+            self.resolve_stream_name(req.stream_name.as_deref(), req.stream_arn.as_deref())?;
+        let mut stream = self.streams.get_mut(name).ok_or_else(|| {
+            KinesisError::ResourceNotFound(format!(
+                "Stream {} under account {} not found.",
+                name, self.account_id
+            ))
+        })?;
+
+        let split_hash: u128 = req
+            .new_starting_hash_key
+            .parse()
+            .map_err(|_| KinesisError::InvalidArgument("Invalid NewStartingHashKey".to_string()))?;
+
+        let shard_idx = stream
+            .shards
+            .iter()
+            .position(|s| s.shard_id == req.shard_to_split)
+            .ok_or_else(|| {
+                KinesisError::ResourceNotFound(format!("Shard {} not found", req.shard_to_split))
+            })?;
+
+        let (parent_start_str, parent_end_str) = {
+            let parent = &mut stream.shards[shard_idx];
+            if parent.ending_sequence_number.is_some() {
+                return Err(KinesisError::InvalidArgument(format!(
+                    "Shard {} is already closed",
+                    req.shard_to_split
+                )));
+            }
+            parent.ending_sequence_number = Some(format!("{:012}", self.next_seq_number()));
+            (
+                parent.starting_hash_key.clone(),
+                parent.ending_hash_key.clone(),
+            )
+        };
+
+        let parent_start: u128 = parent_start_str.parse().unwrap_or(0);
+        let parent_end: u128 = parent_end_str.parse().unwrap_or(u128::MAX);
+
+        if split_hash <= parent_start || split_hash > parent_end {
+            return Err(KinesisError::InvalidArgument(
+                "NewStartingHashKey is out of range".to_string(),
+            ));
+        }
+
+        let new_shard_1_id = format!("shardId-{:012}", stream.shards.len());
+        let new_shard_2_id = format!("shardId-{:012}", stream.shards.len() + 1);
+
+        let shard1 = StoredShard {
+            shard_id: new_shard_1_id,
+            parent_shard_id: Some(req.shard_to_split.clone()),
+            adjacent_parent_shard_id: None,
+            starting_hash_key: parent_start_str,
+            ending_hash_key: (split_hash - 1).to_string(),
+            starting_sequence_number: format!("{:012}", self.next_seq_number()),
+            ending_sequence_number: None,
+            records: Vec::new(),
+        };
+
+        let shard2 = StoredShard {
+            shard_id: new_shard_2_id,
+            parent_shard_id: Some(req.shard_to_split),
+            adjacent_parent_shard_id: None,
+            starting_hash_key: split_hash.to_string(),
+            ending_hash_key: parent_end_str,
+            starting_sequence_number: format!("{:012}", self.next_seq_number()),
+            ending_sequence_number: None,
+            records: Vec::new(),
+        };
+
+        stream.shards.push(shard1);
+        stream.shards.push(shard2);
+
+        Ok(())
+    }
+
+    pub fn merge_shards(&self, req: MergeShardsRequest) -> Result<(), KinesisError> {
+        let name =
+            self.resolve_stream_name(req.stream_name.as_deref(), req.stream_arn.as_deref())?;
+        let mut stream = self.streams.get_mut(name).ok_or_else(|| {
+            KinesisError::ResourceNotFound(format!(
+                "Stream {} under account {} not found.",
+                name, self.account_id
+            ))
+        })?;
+
+        let idx1 = stream
+            .shards
+            .iter()
+            .position(|s| s.shard_id == req.shard_to_merge)
+            .ok_or_else(|| {
+                KinesisError::ResourceNotFound(format!("Shard {} not found", req.shard_to_merge))
+            })?;
+
+        let idx2 = stream
+            .shards
+            .iter()
+            .position(|s| s.shard_id == req.adjacent_shard_to_merge)
+            .ok_or_else(|| {
+                KinesisError::ResourceNotFound(format!(
+                    "Shard {} not found",
+                    req.adjacent_shard_to_merge
+                ))
+            })?;
+
+        let (start1, end1) = {
+            let s1 = &mut stream.shards[idx1];
+            s1.ending_sequence_number = Some(format!("{:012}", self.next_seq_number()));
+            (s1.starting_hash_key.clone(), s1.ending_hash_key.clone())
+        };
+
+        let (start2, end2) = {
+            let s2 = &mut stream.shards[idx2];
+            s2.ending_sequence_number = Some(format!("{:012}", self.next_seq_number()));
+            (s2.starting_hash_key.clone(), s2.ending_hash_key.clone())
+        };
+
+        let u_start1: u128 = start1.parse().unwrap_or(0);
+        let u_start2: u128 = start2.parse().unwrap_or(0);
+        let u_end1: u128 = end1.parse().unwrap_or(0);
+        let u_end2: u128 = end2.parse().unwrap_or(0);
+
+        let merged_start = u_start1.min(u_start2).to_string();
+        let merged_end = u_end1.max(u_end2).to_string();
+
+        let new_shard_id = format!("shardId-{:012}", stream.shards.len());
+        let merged_shard = StoredShard {
+            shard_id: new_shard_id,
+            parent_shard_id: Some(req.shard_to_merge),
+            adjacent_parent_shard_id: Some(req.adjacent_shard_to_merge),
+            starting_hash_key: merged_start,
+            ending_hash_key: merged_end,
+            starting_sequence_number: format!("{:012}", self.next_seq_number()),
+            ending_sequence_number: None,
+            records: Vec::new(),
+        };
+
+        stream.shards.push(merged_shard);
+        Ok(())
+    }
+
+    pub fn update_shard_count(
+        &self,
+        req: UpdateShardCountRequest,
+    ) -> Result<UpdateShardCountResponse, KinesisError> {
+        let name =
+            self.resolve_stream_name(req.stream_name.as_deref(), req.stream_arn.as_deref())?;
+        let mut stream = self.streams.get_mut(name).ok_or_else(|| {
+            KinesisError::ResourceNotFound(format!(
+                "Stream {} under account {} not found.",
+                name, self.account_id
+            ))
+        })?;
+
+        if req.target_shard_count == 0 {
+            return Err(KinesisError::InvalidArgument(
+                "TargetShardCount must be greater than 0".to_string(),
+            ));
+        }
+
+        let current_open_shards: Vec<usize> = stream
+            .shards
+            .iter()
+            .enumerate()
+            .filter(|(_, s)| s.ending_sequence_number.is_none())
+            .map(|(i, _)| i)
+            .collect();
+
+        let current_count = current_open_shards.len();
+
+        // Close current open shards
+        let seq = format!("{:012}", self.next_seq_number());
+        for idx in current_open_shards {
+            stream.shards[idx].ending_sequence_number = Some(seq.clone());
+        }
+
+        // Create new target shards
+        let max_hash = u128::MAX;
+        let count = req.target_shard_count as u128;
+        let step = max_hash / count;
+
+        let base_len = stream.shards.len();
+        for i in 0..req.target_shard_count {
+            let idx = i as u128;
+            let start = idx * step;
+            let end = if i == req.target_shard_count - 1 {
+                max_hash
+            } else {
+                (idx + 1) * step - 1
+            };
+
+            stream.shards.push(StoredShard {
+                shard_id: format!("shardId-{:012}", base_len + i),
+                parent_shard_id: None,
+                adjacent_parent_shard_id: None,
+                starting_hash_key: start.to_string(),
+                ending_hash_key: end.to_string(),
+                starting_sequence_number: format!("{:012}", self.next_seq_number()),
+                ending_sequence_number: None,
+                records: Vec::new(),
+            });
+        }
+
+        Ok(UpdateShardCountResponse {
+            stream_arn: Some(stream.arn.clone()),
+            stream_name: Some(stream.stream_name.clone()),
+            current_shard_count: current_count,
+            target_shard_count: req.target_shard_count,
         })
     }
 

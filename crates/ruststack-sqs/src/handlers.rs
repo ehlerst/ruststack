@@ -465,6 +465,56 @@ async fn handle_sqs_json(
             make_json_response(serde_json::json!({}), StatusCode::OK)
         }
 
+        "TagQueue" => {
+            let queue_url = json_val
+                .get("QueueUrl")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::sqs_bad_request(
+                        "MissingParameter",
+                        "The request must contain the parameter QueueUrl.",
+                    )
+                })?;
+            let tags_map: HashMap<String, String> = json_val
+                .get("Tags")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            engine.tag_queue(queue_url, tags_map)?;
+            make_json_response(serde_json::json!({}), StatusCode::OK)
+        }
+
+        "UntagQueue" => {
+            let queue_url = json_val
+                .get("QueueUrl")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::sqs_bad_request(
+                        "MissingParameter",
+                        "The request must contain the parameter QueueUrl.",
+                    )
+                })?;
+            let tag_keys: Vec<String> = json_val
+                .get("TagKeys")
+                .and_then(|v| serde_json::from_value(v.clone()).ok())
+                .unwrap_or_default();
+            engine.untag_queue(queue_url, &tag_keys)?;
+            make_json_response(serde_json::json!({}), StatusCode::OK)
+        }
+
+        "ListQueueTags" => {
+            let queue_url = json_val
+                .get("QueueUrl")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| {
+                    RustStackError::sqs_bad_request(
+                        "MissingParameter",
+                        "The request must contain the parameter QueueUrl.",
+                    )
+                })?;
+            let tags = engine.list_queue_tags(queue_url)?;
+            make_json_response(serde_json::json!({ "Tags": tags }), StatusCode::OK)
+        }
+
         _ => Err(RustStackError::BadRequest(format!(
             "Unsupported SQS Action: {}",
             action
@@ -750,6 +800,40 @@ async fn handle_sqs_query(
 
             engine.change_message_visibility(&queue_url, receipt, vt)?;
             let xml_body = codec::xml_empty_response("ChangeMessageVisibility", request_id);
+            make_xml_response(xml_body, StatusCode::OK, request_id)
+        }
+
+        "TagQueue" => {
+            let mut tags = HashMap::new();
+            let mut i = 1;
+            while let Some(k) = params.get(&format!("Tag.{}.Key", i)) {
+                let v = params
+                    .get(&format!("Tag.{}.Value", i))
+                    .cloned()
+                    .unwrap_or_default();
+                tags.insert(k.clone(), v);
+                i += 1;
+            }
+            engine.tag_queue(&queue_url, tags)?;
+            let xml_body = codec::xml_empty_response("TagQueue", request_id);
+            make_xml_response(xml_body, StatusCode::OK, request_id)
+        }
+
+        "UntagQueue" => {
+            let mut tag_keys = Vec::new();
+            let mut i = 1;
+            while let Some(k) = params.get(&format!("TagKey.{}", i)) {
+                tag_keys.push(k.clone());
+                i += 1;
+            }
+            engine.untag_queue(&queue_url, &tag_keys)?;
+            let xml_body = codec::xml_empty_response("UntagQueue", request_id);
+            make_xml_response(xml_body, StatusCode::OK, request_id)
+        }
+
+        "ListQueueTags" => {
+            let tags = engine.list_queue_tags(&queue_url)?;
+            let xml_body = codec::xml_list_queue_tags_response(&tags, request_id);
             make_xml_response(xml_body, StatusCode::OK, request_id)
         }
 

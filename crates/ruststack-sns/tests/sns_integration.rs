@@ -222,3 +222,59 @@ async fn test_sns_raw_message_delivery_and_filter_policy() {
     let us_msgs = sqs.receive_message(&q_us, 10, None, None).await.unwrap();
     assert_eq!(us_msgs.len(), 0);
 }
+
+#[tokio::test]
+async fn test_sns_http_webhook_dispatch() {
+    use tokio::sync::mpsc;
+    let (tx, mut rx) = mpsc::channel(1);
+
+    // Setup local HTTP server receiver
+    let app = axum::Router::new().route(
+        "/webhook",
+        axum::routing::post(move |headers: axum::http::HeaderMap, body: String| {
+            let tx = tx.clone();
+            async move {
+                let msg_type = headers
+                    .get("x-amz-sns-message-type")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("")
+                    .to_string();
+                let _ = tx.send((msg_type, body)).await;
+                axum::http::StatusCode::OK
+            }
+        }),
+    );
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let (sns, _) = setup_sns_and_sqs();
+    let topic_arn = sns.create_topic("webhook-alerts", None).unwrap();
+    let webhook_url = format!("http://{}/webhook", addr);
+
+    // Subscribe HTTP endpoint
+    sns.subscribe(&topic_arn, "http", &webhook_url, None).unwrap();
+
+    // Publish to topic
+    sns.publish(
+        &topic_arn,
+        "Alert! Service health check failed".to_string(),
+        Some("Health Alert".to_string()),
+        None,
+        None,
+        None,
+    )
+    .unwrap();
+
+    // Await webhook invocation with timeout
+    let result = tokio::time::timeout(std::time::Duration::from_secs(3), rx.recv()).await;
+    assert!(result.is_ok());
+    let (msg_type, body) = result.unwrap().unwrap();
+    assert_eq!(msg_type, "Notification");
+    let env: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(env["Subject"].as_str().unwrap(), "Health Alert");
+    assert_eq!(env["Message"].as_str().unwrap(), "Alert! Service health check failed");
+}

@@ -152,11 +152,72 @@ impl BucketNotificationConfig {
     }
 }
 
+// Versioning
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectVersion {
+    pub key: String,
+    pub version_id: String,
+    pub is_latest: bool,
+    pub last_modified: DateTime<Utc>,
+    pub etag: String,
+    pub size: u64,
+    pub is_delete_marker: bool,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ListObjectVersionsResult {
+    pub name: String,
+    pub prefix: String,
+    pub key_marker: Option<String>,
+    pub version_id_marker: Option<String>,
+    pub next_key_marker: Option<String>,
+    pub next_version_id_marker: Option<String>,
+    pub max_keys: usize,
+    pub is_truncated: bool,
+    pub versions: Vec<ObjectVersion>,
+    pub delete_markers: Vec<ObjectVersion>,
+    pub common_prefixes: Vec<String>,
+}
+
+// Lifecycle
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LifecycleRule {
+    pub id: Option<String>,
+    pub status: String, // "Enabled" or "Disabled"
+    pub prefix: Option<String>,
+    pub expiration_days: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BucketLifecycleConfig {
+    pub rules: Vec<LifecycleRule>,
+}
+
+// CORS
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorsRule {
+    pub id: Option<String>,
+    pub allowed_methods: Vec<String>,
+    pub allowed_origins: Vec<String>,
+    pub allowed_headers: Vec<String>,
+    pub expose_headers: Vec<String>,
+    pub max_age_seconds: Option<i32>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BucketCorsConfig {
+    pub rules: Vec<CorsRule>,
+}
+
 // Snapshot Structures
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StoredObjectSnapshot {
     pub metadata: ObjectMetadata,
     pub data_base64: String,
+    #[serde(default)]
+    pub version_id: Option<String>,
+    #[serde(default)]
+    pub is_delete_marker: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -164,6 +225,16 @@ pub struct BucketSnapshot {
     pub info: BucketInfo,
     pub notifications: BucketNotificationConfig,
     pub objects: Vec<StoredObjectSnapshot>,
+    #[serde(default)]
+    pub versioning: Option<String>,
+    #[serde(default)]
+    pub lifecycle: Option<BucketLifecycleConfig>,
+    #[serde(default)]
+    pub cors: Option<BucketCorsConfig>,
+    #[serde(default)]
+    pub policy: Option<String>,
+    #[serde(default)]
+    pub tagging: HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]

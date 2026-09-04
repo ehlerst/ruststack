@@ -124,6 +124,51 @@ pub trait S3Storage: Send + Sync {
         config: BucketNotificationConfig,
     ) -> Result<(), RustStackError>;
 
+    // Versioning
+    fn get_bucket_versioning(&self, bucket: &str) -> Result<Option<String>, RustStackError>;
+    fn put_bucket_versioning(&self, bucket: &str, status: &str) -> Result<(), RustStackError>;
+    fn list_object_versions(
+        &self,
+        bucket: &str,
+        prefix: Option<&str>,
+        delimiter: Option<&str>,
+        key_marker: Option<&str>,
+        version_id_marker: Option<&str>,
+        max_keys: usize,
+    ) -> Result<crate::types::ListObjectVersionsResult, RustStackError>;
+    fn get_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: &str,
+    ) -> Result<(ObjectMetadata, Bytes), RustStackError>;
+    fn delete_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: Option<&str>,
+    ) -> Result<Option<String>, RustStackError>;
+
+    // Lifecycle
+    fn get_bucket_lifecycle(&self, bucket: &str) -> Result<Option<crate::types::BucketLifecycleConfig>, RustStackError>;
+    fn put_bucket_lifecycle(&self, bucket: &str, config: crate::types::BucketLifecycleConfig) -> Result<(), RustStackError>;
+    fn delete_bucket_lifecycle(&self, bucket: &str) -> Result<(), RustStackError>;
+
+    // CORS
+    fn get_bucket_cors(&self, bucket: &str) -> Result<Option<crate::types::BucketCorsConfig>, RustStackError>;
+    fn put_bucket_cors(&self, bucket: &str, config: crate::types::BucketCorsConfig) -> Result<(), RustStackError>;
+    fn delete_bucket_cors(&self, bucket: &str) -> Result<(), RustStackError>;
+
+    // Policy
+    fn get_bucket_policy(&self, bucket: &str) -> Result<Option<String>, RustStackError>;
+    fn put_bucket_policy(&self, bucket: &str, policy: String) -> Result<(), RustStackError>;
+    fn delete_bucket_policy(&self, bucket: &str) -> Result<(), RustStackError>;
+
+    // Tagging
+    fn get_bucket_tagging(&self, bucket: &str) -> Result<HashMap<String, String>, RustStackError>;
+    fn put_bucket_tagging(&self, bucket: &str, tags: HashMap<String, String>) -> Result<(), RustStackError>;
+    fn delete_bucket_tagging(&self, bucket: &str) -> Result<(), RustStackError>;
+
     fn set_notification_target(&self, target: Arc<dyn S3NotificationTarget>);
 }
 
@@ -149,9 +194,24 @@ struct StoredMultipartUpload {
     parts: RwLock<BTreeMap<i32, StoredPart>>,
 }
 
+#[derive(Clone)]
+struct StoredObjectVersion {
+    version_id: String,
+    is_latest: bool,
+    is_delete_marker: bool,
+    metadata: ObjectMetadata,
+    data: Bytes,
+}
+
 struct Bucket {
     info: BucketInfo,
     objects: DashMap<String, StoredObject>,
+    versions: DashMap<String, Vec<StoredObjectVersion>>,
+    versioning: RwLock<Option<String>>,
+    lifecycle: RwLock<Option<crate::types::BucketLifecycleConfig>>,
+    cors: RwLock<Option<crate::types::BucketCorsConfig>>,
+    policy: RwLock<Option<String>>,
+    tagging: RwLock<HashMap<String, String>>,
     multipart_uploads: DashMap<String, StoredMultipartUpload>,
     notifications: RwLock<BucketNotificationConfig>,
 }
@@ -356,6 +416,12 @@ impl S3Storage for InMemoryStorage {
                     region: region.to_string(),
                 },
                 objects: DashMap::new(),
+                versions: DashMap::new(),
+                versioning: RwLock::new(None),
+                lifecycle: RwLock::new(None),
+                cors: RwLock::new(None),
+                policy: RwLock::new(None),
+                tagging: RwLock::new(HashMap::new()),
                 multipart_uploads: DashMap::new(),
                 notifications: RwLock::new(BucketNotificationConfig::default()),
             },
@@ -427,6 +493,22 @@ impl S3Storage for InMemoryStorage {
             content_type: content_type.unwrap_or_else(|| "application/octet-stream".to_string()),
             user_metadata,
         };
+
+        let is_versioned = entry.versioning.read().as_deref() == Some("Enabled");
+        if is_versioned {
+            let version_id = uuid::Uuid::new_v4().to_string();
+            let mut v_list = entry.versions.entry(key.to_string()).or_default();
+            for v in v_list.iter_mut() {
+                v.is_latest = false;
+            }
+            v_list.push(StoredObjectVersion {
+                version_id,
+                is_latest: true,
+                is_delete_marker: false,
+                metadata: metadata.clone(),
+                data: data.clone(),
+            });
+        }
 
         entry.objects.insert(
             key.to_string(),
@@ -848,6 +930,321 @@ impl S3Storage for InMemoryStorage {
         Ok(list)
     }
 
+    fn get_bucket_versioning(&self, bucket: &str) -> Result<Option<String>, RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        let res = entry.versioning.read().clone();
+        Ok(res)
+    }
+
+    fn put_bucket_versioning(&self, bucket: &str, status: &str) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        *entry.versioning.write() = Some(status.to_string());
+        Ok(())
+    }
+
+    fn list_object_versions(
+        &self,
+        bucket: &str,
+        prefix: Option<&str>,
+        _delimiter: Option<&str>,
+        key_marker: Option<&str>,
+        version_id_marker: Option<&str>,
+        max_keys: usize,
+    ) -> Result<crate::types::ListObjectVersionsResult, RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+
+        let mut versions_out = Vec::new();
+        let mut delete_markers_out = Vec::new();
+        let prefix_str = prefix.unwrap_or("");
+
+        for pair in entry.versions.iter() {
+            let key = pair.key();
+            if !key.starts_with(prefix_str) {
+                continue;
+            }
+            for v in pair.value() {
+                let obj_ver = crate::types::ObjectVersion {
+                    key: key.clone(),
+                    version_id: v.version_id.clone(),
+                    is_latest: v.is_latest,
+                    last_modified: v.metadata.last_modified,
+                    etag: v.metadata.etag.clone(),
+                    size: v.metadata.size,
+                    is_delete_marker: v.is_delete_marker,
+                };
+                if v.is_delete_marker {
+                    delete_markers_out.push(obj_ver);
+                } else {
+                    versions_out.push(obj_ver);
+                }
+            }
+        }
+
+        Ok(crate::types::ListObjectVersionsResult {
+            name: bucket.to_string(),
+            prefix: prefix_str.to_string(),
+            key_marker: key_marker.map(|s| s.to_string()),
+            version_id_marker: version_id_marker.map(|s| s.to_string()),
+            next_key_marker: None,
+            next_version_id_marker: None,
+            max_keys,
+            is_truncated: false,
+            versions: versions_out,
+            delete_markers: delete_markers_out,
+            common_prefixes: Vec::new(),
+        })
+    }
+
+    fn get_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: &str,
+    ) -> Result<(ObjectMetadata, Bytes), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+
+        let v_list = entry.versions.get(key).ok_or_else(|| {
+            RustStackError::s3_not_found("NoSuchKey", "The specified key does not exist.")
+        })?;
+
+        let found = v_list
+            .iter()
+            .find(|v| v.version_id == version_id)
+            .ok_or_else(|| {
+                RustStackError::s3_not_found("NoSuchVersion", "The specified version does not exist.")
+            })?;
+
+        if found.is_delete_marker {
+            return Err(RustStackError::S3 {
+                code: "MethodNotAllowed".to_string(),
+                message: "The specified method is not allowed against this resource.".to_string(),
+                status: http::StatusCode::METHOD_NOT_ALLOWED,
+                resource: Some(key.to_string()),
+            });
+        }
+
+        Ok((found.metadata.clone(), found.data.clone()))
+    }
+
+    fn delete_object_version(
+        &self,
+        bucket: &str,
+        key: &str,
+        version_id: Option<&str>,
+    ) -> Result<Option<String>, RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+
+        if let Some(vid) = version_id {
+            if let Some(mut v_list) = entry.versions.get_mut(key) {
+                v_list.retain(|v| v.version_id != vid);
+                if let Some(last) = v_list.last_mut() {
+                    last.is_latest = true;
+                    if !last.is_delete_marker {
+                        entry.objects.insert(
+                            key.to_string(),
+                            StoredObject {
+                                metadata: last.metadata.clone(),
+                                data: last.data.clone(),
+                            },
+                        );
+                    } else {
+                        entry.objects.remove(key);
+                    }
+                } else {
+                    entry.objects.remove(key);
+                }
+            }
+            return Ok(Some(vid.to_string()));
+        }
+
+        let is_versioned = entry.versioning.read().as_deref() == Some("Enabled");
+        if is_versioned {
+            let delete_marker_id = uuid::Uuid::new_v4().to_string();
+            let mut v_list = entry.versions.entry(key.to_string()).or_default();
+            for v in v_list.iter_mut() {
+                v.is_latest = false;
+            }
+            let metadata = ObjectMetadata {
+                key: key.to_string(),
+                size: 0,
+                etag: String::new(),
+                last_modified: Utc::now(),
+                content_type: "application/octet-stream".to_string(),
+                user_metadata: HashMap::new(),
+            };
+            v_list.push(StoredObjectVersion {
+                version_id: delete_marker_id.clone(),
+                is_latest: true,
+                is_delete_marker: true,
+                metadata,
+                data: Bytes::new(),
+            });
+            entry.objects.remove(key);
+            Ok(Some(delete_marker_id))
+        } else {
+            entry.objects.remove(key);
+            entry.versions.remove(key);
+            Ok(None)
+        }
+    }
+
+    fn get_bucket_lifecycle(&self, bucket: &str) -> Result<Option<crate::types::BucketLifecycleConfig>, RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        let res = entry.lifecycle.read().clone();
+        Ok(res)
+    }
+
+    fn put_bucket_lifecycle(&self, bucket: &str, config: crate::types::BucketLifecycleConfig) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        *entry.lifecycle.write() = Some(config);
+        Ok(())
+    }
+
+    fn delete_bucket_lifecycle(&self, bucket: &str) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        *entry.lifecycle.write() = None;
+        Ok(())
+    }
+
+    fn get_bucket_cors(&self, bucket: &str) -> Result<Option<crate::types::BucketCorsConfig>, RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        let res = entry.cors.read().clone();
+        Ok(res)
+    }
+
+    fn put_bucket_cors(&self, bucket: &str, config: crate::types::BucketCorsConfig) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        *entry.cors.write() = Some(config);
+        Ok(())
+    }
+
+    fn delete_bucket_cors(&self, bucket: &str) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        *entry.cors.write() = None;
+        Ok(())
+    }
+
+    fn get_bucket_policy(&self, bucket: &str) -> Result<Option<String>, RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        let res = entry.policy.read().clone();
+        Ok(res)
+    }
+
+    fn put_bucket_policy(&self, bucket: &str, policy: String) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        *entry.policy.write() = Some(policy);
+        Ok(())
+    }
+
+    fn delete_bucket_policy(&self, bucket: &str) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        *entry.policy.write() = None;
+        Ok(())
+    }
+
+    fn get_bucket_tagging(&self, bucket: &str) -> Result<HashMap<String, String>, RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        let res = entry.tagging.read().clone();
+        Ok(res)
+    }
+
+    fn put_bucket_tagging(&self, bucket: &str, tags: HashMap<String, String>) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        *entry.tagging.write() = tags;
+        Ok(())
+    }
+
+    fn delete_bucket_tagging(&self, bucket: &str) -> Result<(), RustStackError> {
+        let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
+            code: "NoSuchBucket".to_string(),
+            message: "The specified bucket does not exist".to_string(),
+            status: http::StatusCode::NOT_FOUND,
+            resource: Some(bucket.to_string()),
+        })?;
+        entry.tagging.write().clear();
+        Ok(())
+    }
+
     fn reset(&self) {
         self.buckets.clear();
     }
@@ -862,12 +1259,19 @@ impl S3Storage for InMemoryStorage {
                 objs.push(StoredObjectSnapshot {
                     metadata: obj.metadata.clone(),
                     data_base64: base64::engine::general_purpose::STANDARD.encode(&obj.data),
+                    version_id: None,
+                    is_delete_marker: false,
                 });
             }
             buckets_snap.push(BucketSnapshot {
                 info: bucket.info.clone(),
                 notifications: bucket.notifications.read().clone(),
                 objects: objs,
+                versioning: bucket.versioning.read().clone(),
+                lifecycle: bucket.lifecycle.read().clone(),
+                cors: bucket.cors.read().clone(),
+                policy: bucket.policy.read().clone(),
+                tagging: bucket.tagging.read().clone(),
             });
         }
         S3Snapshot {
@@ -881,6 +1285,12 @@ impl S3Storage for InMemoryStorage {
             let bucket = Bucket {
                 info: b_snap.info.clone(),
                 objects: DashMap::new(),
+                versions: DashMap::new(),
+                versioning: RwLock::new(b_snap.versioning),
+                lifecycle: RwLock::new(b_snap.lifecycle),
+                cors: RwLock::new(b_snap.cors),
+                policy: RwLock::new(b_snap.policy),
+                tagging: RwLock::new(b_snap.tagging),
                 multipart_uploads: DashMap::new(),
                 notifications: RwLock::new(b_snap.notifications),
             };

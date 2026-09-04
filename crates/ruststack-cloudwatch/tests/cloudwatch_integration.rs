@@ -103,3 +103,69 @@ fn test_cloudwatch_metric_and_alarm_lifecycle() {
         .unwrap();
     assert_eq!(desc_resp_after.metric_alarms.len(), 0);
 }
+
+#[tokio::test]
+async fn test_cloudwatch_alarm_action_sns_notification() {
+    let cw_state = std::sync::Arc::new(CloudWatchState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let sqs = std::sync::Arc::new(ruststack_sqs::SqsEngine::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let sns = std::sync::Arc::new(ruststack_sns::SnsEngine::new(
+        sqs.clone(),
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    cw_state.set_sns_engine(sns.clone());
+
+    // 1. Create SQS Queue and SNS Topic, and subscribe
+    let queue_url = sqs.create_queue("alarm-notifications", None).unwrap();
+    let topic_arn = sns.create_topic("ops-alerts", None).unwrap();
+    sns.subscribe(&topic_arn, "sqs", &queue_url, None).unwrap();
+
+    // 2. Put Metric Alarm with AlarmActions pointing to SNS Topic
+    let alarm_req = PutMetricAlarmRequest {
+        alarm_name: "CpuUtilizationHigh".to_string(),
+        alarm_description: Some("CPU > 90%".to_string()),
+        actions_enabled: Some(true),
+        ok_actions: None,
+        alarm_actions: Some(vec![topic_arn.clone()]),
+        insufficient_data_actions: None,
+        metric_name: Some("CPUUtilization".to_string()),
+        namespace: Some("AWS/EC2".to_string()),
+        statistic: Some("Average".to_string()),
+        extended_statistic: None,
+        dimensions: None,
+        period: Some(60),
+        unit: None,
+        evaluation_periods: 1,
+        datapoints_to_alarm: None,
+        threshold: Some(90.0),
+        comparison_operator: "GreaterThanThreshold".to_string(),
+        treat_missing_data: None,
+        evaluate_low_sample_count_percentile: None,
+        metrics: None,
+        tags: None,
+        threshold_metric_id: None,
+    };
+    cw_state.put_metric_alarm(alarm_req).unwrap();
+
+    // 3. Set Alarm State to ALARM
+    let set_state_req = SetAlarmStateRequest {
+        alarm_name: "CpuUtilizationHigh".to_string(),
+        state_value: "ALARM".to_string(),
+        state_reason: "Threshold Crossed: 1 out of 1 datapoints [95.0] > threshold [90.0]".to_string(),
+        state_reason_data: None,
+    };
+    cw_state.set_alarm_state(set_state_req).unwrap();
+
+    // 4. Verify message received in SQS queue
+    let msgs = sqs.receive_message(&queue_url, 10, None, None).await.unwrap();
+    assert_eq!(msgs.len(), 1);
+    let body_str = &msgs[0].body;
+    assert!(body_str.contains("CpuUtilizationHigh"));
+    assert!(body_str.contains("ALARM"));
+}

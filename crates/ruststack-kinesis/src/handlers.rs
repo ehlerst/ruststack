@@ -254,6 +254,67 @@ pub async fn handle_kinesis_request(
                 Err(e) => map_kinesis_error(e),
             }
         }
+        "SplitShard" => {
+            let req: SplitShardRequest = match serde_json::from_slice(&body) {
+                Ok(r) => r,
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidArgumentException",
+                        &e.to_string(),
+                    )
+                }
+            };
+            match state.split_shard(req) {
+                Ok(()) => (
+                    StatusCode::OK,
+                    [("content-type", "application/x-amz-json-1.1")],
+                    "{}",
+                )
+                    .into_response(),
+                Err(e) => map_kinesis_error(e),
+            }
+        }
+        "MergeShards" => {
+            let req: MergeShardsRequest = match serde_json::from_slice(&body) {
+                Ok(r) => r,
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidArgumentException",
+                        &e.to_string(),
+                    )
+                }
+            };
+            match state.merge_shards(req) {
+                Ok(()) => (
+                    StatusCode::OK,
+                    [("content-type", "application/x-amz-json-1.1")],
+                    "{}",
+                )
+                    .into_response(),
+                Err(e) => map_kinesis_error(e),
+            }
+        }
+        "UpdateShardCount" => {
+            let req: UpdateShardCountRequest = match serde_json::from_slice(&body) {
+                Ok(r) => r,
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidArgumentException",
+                        &e.to_string(),
+                    )
+                }
+            };
+            match state.update_shard_count(req) {
+                Ok(res) => json_response(
+                    StatusCode::OK,
+                    serde_json::to_value(&res).unwrap_or_default(),
+                ),
+                Err(e) => map_kinesis_error(e),
+            }
+        }
         _ => error_response(
             StatusCode::BAD_REQUEST,
             "InvalidAction",

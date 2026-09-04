@@ -6,22 +6,40 @@ use axum::routing::{any, delete, get};
 use axum::Router;
 use clap::Parser;
 use http_body_util::BodyExt;
+use ruststack_acm::{handle_acm_request, AcmState};
+use ruststack_apigateway::{handle_apigateway_request, ApiGatewayState};
+use ruststack_athena::{handle_athena_request, AthenaState};
+use ruststack_bedrock::{handle_bedrock_request, BedrockState};
+use ruststack_cloudformation::{handle_cloudformation_request, CloudFormationState};
 use ruststack_cloudwatch::{handle_cloudwatch_request, CloudWatchState};
+use ruststack_cognito::{handle_cognito_request, CognitoState};
 use ruststack_core::{AwsService, ChaosDecision, ChaosEngine, Dispatcher};
 use ruststack_dynamodb::{handle_dynamodb_request, DynamoDbEngine};
+use ruststack_ec2::{handle_ec2_request, Ec2State};
+use ruststack_ecr::{handle_ecr_request, EcrState};
+use ruststack_ecs::{handle_ecs_request, EcsState};
+use ruststack_elasticache::{handle_elasticache_request, ElastiCacheState};
+use ruststack_elbv2::{handle_elbv2_request, Elbv2State};
 use ruststack_eventbridge::{handle_eventbridge_request, EventBridgeEngine};
 use ruststack_iam::{handle_iam_request, IamState};
 use ruststack_kinesis::{handle_kinesis_request, KinesisState};
 use ruststack_kms::{handle_kms_request, KmsState};
 use ruststack_lambda::{handle_lambda_request, LambdaState};
 use ruststack_logs::{handle_logs_request, LogsState};
+use ruststack_opensearch::{handle_opensearch_request, OpenSearchState};
+use ruststack_organizations::{handle_organizations_request, OrganizationsState};
+use ruststack_rds::{handle_rds_request, RdsState};
+use ruststack_redshift::{handle_redshift_request, RedshiftState};
+use ruststack_route53::{handle_route53_request, Route53State};
 use ruststack_s3::{handle_s3_request, S3NotificationTarget, S3Storage};
 use ruststack_secretsmanager::{handle_secretsmanager_request, SecretsManagerEngine};
 use ruststack_ses::{handle_ses_request, SesState};
 use ruststack_sns::{handle_sns_request, SnsEngine};
 use ruststack_sqs::{handle_sqs_request, SqsEngine};
 use ruststack_ssm::{handle_ssm_request, SsmEngine};
+use ruststack_stepfunctions::{handle_stepfunctions_request, StepFunctionsState};
 use ruststack_sts::{handle_sts_request, StsEngine};
+use ruststack_wafv2::{handle_wafv2_request, Wafv2State};
 use std::sync::Arc;
 use tower_http::cors::{Any, CorsLayer};
 use tower_http::trace::TraceLayer;
@@ -48,7 +66,7 @@ pub struct Opts {
     #[arg(
         short,
         long,
-        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda",
+        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda,cognito,apigateway,route53,stepfunctions,cloudformation,ecr,ecs,ec2,elbv2,bedrock,opensearch,athena,rds,elasticache,redshift",
         env = "SERVICES"
     )]
     pub services: String,
@@ -71,7 +89,7 @@ impl Default for Opts {
         Self {
             port: 4566,
             host: "0.0.0.0".to_string(),
-            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda".to_string(),
+            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda,cognito,apigateway,route53,stepfunctions,cloudformation,ecr,ecs,ec2,elbv2,bedrock,opensearch,athena,rds,elasticache,redshift,acm,wafv2,organizations".to_string(),
             region: "us-east-1".to_string(),
             account_id: "000000000000".to_string(),
             data_dir: None,
@@ -145,6 +163,24 @@ pub struct AppState {
     pub ses_state: Arc<SesState>,
     pub kinesis_state: Arc<KinesisState>,
     pub lambda_state: Arc<LambdaState>,
+    pub cognito_state: Arc<CognitoState>,
+    pub apigateway_state: Arc<ApiGatewayState>,
+    pub route53_state: Arc<Route53State>,
+    pub stepfunctions_state: Arc<StepFunctionsState>,
+    pub cloudformation_state: Arc<CloudFormationState>,
+    pub ecr_state: Arc<EcrState>,
+    pub ecs_state: Arc<EcsState>,
+    pub ec2_state: Arc<Ec2State>,
+    pub elbv2_state: Arc<Elbv2State>,
+    pub bedrock_state: Arc<BedrockState>,
+    pub opensearch_state: Arc<OpenSearchState>,
+    pub athena_state: Arc<AthenaState>,
+    pub rds_state: Arc<RdsState>,
+    pub elasticache_state: Arc<ElastiCacheState>,
+    pub redshift_state: Arc<RedshiftState>,
+    pub acm_state: Arc<AcmState>,
+    pub wafv2_state: Arc<Wafv2State>,
+    pub organizations_state: Arc<OrganizationsState>,
     pub chaos_engine: Arc<ChaosEngine>,
     pub region: String,
     pub account_id: String,
@@ -158,6 +194,24 @@ pub fn create_router(state: AppState) -> Router {
             state.sns_engine.clone(),
             state.eventbridge_engine.clone(),
         )));
+
+    state.lambda_state.set_sqs_engine(state.sqs_engine.clone());
+    state
+        .cloudwatch_state
+        .set_sns_engine(state.sns_engine.clone());
+    state
+        .apigateway_state
+        .set_lambda_state(state.lambda_state.clone());
+    state
+        .stepfunctions_state
+        .set_lambda_state(state.lambda_state.clone());
+    state.cloudformation_state.set_services(
+        Some(state.s3_storage.clone()),
+        Some(state.sqs_engine.clone()),
+        Some(state.sns_engine.clone()),
+        Some(state.dynamodb_engine.clone()),
+        Some(state.iam_state.clone()),
+    );
 
     let cors = CorsLayer::new()
         .allow_origin(Any)
@@ -205,27 +259,48 @@ async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
         "version": env!("CARGO_PKG_VERSION"),
         "services": [
             "s3", "sqs", "sns", "events", "ssm", "secretsmanager", "sts",
-            "dynamodb", "kms", "logs", "iam", "cloudwatch", "ses", "kinesis", "lambda", "dynamodbstreams"
+            "dynamodb", "kms", "logs", "iam", "cloudwatch", "ses", "kinesis", "lambda", "dynamodbstreams",
+            "cognito", "apigateway", "route53", "stepfunctions", "cloudformation", "ecr",
+            "ecs", "ec2", "elbv2", "bedrock", "opensearch", "athena", "rds", "elasticache", "redshift",
+            "acm", "wafv2", "organizations"
         ],
         "region": state.region,
         "account_id": state.account_id,
         "features": {
-            "s3": ["buckets", "objects", "multipart", "byte-range", "virtual-hosting", "bucket-notifications"],
-            "sqs": ["standard-queue", "fifo-queue", "dlq-redrive", "long-polling", "batching", "visibility-timeout", "query-and-json-protocols"],
-            "sns": ["topics", "subscriptions", "sqs-fanout", "filter-policy", "raw-message-delivery", "query-and-json-protocols"],
+            "s3": ["buckets", "objects", "multipart", "byte-range", "virtual-hosting", "bucket-notifications", "versioning", "lifecycle", "cors", "policy", "tagging"],
+            "sqs": ["standard-queue", "fifo-queue", "dlq-redrive", "long-polling", "batching", "visibility-timeout", "query-and-json-protocols", "tagging", "delays"],
+            "sns": ["topics", "subscriptions", "sqs-fanout", "filter-policy", "raw-message-delivery", "http-webhooks", "query-and-json-protocols"],
             "events": ["event-buses", "rules", "pattern-matching", "targets-sqs-sns", "json-protocol"],
             "ssm": ["parameters", "hierarchical-paths", "versioning", "secure-string", "json-protocol"],
             "secretsmanager": ["secrets", "version-stages", "rotation", "binary-and-string", "json-protocol"],
             "sts": ["caller-identity", "assume-role", "session-tokens", "query-and-json-protocols"],
-            "dynamodb": ["tables", "crud", "query", "scan", "key-conditions", "filter-expressions", "gsi-lsi", "batching", "json-protocol"],
+            "dynamodb": ["tables", "crud", "query", "scan", "key-conditions", "filter-expressions", "gsi-lsi", "batching", "transactions", "ttl", "json-protocol"],
             "dynamodbstreams": ["shards", "shard-iterators", "get-records", "insert-modify-remove-capture"],
             "kms": ["keys", "aliases", "encrypt-decrypt", "generate-data-key", "json-protocol"],
             "logs": ["log-groups", "log-streams", "put-events", "filter-events", "json-protocol"],
             "iam": ["roles", "policies", "users", "access-keys", "query-and-json-protocols"],
-            "cloudwatch": ["put-metric-data", "get-metric-data", "get-metric-statistics", "alarms", "query-and-json-protocols"],
-            "ses": ["send-email", "send-raw-email", "verify-identities", "quota", "query-and-json-protocols"],
-            "kinesis": ["streams", "shards", "put-record", "put-records", "shard-iterators", "get-records", "json-protocol"],
-            "lambda": ["functions", "synchronous-invoke", "asynchronous-invoke", "event-source-mappings", "rest-and-json-protocols"],
+            "cloudwatch": ["put-metric-data", "get-metric-data", "get-metric-statistics", "alarms", "alarm-actions", "query-and-json-protocols"],
+            "ses": ["send-email", "send-raw-email", "verify-identities", "templates", "send-templated-email", "quota", "query-and-json-protocols"],
+            "kinesis": ["streams", "shards", "put-record", "put-records", "shard-iterators", "get-records", "resharding", "json-protocol"],
+            "lambda": ["functions", "synchronous-invoke", "asynchronous-invoke", "event-source-mappings", "sqs-poller", "rest-and-json-protocols"],
+            "cognito": ["user-pools", "user-pool-clients", "sign-up", "admin-create-user", "auth", "jwt-tokens", "jwks", "json-protocol"],
+            "apigateway": ["rest-apis", "resources", "methods", "mock-integrations", "lambda-integrations", "deployments", "stages", "invocation-routing"],
+            "route53": ["hosted-zones", "change-resource-record-sets", "list-resource-record-sets", "xml-and-json-protocols"],
+            "stepfunctions": ["state-machines", "asl-execution-engine", "pass-task-choice-wait-succeed-fail", "execution-history", "json-protocol"],
+            "cloudformation": ["stack-lifecycle", "template-parser", "resource-orchestration", "outputs", "xml-and-json-protocols"],
+            "ecr": ["repositories", "image-manifests", "tags", "digests", "auth-tokens", "json-protocol"],
+            "ecs": ["clusters", "task-definitions", "tasks", "services", "fargate-launch-type", "json-protocol"],
+            "ec2": ["vpcs", "subnets", "security-groups", "ingress-rules", "key-pairs", "instances", "xml-and-query-protocols"],
+            "elbv2": ["application-load-balancers", "target-groups", "target-registration", "listeners", "health-checks", "xml-and-query-protocols"],
+            "bedrock": ["foundation-models", "claude-llama-titan-models", "model-invocation", "streaming-token-responses", "rest-and-json-protocols"],
+            "opensearch": ["domains", "cluster-configurations", "search-endpoints", "encryption", "rest-and-json-protocols"],
+            "athena": ["query-execution", "named-queries", "workgroups", "result-sets", "json-protocol"],
+            "rds": ["db-instances", "db-clusters", "snapshots", "postgres-mysql-aurora", "xml-and-query-protocols"],
+            "elasticache": ["cache-clusters", "replication-groups", "redis-memcached", "xml-and-query-protocols"],
+            "redshift": ["clusters", "snapshots", "data-warehousing", "xml-and-query-protocols"],
+            "acm": ["request-certificate", "describe-certificate", "list-certificates", "x509-mocking", "dns-validation", "json-protocol"],
+            "wafv2": ["web-acls", "rules", "ip-sets", "alb-and-apigateway-associations", "json-protocol"],
+            "organizations": ["organizations", "roots", "accounts", "organizational-units", "json-protocol"],
             "chaos": ["latency-injection", "jitter", "error-rate-simulation", "rule-limits", "service-filtering"]
         }
     });
@@ -383,6 +458,165 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
                 State((*state.lambda_state).clone()),
                 method,
                 uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Cognito => {
+            handle_cognito_request(
+                State((*state.cognito_state).clone()),
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::ApiGateway => {
+            handle_apigateway_request(
+                State((*state.apigateway_state).clone()),
+                method,
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Route53 => {
+            handle_route53_request(
+                State((*state.route53_state).clone()),
+                method,
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::StepFunctions => {
+            handle_stepfunctions_request(
+                State((*state.stepfunctions_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::CloudFormation => {
+            handle_cloudformation_request(
+                State((*state.cloudformation_state).clone()),
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Ecr => {
+            handle_ecr_request(
+                State((*state.ecr_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Ecs => {
+            handle_ecs_request(
+                State((*state.ecs_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Ec2 => {
+            handle_ec2_request(
+                State((*state.ec2_state).clone()),
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Elbv2 => {
+            handle_elbv2_request(
+                State((*state.elbv2_state).clone()),
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Bedrock => {
+            handle_bedrock_request(
+                State((*state.bedrock_state).clone()),
+                method,
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::OpenSearch => {
+            handle_opensearch_request(
+                State((*state.opensearch_state).clone()),
+                method,
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Athena => {
+            handle_athena_request(
+                State((*state.athena_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Rds => {
+            handle_rds_request(
+                State((*state.rds_state).clone()),
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::ElastiCache => {
+            handle_elasticache_request(
+                State((*state.elasticache_state).clone()),
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Redshift => {
+            handle_redshift_request(
+                State((*state.redshift_state).clone()),
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Acm => {
+            handle_acm_request(
+                State((*state.acm_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::WafV2 => {
+            handle_wafv2_request(
+                State((*state.wafv2_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Organizations => {
+            handle_organizations_request(
+                State((*state.organizations_state).clone()),
                 headers,
                 body_bytes,
             )

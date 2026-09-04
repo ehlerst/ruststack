@@ -24,6 +24,7 @@ pub struct LambdaState {
     region: String,
     functions: Arc<DashMap<String, StoredFunction>>,
     event_source_mappings: Arc<DashMap<String, EventSourceMappingConfiguration>>,
+    sqs_engine: Arc<parking_lot::RwLock<Option<Arc<ruststack_sqs::SqsEngine>>>>,
 }
 
 impl LambdaState {
@@ -33,7 +34,12 @@ impl LambdaState {
             region,
             functions: Arc::new(DashMap::new()),
             event_source_mappings: Arc::new(DashMap::new()),
+            sqs_engine: Arc::new(parking_lot::RwLock::new(None)),
         }
+    }
+
+    pub fn set_sqs_engine(&self, engine: Arc<ruststack_sqs::SqsEngine>) {
+        *self.sqs_engine.write() = Some(engine);
     }
 
     pub fn account_id(&self) -> &str {
@@ -433,6 +439,83 @@ impl LambdaState {
         for m in snapshot.event_source_mappings {
             self.event_source_mappings.insert(m.uuid.clone(), m);
         }
+    }
+
+    pub async fn poll_event_sources_once(&self) -> usize {
+        let mut processed = 0;
+        let mappings: Vec<EventSourceMappingConfiguration> = self
+            .event_source_mappings
+            .iter()
+            .map(|item| item.value().clone())
+            .collect();
+
+        let sqs_opt = self.sqs_engine.read().clone();
+
+        for mapping in mappings {
+            if mapping.state.as_deref() != Some("Enabled") {
+                continue;
+            }
+
+            if let Some(ref src_arn) = mapping.event_source_arn {
+                if src_arn.starts_with("arn:aws:sqs:") || src_arn.contains(":sqs:") {
+                    if let Some(ref sqs) = sqs_opt {
+                        let batch_size = mapping.batch_size.unwrap_or(10) as u32;
+                        if let Ok(msgs) = sqs
+                            .receive_message(src_arn, batch_size, Some(30), Some(0))
+                            .await
+                        {
+                            if !msgs.is_empty() {
+                                let records: Vec<serde_json::Value> = msgs
+                                    .iter()
+                                    .map(|m| {
+                                        serde_json::json!({
+                                            "messageId": m.message_id,
+                                            "receiptHandle": m.receipt_handle,
+                                            "body": m.body,
+                                            "attributes": m.attributes,
+                                            "md5OfBody": m.md5_of_body,
+                                            "eventSource": "aws:sqs",
+                                            "eventSourceARN": src_arn,
+                                            "awsRegion": self.region
+                                        })
+                                    })
+                                    .collect();
+
+                                let event_payload = serde_json::json!({ "Records": records });
+                                let payload_bytes =
+                                    serde_json::to_vec(&event_payload).unwrap_or_default();
+
+                                if self
+                                    .invoke_function(
+                                        &mapping.function_arn,
+                                        Some(payload_bytes),
+                                        Some(InvocationType::Event),
+                                    )
+                                    .is_ok()
+                                {
+                                    for m in &msgs {
+                                        let _ = sqs.delete_message(src_arn, &m.receipt_handle);
+                                    }
+                                    processed += msgs.len();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        processed
+    }
+
+    pub fn start_poller(self: Arc<Self>) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(std::time::Duration::from_millis(100));
+            loop {
+                interval.tick().await;
+                let _ = self.poll_event_sources_once().await;
+            }
+        })
     }
 
     pub fn reset(&self) {

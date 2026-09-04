@@ -23,6 +23,7 @@ pub struct QueueState {
     pub dedup_cache: HashMap<String, Instant>,
     pub sequence_counter: u64,
     pub notify: Arc<Notify>,
+    pub tags: HashMap<String, String>,
 }
 
 impl QueueState {
@@ -39,6 +40,7 @@ impl QueueState {
             dedup_cache: HashMap::new(),
             sequence_counter: 0,
             notify: Arc::new(Notify::new()),
+            tags: HashMap::new(),
         }
     }
 
@@ -280,7 +282,9 @@ impl SqsEngine {
         let mut map = HashMap::new();
         let all = attribute_names.is_empty() || attribute_names.iter().any(|a| a == "All");
 
-        let visible_count = state.messages.len();
+        let now = Instant::now();
+        let visible_count = state.messages.iter().filter(|m| m.visible_at <= now).count();
+        let delayed_count = state.messages.iter().filter(|m| m.visible_at > now).count();
         let in_flight_count = state.in_flight.len();
 
         let check = |key: &str| all || attribute_names.iter().any(|a| a == key);
@@ -303,7 +307,7 @@ impl SqsEngine {
         if check("ApproximateNumberOfMessagesDelayed") {
             map.insert(
                 "ApproximateNumberOfMessagesDelayed".to_string(),
-                "0".to_string(),
+                delayed_count.to_string(),
             );
         }
         if check("VisibilityTimeout") {
@@ -568,12 +572,14 @@ impl SqsEngine {
                 let mut state = q.lock();
                 self.process_expired_in_flight(&mut state);
 
-                if !state.messages.is_empty() {
-                    let vt = visibility_timeout_opt.unwrap_or(state.attributes.visibility_timeout);
-                    let mut result = Vec::new();
+                let now = Instant::now();
+                let vt = visibility_timeout_opt.unwrap_or(state.attributes.visibility_timeout);
+                let mut result = Vec::new();
 
-                    while result.len() < max_msgs && !state.messages.is_empty() {
-                        let mut msg = state.messages.pop_front().unwrap();
+                let mut i = 0;
+                while i < state.messages.len() && result.len() < max_msgs {
+                    if state.messages[i].visible_at <= now {
+                        let mut msg = state.messages.remove(i).unwrap();
                         let handle = uuid::Uuid::new_v4().to_string();
                         msg.receipt_handle = handle.clone();
                         msg.receive_count += 1;
@@ -596,8 +602,12 @@ impl SqsEngine {
 
                         state.in_flight.insert(handle, msg.clone());
                         result.push(msg);
+                    } else {
+                        i += 1;
                     }
+                }
 
+                if !result.is_empty() {
                     return Ok(result);
                 }
             }
@@ -709,6 +719,52 @@ impl SqsEngine {
         Ok((successful, errors))
     }
 
+    pub fn tag_queue(
+        &self,
+        queue_id: &str,
+        tags: HashMap<String, String>,
+    ) -> Result<(), RustStackError> {
+        let name = self.resolve_queue_name(queue_id);
+        let q = self.queues.get(&name).ok_or_else(|| {
+            RustStackError::sqs_not_found(
+                "AWS.SimpleQueueService.NonExistentQueue",
+                "The specified queue does not exist.",
+            )
+        })?;
+        let mut state = q.lock();
+        for (k, v) in tags {
+            state.tags.insert(k, v);
+        }
+        Ok(())
+    }
+
+    pub fn untag_queue(&self, queue_id: &str, tag_keys: &[String]) -> Result<(), RustStackError> {
+        let name = self.resolve_queue_name(queue_id);
+        let q = self.queues.get(&name).ok_or_else(|| {
+            RustStackError::sqs_not_found(
+                "AWS.SimpleQueueService.NonExistentQueue",
+                "The specified queue does not exist.",
+            )
+        })?;
+        let mut state = q.lock();
+        for k in tag_keys {
+            state.tags.remove(k);
+        }
+        Ok(())
+    }
+
+    pub fn list_queue_tags(&self, queue_id: &str) -> Result<HashMap<String, String>, RustStackError> {
+        let name = self.resolve_queue_name(queue_id);
+        let q = self.queues.get(&name).ok_or_else(|| {
+            RustStackError::sqs_not_found(
+                "AWS.SimpleQueueService.NonExistentQueue",
+                "The specified queue does not exist.",
+            )
+        })?;
+        let state = q.lock();
+        Ok(state.tags.clone())
+    }
+
     pub fn reset(&self) {
         self.queues.clear();
     }
@@ -732,6 +788,7 @@ impl SqsEngine {
                 arn: state.arn.clone(),
                 attributes: state.attributes.clone(),
                 messages: msgs,
+                tags: state.tags.clone(),
             });
         }
         SqsSnapshot { queues: qs }
@@ -750,6 +807,7 @@ impl SqsEngine {
                 dedup_cache: HashMap::new(),
                 sequence_counter: 0,
                 notify: Arc::new(Notify::new()),
+                tags: q_snap.tags,
             };
             self.queues
                 .insert(q_snap.name.clone(), Arc::new(Mutex::new(state)));

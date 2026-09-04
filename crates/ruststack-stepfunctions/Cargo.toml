@@ -1,0 +1,31 @@
+[package]
+name = "ruststack-stepfunctions"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "High-performance AWS Step Functions state machine execution engine for RustStack"
+
+[dependencies]
+ruststack-core = { workspace = true }
+ruststack-lambda = { path = "../ruststack-lambda" }
+ruststack-sqs = { path = "../ruststack-sqs" }
+ruststack-sns = { path = "../ruststack-sns" }
+ruststack-dynamodb = { path = "../ruststack-dynamodb" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+fastrand = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }

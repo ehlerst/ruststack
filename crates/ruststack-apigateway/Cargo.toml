@@ -1,0 +1,29 @@
+[package]
+name = "ruststack-apigateway"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "High-performance Amazon API Gateway REST & HTTP APIs engine for RustStack"
+
+[dependencies]
+ruststack-core = { workspace = true }
+ruststack-lambda = { path = "../ruststack-lambda" }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+fastrand = { workspace = true }
+reqwest = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }

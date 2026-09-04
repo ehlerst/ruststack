@@ -522,6 +522,210 @@ pub async fn handle_ses_request(
             }
         }
 
+        "CreateTemplate" => {
+            let template_name = params.get("Template.TemplateName").cloned().unwrap_or_default();
+            let subject_part = params.get("Template.SubjectPart").cloned();
+            let text_part = params.get("Template.TextPart").cloned();
+            let html_part = params.get("Template.HtmlPart").cloned();
+
+            let req = CreateTemplateRequest {
+                template: Template {
+                    template_name,
+                    subject_part,
+                    text_part,
+                    html_part,
+                },
+            };
+
+            match state.create_template(req) {
+                Ok(_) => {
+                    if is_json {
+                        json_response(StatusCode::OK, json!({}))
+                    } else {
+                        let xml = format!(
+                            r#"<CreateTemplateResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
+  <CreateTemplateResult/>
+  <ResponseMetadata>
+    <RequestId>{}</RequestId>
+  </ResponseMetadata>
+</CreateTemplateResponse>"#,
+                            request_id
+                        );
+                        xml_response(StatusCode::OK, &xml)
+                    }
+                }
+                Err(e) => map_ses_error(is_json, e, &request_id),
+            }
+        }
+
+        "GetTemplate" => {
+            let name = params.get("TemplateName").map(|s| s.as_str()).unwrap_or_default();
+            match state.get_template(name) {
+                Ok(template) => {
+                    if is_json {
+                        json_response(StatusCode::OK, json!({ "Template": template }))
+                    } else {
+                        let xml = format!(
+                            r#"<GetTemplateResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
+  <GetTemplateResult>
+    <Template>
+      <TemplateName>{}</TemplateName>
+      <SubjectPart>{}</SubjectPart>
+      <TextPart>{}</TextPart>
+      <HtmlPart>{}</HtmlPart>
+    </Template>
+  </GetTemplateResult>
+  <ResponseMetadata>
+    <RequestId>{}</RequestId>
+  </ResponseMetadata>
+</GetTemplateResponse>"#,
+                            escape(&template.template_name),
+                            escape(template.subject_part.as_deref().unwrap_or("")),
+                            escape(template.text_part.as_deref().unwrap_or("")),
+                            escape(template.html_part.as_deref().unwrap_or("")),
+                            request_id
+                        );
+                        xml_response(StatusCode::OK, &xml)
+                    }
+                }
+                Err(e) => map_ses_error(is_json, e, &request_id),
+            }
+        }
+
+        "ListTemplates" => {
+            match state.list_templates() {
+                Ok(templates) => {
+                    if is_json {
+                        json_response(StatusCode::OK, json!({ "TemplatesMetadata": templates }))
+                    } else {
+                        let mut members = String::new();
+                        for t in templates {
+                            members.push_str(&format!(
+                                r#"<member><Name>{}</Name><CreatedTimestamp>{}</CreatedTimestamp></member>"#,
+                                escape(&t.name),
+                                escape(t.created_timestamp.as_deref().unwrap_or(""))
+                            ));
+                        }
+                        let xml = format!(
+                            r#"<ListTemplatesResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
+  <ListTemplatesResult>
+    <TemplatesMetadata>{}</TemplatesMetadata>
+  </ListTemplatesResult>
+  <ResponseMetadata>
+    <RequestId>{}</RequestId>
+  </ResponseMetadata>
+</ListTemplatesResponse>"#,
+                            members, request_id
+                        );
+                        xml_response(StatusCode::OK, &xml)
+                    }
+                }
+                Err(e) => map_ses_error(is_json, e, &request_id),
+            }
+        }
+
+        "UpdateTemplate" => {
+            let template_name = params.get("Template.TemplateName").cloned().unwrap_or_default();
+            let subject_part = params.get("Template.SubjectPart").cloned();
+            let text_part = params.get("Template.TextPart").cloned();
+            let html_part = params.get("Template.HtmlPart").cloned();
+
+            let req = UpdateTemplateRequest {
+                template: Template {
+                    template_name,
+                    subject_part,
+                    text_part,
+                    html_part,
+                },
+            };
+
+            match state.update_template(req) {
+                Ok(_) => {
+                    if is_json {
+                        json_response(StatusCode::OK, json!({}))
+                    } else {
+                        let xml = format!(
+                            r#"<UpdateTemplateResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
+  <UpdateTemplateResult/>
+  <ResponseMetadata>
+    <RequestId>{}</RequestId>
+  </ResponseMetadata>
+</UpdateTemplateResponse>"#,
+                            request_id
+                        );
+                        xml_response(StatusCode::OK, &xml)
+                    }
+                }
+                Err(e) => map_ses_error(is_json, e, &request_id),
+            }
+        }
+
+        "DeleteTemplate" => {
+            let name = params.get("TemplateName").map(|s| s.as_str()).unwrap_or_default();
+            match state.delete_template(name) {
+                Ok(_) => {
+                    if is_json {
+                        json_response(StatusCode::OK, json!({}))
+                    } else {
+                        let xml = format!(
+                            r#"<DeleteTemplateResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
+  <DeleteTemplateResult/>
+  <ResponseMetadata>
+    <RequestId>{}</RequestId>
+  </ResponseMetadata>
+</DeleteTemplateResponse>"#,
+                            request_id
+                        );
+                        xml_response(StatusCode::OK, &xml)
+                    }
+                }
+                Err(e) => map_ses_error(is_json, e, &request_id),
+            }
+        }
+
+        "SendTemplatedEmail" => {
+            let source = params.get("Source").cloned().unwrap_or_default();
+            let to_addresses = extract_member_list(&params, "Destination.ToAddresses");
+            let cc_addresses = extract_member_list(&params, "Destination.CcAddresses");
+            let bcc_addresses = extract_member_list(&params, "Destination.BccAddresses");
+            let destination = Destination {
+                to_addresses,
+                cc_addresses,
+                bcc_addresses,
+            };
+            let template = params.get("Template").cloned().unwrap_or_default();
+            let template_data = params.get("TemplateData").cloned().unwrap_or_else(|| "{}".to_string());
+
+            let req = SendTemplatedEmailRequest {
+                source,
+                destination,
+                template,
+                template_data,
+            };
+
+            match state.send_templated_email(req) {
+                Ok(resp) => {
+                    if is_json {
+                        json_response(StatusCode::OK, json!({ "MessageId": resp.message_id }))
+                    } else {
+                        let xml = format!(
+                            r#"<SendTemplatedEmailResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
+  <SendTemplatedEmailResult>
+    <MessageId>{}</MessageId>
+  </SendTemplatedEmailResult>
+  <ResponseMetadata>
+    <RequestId>{}</RequestId>
+  </ResponseMetadata>
+</SendTemplatedEmailResponse>"#,
+                            resp.message_id, request_id
+                        );
+                        xml_response(StatusCode::OK, &xml)
+                    }
+                }
+                Err(e) => map_ses_error(is_json, e, &request_id),
+            }
+        }
+
         _ => make_error_response(
             is_json,
             StatusCode::BAD_REQUEST,

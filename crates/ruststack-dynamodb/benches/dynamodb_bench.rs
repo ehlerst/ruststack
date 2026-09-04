@@ -30,6 +30,7 @@ fn dynamodb_benchmark(c: &mut Criterion) {
         Some("PAY_PER_REQUEST".to_string()),
         None,
         None,
+        None,
     )
     .unwrap();
 

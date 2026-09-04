@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 use clap::{Parser, Subcommand};
 use ruststack_dynamodb::DynamoDbEngine;
 use ruststack_eventbridge::EventBridgeEngine;
@@ -381,6 +383,78 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         opts.account_id.clone(),
         opts.region.clone(),
     ));
+    let cognito_state = Arc::new(ruststack_cognito::CognitoState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let apigateway_state = Arc::new(ruststack_apigateway::ApiGatewayState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let route53_state = Arc::new(ruststack_route53::Route53State::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let stepfunctions_state = Arc::new(ruststack_stepfunctions::StepFunctionsState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let cloudformation_state = Arc::new(ruststack_cloudformation::CloudFormationState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let ecr_state = Arc::new(ruststack_ecr::EcrState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let ecs_state = Arc::new(ruststack_ecs::EcsState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let ec2_state = Arc::new(ruststack_ec2::Ec2State::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let elbv2_state = Arc::new(ruststack_elbv2::Elbv2State::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let bedrock_state = Arc::new(ruststack_bedrock::BedrockState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let opensearch_state = Arc::new(ruststack_opensearch::OpenSearchState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let athena_state = Arc::new(ruststack_athena::AthenaState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let rds_state = Arc::new(ruststack_rds::RdsState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let elasticache_state = Arc::new(ruststack_elasticache::ElastiCacheState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let redshift_state = Arc::new(ruststack_redshift::RedshiftState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let acm_state = Arc::new(ruststack_acm::AcmState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let wafv2_state = Arc::new(ruststack_wafv2::Wafv2State::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let organizations_state = Arc::new(ruststack_organizations::OrganizationsState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let state = AppState {
@@ -399,6 +473,24 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         ses_state: ses_state.clone(),
         kinesis_state: kinesis_state.clone(),
         lambda_state: lambda_state.clone(),
+        cognito_state: cognito_state.clone(),
+        apigateway_state: apigateway_state.clone(),
+        route53_state: route53_state.clone(),
+        stepfunctions_state: stepfunctions_state.clone(),
+        cloudformation_state: cloudformation_state.clone(),
+        ecr_state: ecr_state.clone(),
+        ecs_state: ecs_state.clone(),
+        ec2_state: ec2_state.clone(),
+        elbv2_state: elbv2_state.clone(),
+        bedrock_state: bedrock_state.clone(),
+        opensearch_state: opensearch_state.clone(),
+        athena_state: athena_state.clone(),
+        rds_state: rds_state.clone(),
+        elasticache_state: elasticache_state.clone(),
+        redshift_state: redshift_state.clone(),
+        acm_state: acm_state.clone(),
+        wafv2_state: wafv2_state.clone(),
+        organizations_state: organizations_state.clone(),
         chaos_engine,
         region: opts.region.clone(),
         account_id: opts.account_id.clone(),
@@ -433,6 +525,24 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
                         ses_state.import_snapshot(snapshot.ses);
                         kinesis_state.import_snapshot(snapshot.kinesis);
                         lambda_state.import_snapshot(snapshot.lambda);
+                        cognito_state.import_snapshot(snapshot.cognito);
+                        apigateway_state.import_snapshot(snapshot.apigateway);
+                        route53_state.import_snapshot(snapshot.route53);
+                        stepfunctions_state.import_snapshot(snapshot.stepfunctions);
+                        cloudformation_state.import_snapshot(snapshot.cloudformation);
+                        ecr_state.import_snapshot(snapshot.ecr);
+                        ecs_state.import_snapshot(snapshot.ecs);
+                        ec2_state.import_snapshot(snapshot.ec2);
+                        elbv2_state.import_snapshot(snapshot.elbv2);
+                        bedrock_state.import_snapshot(snapshot.bedrock);
+                        opensearch_state.import_snapshot(snapshot.opensearch);
+                        athena_state.import_snapshot(snapshot.athena);
+                        rds_state.import_snapshot(snapshot.rds);
+                        elasticache_state.import_snapshot(snapshot.elasticache);
+                        redshift_state.import_snapshot(snapshot.redshift);
+                        acm_state.import_snapshot(snapshot.acm);
+                        wafv2_state.import_snapshot(snapshot.wafv2);
+                        organizations_state.import_snapshot(snapshot.organizations);
                         info!("💾 Auto-loaded persistent cluster state from {}", path);
                     }
                     Err(e) => {
@@ -477,6 +587,24 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
             ses: ses_state.export_snapshot(),
             kinesis: kinesis_state.export_snapshot(),
             lambda: lambda_state.export_snapshot(),
+            cognito: cognito_state.export_snapshot(),
+            apigateway: apigateway_state.export_snapshot(),
+            route53: route53_state.export_snapshot(),
+            stepfunctions: stepfunctions_state.export_snapshot(),
+            cloudformation: cloudformation_state.export_snapshot(),
+            ecr: ecr_state.export_snapshot(),
+            ecs: ecs_state.export_snapshot(),
+            ec2: ec2_state.export_snapshot(),
+            elbv2: elbv2_state.export_snapshot(),
+            bedrock: bedrock_state.export_snapshot(),
+            opensearch: opensearch_state.export_snapshot(),
+            athena: athena_state.export_snapshot(),
+            rds: rds_state.export_snapshot(),
+            elasticache: elasticache_state.export_snapshot(),
+            redshift: redshift_state.export_snapshot(),
+            acm: acm_state.export_snapshot(),
+            wafv2: wafv2_state.export_snapshot(),
+            organizations: organizations_state.export_snapshot(),
         };
         if let Ok(json_str) = serde_json::to_string_pretty(&snapshot) {
             if let Ok(()) = std::fs::write(path, json_str) {

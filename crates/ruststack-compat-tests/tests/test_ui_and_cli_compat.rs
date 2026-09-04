@@ -66,6 +66,78 @@ fn setup_test_app() -> axum::Router {
         account_id.clone(),
         region.clone(),
     ));
+    let cognito_state = Arc::new(ruststack_cognito::CognitoState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let apigateway_state = Arc::new(ruststack_apigateway::ApiGatewayState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let route53_state = Arc::new(ruststack_route53::Route53State::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let stepfunctions_state = Arc::new(ruststack_stepfunctions::StepFunctionsState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let cloudformation_state = Arc::new(ruststack_cloudformation::CloudFormationState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let ecr_state = Arc::new(ruststack_ecr::EcrState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let ecs_state = Arc::new(ruststack_ecs::EcsState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let ec2_state = Arc::new(ruststack_ec2::Ec2State::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let elbv2_state = Arc::new(ruststack_elbv2::Elbv2State::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let bedrock_state = Arc::new(ruststack_bedrock::BedrockState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let opensearch_state = Arc::new(ruststack_opensearch::OpenSearchState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let athena_state = Arc::new(ruststack_athena::AthenaState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let rds_state = Arc::new(ruststack_rds::RdsState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let elasticache_state = Arc::new(ruststack_elasticache::ElastiCacheState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let redshift_state = Arc::new(ruststack_redshift::RedshiftState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let acm_state = Arc::new(ruststack_acm::AcmState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let wafv2_state = Arc::new(ruststack_wafv2::Wafv2State::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let organizations_state = Arc::new(ruststack_organizations::OrganizationsState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let app_state = AppState {
@@ -84,6 +156,24 @@ fn setup_test_app() -> axum::Router {
         ses_state,
         kinesis_state,
         lambda_state,
+        cognito_state,
+        apigateway_state,
+        route53_state,
+        stepfunctions_state,
+        cloudformation_state,
+        ecr_state,
+        ecs_state,
+        ec2_state,
+        elbv2_state,
+        bedrock_state,
+        opensearch_state,
+        athena_state,
+        rds_state,
+        elasticache_state,
+        redshift_state,
+        acm_state,
+        wafv2_state,
+        organizations_state,
         chaos_engine,
         region,
         account_id,

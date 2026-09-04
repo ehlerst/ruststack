@@ -28,6 +28,24 @@ pub struct RustStackStateSnapshot {
     pub ses: ruststack_ses::SesStateSnapshot,
     pub kinesis: ruststack_kinesis::KinesisStateSnapshot,
     pub lambda: ruststack_lambda::LambdaStateSnapshot,
+    pub cognito: ruststack_cognito::CognitoStateSnapshot,
+    pub apigateway: ruststack_apigateway::ApiGatewayStateSnapshot,
+    pub route53: ruststack_route53::Route53StateSnapshot,
+    pub stepfunctions: ruststack_stepfunctions::StepFunctionsStateSnapshot,
+    pub cloudformation: ruststack_cloudformation::CloudFormationStateSnapshot,
+    pub ecr: ruststack_ecr::EcrStateSnapshot,
+    pub ecs: ruststack_ecs::EcsStateSnapshot,
+    pub ec2: ruststack_ec2::Ec2StateSnapshot,
+    pub elbv2: ruststack_elbv2::Elbv2StateSnapshot,
+    pub bedrock: ruststack_bedrock::BedrockStateSnapshot,
+    pub opensearch: ruststack_opensearch::OpenSearchStateSnapshot,
+    pub athena: ruststack_athena::AthenaStateSnapshot,
+    pub rds: ruststack_rds::RdsStateSnapshot,
+    pub elasticache: ruststack_elasticache::ElastiCacheStateSnapshot,
+    pub redshift: ruststack_redshift::RedshiftStateSnapshot,
+    pub acm: ruststack_acm::AcmStateSnapshot,
+    pub wafv2: ruststack_wafv2::Wafv2StateSnapshot,
+    pub organizations: ruststack_organizations::OrganizationsStateSnapshot,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -82,6 +100,24 @@ pub async fn state_reset_handler(
         "ses",
         "kinesis",
         "lambda",
+        "cognito",
+        "apigateway",
+        "route53",
+        "stepfunctions",
+        "cloudformation",
+        "ecr",
+        "ecs",
+        "ec2",
+        "elbv2",
+        "bedrock",
+        "opensearch",
+        "athena",
+        "rds",
+        "elasticache",
+        "redshift",
+        "acm",
+        "wafv2",
+        "organizations",
     ];
 
     let target_services = match reset_req.services {
@@ -106,6 +142,24 @@ pub async fn state_reset_handler(
             "ses" => state.ses_state.reset(),
             "kinesis" => state.kinesis_state.reset(),
             "lambda" => state.lambda_state.reset(),
+            "cognito" | "cognito-idp" => state.cognito_state.reset(),
+            "apigateway" => state.apigateway_state.reset(),
+            "route53" => state.route53_state.reset(),
+            "stepfunctions" | "states" => state.stepfunctions_state.reset(),
+            "cloudformation" => state.cloudformation_state.reset(),
+            "ecr" => state.ecr_state.reset(),
+            "ecs" => state.ecs_state.reset(),
+            "ec2" => state.ec2_state.reset(),
+            "elbv2" | "elasticloadbalancing" => state.elbv2_state.reset(),
+            "bedrock" => state.bedrock_state.reset(),
+            "opensearch" | "es" => state.opensearch_state.reset(),
+            "athena" => state.athena_state.reset(),
+            "rds" => state.rds_state.reset(),
+            "elasticache" => state.elasticache_state.reset(),
+            "redshift" => state.redshift_state.reset(),
+            "acm" => state.acm_state.reset(),
+            "wafv2" | "waf" => state.wafv2_state.reset(),
+            "organizations" => state.organizations_state.reset(),
             _ => {}
         }
     }
@@ -158,6 +212,24 @@ pub async fn state_dump_handler(
         ses: state.ses_state.export_snapshot(),
         kinesis: state.kinesis_state.export_snapshot(),
         lambda: state.lambda_state.export_snapshot(),
+        cognito: state.cognito_state.export_snapshot(),
+        apigateway: state.apigateway_state.export_snapshot(),
+        route53: state.route53_state.export_snapshot(),
+        stepfunctions: state.stepfunctions_state.export_snapshot(),
+        cloudformation: state.cloudformation_state.export_snapshot(),
+        ecr: state.ecr_state.export_snapshot(),
+        ecs: state.ecs_state.export_snapshot(),
+        ec2: state.ec2_state.export_snapshot(),
+        elbv2: state.elbv2_state.export_snapshot(),
+        bedrock: state.bedrock_state.export_snapshot(),
+        opensearch: state.opensearch_state.export_snapshot(),
+        athena: state.athena_state.export_snapshot(),
+        rds: state.rds_state.export_snapshot(),
+        elasticache: state.elasticache_state.export_snapshot(),
+        redshift: state.redshift_state.export_snapshot(),
+        acm: state.acm_state.export_snapshot(),
+        wafv2: state.wafv2_state.export_snapshot(),
+        organizations: state.organizations_state.export_snapshot(),
     };
 
     if let Some(file_path) = dump_req.file_path {
@@ -275,6 +347,32 @@ pub async fn state_load_handler(
     state.ses_state.import_snapshot(snapshot.ses);
     state.kinesis_state.import_snapshot(snapshot.kinesis);
     state.lambda_state.import_snapshot(snapshot.lambda);
+    state.cognito_state.import_snapshot(snapshot.cognito);
+    state.apigateway_state.import_snapshot(snapshot.apigateway);
+    state.route53_state.import_snapshot(snapshot.route53);
+    state
+        .stepfunctions_state
+        .import_snapshot(snapshot.stepfunctions);
+    state
+        .cloudformation_state
+        .import_snapshot(snapshot.cloudformation);
+    state.ecr_state.import_snapshot(snapshot.ecr);
+    state.ecs_state.import_snapshot(snapshot.ecs);
+    state.ec2_state.import_snapshot(snapshot.ec2);
+    state.elbv2_state.import_snapshot(snapshot.elbv2);
+    state.bedrock_state.import_snapshot(snapshot.bedrock);
+    state.opensearch_state.import_snapshot(snapshot.opensearch);
+    state.athena_state.import_snapshot(snapshot.athena);
+    state.rds_state.import_snapshot(snapshot.rds);
+    state
+        .elasticache_state
+        .import_snapshot(snapshot.elasticache);
+    state.redshift_state.import_snapshot(snapshot.redshift);
+    state.acm_state.import_snapshot(snapshot.acm);
+    state.wafv2_state.import_snapshot(snapshot.wafv2);
+    state
+        .organizations_state
+        .import_snapshot(snapshot.organizations);
 
     let resp_json = json!({
         "status": "ok",

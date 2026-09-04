@@ -117,11 +117,70 @@ fn dispatch_s3_op(
             Ok(res)
         }
 
-        // PUT /<bucket> -> CreateBucket / PutBucketNotificationConfiguration
+        // PUT /<bucket> -> CreateBucket / PutBucketNotificationConfiguration / Versioning / Lifecycle / CORS / Policy / Tagging
         (&Method::PUT, Some(bucket), None) => {
             if query.contains_key("notification") {
                 let config = xml::parse_notification_configuration(&body)?;
                 storage.put_bucket_notification_configuration(bucket, config)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("versioning") {
+                let status = xml::parse_put_bucket_versioning(&body)?;
+                storage.put_bucket_versioning(bucket, &status)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("lifecycle") || query.contains_key("lifecycle-configuration") {
+                let config = xml::parse_put_bucket_lifecycle(&body)?;
+                storage.put_bucket_lifecycle(bucket, config)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("cors") {
+                let config = xml::parse_put_bucket_cors(&body)?;
+                storage.put_bucket_cors(bucket, config)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("policy") {
+                storage.put_bucket_policy(bucket, String::from_utf8_lossy(&body).to_string())?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("tagging") {
+                let tags = xml::parse_put_bucket_tagging(&body)?;
+                storage.put_bucket_tagging(bucket, tags)?;
                 let mut res = Response::new(Body::empty());
                 *res.status_mut() = StatusCode::OK;
                 res.headers_mut().insert(
@@ -146,8 +205,52 @@ fn dispatch_s3_op(
             Ok(res)
         }
 
-        // DELETE /<bucket> -> DeleteBucket
+        // DELETE /<bucket> -> DeleteBucket / Lifecycle / CORS / Policy / Tagging
         (&Method::DELETE, Some(bucket), None) => {
+            if query.contains_key("lifecycle") || query.contains_key("lifecycle-configuration") {
+                storage.delete_bucket_lifecycle(bucket)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::NO_CONTENT;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("cors") {
+                storage.delete_bucket_cors(bucket)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::NO_CONTENT;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("policy") {
+                storage.delete_bucket_policy(bucket)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::NO_CONTENT;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("tagging") {
+                storage.delete_bucket_tagging(bucket)?;
+                let mut res = Response::new(Body::empty());
+                *res.status_mut() = StatusCode::NO_CONTENT;
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
             storage.delete_bucket(bucket)?;
             let mut res = Response::new(Body::empty());
             *res.status_mut() = StatusCode::NO_CONTENT;
@@ -170,11 +273,120 @@ fn dispatch_s3_op(
             Ok(res)
         }
 
-        // GET /<bucket> -> ListObjectsV2 / GetBucketLocation / GetBucketNotificationConfiguration
+        // GET /<bucket> -> ListObjectsV2 / Versions / Location / Notification / Versioning / Lifecycle / CORS / Policy / Tagging
         (&Method::GET, Some(bucket), None) => {
             if query.contains_key("notification") {
                 let config = storage.get_bucket_notification_configuration(bucket)?;
                 let xml_body = xml::serialize_notification_configuration(&config);
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("versioning") {
+                let status = storage.get_bucket_versioning(bucket)?;
+                let xml_body = xml::serialize_get_bucket_versioning(status.as_deref());
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("versions") {
+                let prefix = query.get("prefix").map(|s| s.as_str());
+                let delimiter = query.get("delimiter").map(|s| s.as_str());
+                let key_marker = query.get("key-marker").map(|s| s.as_str());
+                let version_id_marker = query.get("version-id-marker").map(|s| s.as_str());
+                let max_keys = query
+                    .get("max-keys")
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(1000);
+                let list_res = storage.list_object_versions(bucket, prefix, delimiter, key_marker, version_id_marker, max_keys)?;
+                let xml_body = xml::serialize_list_object_versions(&list_res);
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("lifecycle") || query.contains_key("lifecycle-configuration") {
+                let config = storage.get_bucket_lifecycle(bucket)?;
+                let config = config.ok_or_else(|| RustStackError::S3 {
+                    code: "NoSuchLifecycleConfiguration".to_string(),
+                    message: "The lifecycle configuration does not exist".to_string(),
+                    status: StatusCode::NOT_FOUND,
+                    resource: Some(bucket.to_string()),
+                })?;
+                let xml_body = xml::serialize_get_bucket_lifecycle(&config);
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("cors") {
+                let config = storage.get_bucket_cors(bucket)?;
+                let config = config.ok_or_else(|| RustStackError::S3 {
+                    code: "NoSuchCORSConfiguration".to_string(),
+                    message: "The CORS configuration does not exist".to_string(),
+                    status: StatusCode::NOT_FOUND,
+                    resource: Some(bucket.to_string()),
+                })?;
+                let xml_body = xml::serialize_get_bucket_cors(&config);
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("policy") {
+                let policy = storage.get_bucket_policy(bucket)?;
+                let policy = policy.ok_or_else(|| RustStackError::S3 {
+                    code: "NoSuchBucketPolicy".to_string(),
+                    message: "The bucket policy does not exist".to_string(),
+                    status: StatusCode::NOT_FOUND,
+                    resource: Some(bucket.to_string()),
+                })?;
+                let mut res = Response::new(Body::from(policy));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/json"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("tagging") {
+                let tags = storage.get_bucket_tagging(bucket)?;
+                let xml_body = xml::serialize_get_bucket_tagging(&tags);
                 let mut res = Response::new(Body::from(xml_body));
                 *res.status_mut() = StatusCode::OK;
                 res.headers_mut()
@@ -343,6 +555,29 @@ fn dispatch_s3_op(
                 return Ok(res);
             }
 
+            if let Some(vid) = query.get("versionId") {
+                let (meta, data) = storage.get_object_version(bucket, key, vid)?;
+                let mut res = Response::new(Body::from(data));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut().insert(
+                    "content-type",
+                    HeaderValue::from_str(&meta.content_type).unwrap(),
+                );
+                res.headers_mut().insert(
+                    "content-length",
+                    HeaderValue::from_str(&meta.size.to_string()).unwrap(),
+                );
+                res.headers_mut()
+                    .insert("etag", HeaderValue::from_str(&meta.etag).unwrap());
+                res.headers_mut()
+                    .insert("x-amz-version-id", HeaderValue::from_str(vid).unwrap());
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
             let range_header = headers.get("range").and_then(|v| v.to_str().ok());
             let meta = storage.head_object(bucket, key)?;
 
@@ -457,9 +692,18 @@ fn dispatch_s3_op(
                 return Ok(res);
             }
 
-            storage.delete_object(bucket, key)?;
+            let vid_opt = query.get("versionId").map(|s| s.as_str());
+            let del_result = storage.delete_object_version(bucket, key, vid_opt)?;
             let mut res = Response::new(Body::empty());
             *res.status_mut() = StatusCode::NO_CONTENT;
+            if let Some(id) = del_result {
+                if vid_opt.is_some() {
+                    res.headers_mut().insert("x-amz-version-id", HeaderValue::from_str(&id).unwrap());
+                } else {
+                    res.headers_mut().insert("x-amz-delete-marker", HeaderValue::from_static("true"));
+                    res.headers_mut().insert("x-amz-version-id", HeaderValue::from_str(&id).unwrap());
+                }
+            }
             res.headers_mut().insert(
                 "x-amz-request-id",
                 HeaderValue::from_str(request_id).unwrap(),

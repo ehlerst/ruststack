@@ -1,3 +1,5 @@
+#![recursion_limit = "256"]
+
 pub mod app;
 pub mod chaos_api;
 pub mod state_api;

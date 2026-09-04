@@ -502,8 +502,54 @@ impl SnsEngine {
                         message_deduplication_id.clone(),
                     );
                 }
+                "http" | "https" => {
+                    let endpoint = sub.endpoint.clone();
+                    let payload = if sub.attributes.raw_message_delivery {
+                        message.clone()
+                    } else {
+                        let mut envelope = serde_json::json!({
+                            "Type": "Notification",
+                            "MessageId": message_id,
+                            "TopicArn": topic_arn,
+                            "Message": message,
+                            "Timestamp": timestamp.to_rfc3339(),
+                            "SignatureVersion": "1",
+                            "Signature": "EXAMPLEpH+DcEwjAPg8O9mY8dReBSwksfg2S7WKQizmGIEePVKySt+wfNTWmww5acDxXdHobdYWWSTkXdFuTvWSukIHrZeOiKKO0cgJ3WoxARfzTJxSTeyKEqMyq8hCC2+FigPftuAVvMZCONFIGEXAMPLE=",
+                            "SigningCertURL": "https://sns.us-east-1.amazonaws.com/SimpleNotificationService.pem",
+                            "UnsubscribeURL": format!("http://localhost:4566/?Action=Unsubscribe&SubscriptionArn={}", sub.subscription_arn)
+                        });
+
+                        if let Some(ref s) = subject {
+                            envelope["Subject"] = serde_json::Value::String(s.clone());
+                        }
+
+                        envelope.to_string()
+                    };
+
+                    let topic_arn_owned = topic_arn.to_string();
+                    let sub_arn_owned = sub.subscription_arn.clone();
+                    let msg_id_owned = message_id.clone();
+
+                    tokio::spawn(async move {
+                        let client = reqwest::Client::builder()
+                            .timeout(std::time::Duration::from_secs(5))
+                            .build();
+                        if let Ok(cli) = client {
+                            let _ = cli
+                                .post(&endpoint)
+                                .header("x-amz-sns-message-type", "Notification")
+                                .header("x-amz-sns-topic-arn", &topic_arn_owned)
+                                .header("x-amz-sns-subscription-arn", &sub_arn_owned)
+                                .header("x-amz-sns-message-id", &msg_id_owned)
+                                .header("content-type", "application/json")
+                                .body(payload)
+                                .send()
+                                .await;
+                        }
+                    });
+                }
                 _ => {
-                    // Future protocols (HTTP webhook, lambda, etc.)
+                    // Future protocols (lambda, etc.)
                 }
             }
         }

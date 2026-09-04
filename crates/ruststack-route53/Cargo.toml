@@ -1,0 +1,29 @@
+[package]
+name = "ruststack-route53"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "High-performance Amazon Route 53 DNS & Hosted Zones engine for RustStack"
+
+[dependencies]
+ruststack-core = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+quick-xml = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dashmap = { workspace = true }
+parking_lot = { workspace = true }
+tracing = { workspace = true }
+http = { workspace = true }
+http-body-util = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+fastrand = { workspace = true }
+form_urlencoded = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }

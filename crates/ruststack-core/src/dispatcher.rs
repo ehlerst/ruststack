@@ -103,6 +103,55 @@ impl Dispatcher {
             {
                 return AwsService::Lambda;
             }
+            if target.starts_with("AWSCognitoIdentityProviderService")
+                || target.starts_with("AWSCognitoIdentityProviderService.")
+                || target.starts_with("Cognito")
+                || target.starts_with("Cognito.")
+            {
+                return AwsService::Cognito;
+            }
+            if target.starts_with("AWSStepFunctions")
+                || target.starts_with("AWSStepFunctions.")
+                || target.starts_with("StepFunctions")
+                || target.starts_with("StepFunctions.")
+            {
+                return AwsService::StepFunctions;
+            }
+            if target.starts_with("AmazonEC2ContainerRegistry_V20150921")
+                || target.starts_with("AmazonEC2ContainerRegistry_V20150921.")
+                || target.starts_with("ECR")
+                || target.starts_with("ECR.")
+            {
+                return AwsService::Ecr;
+            }
+            if target.starts_with("AmazonEC2ContainerServiceV20141113")
+                || target.starts_with("AmazonEC2ContainerServiceV20141113.")
+                || target.starts_with("ECS")
+                || target.starts_with("ECS.")
+            {
+                return AwsService::Ecs;
+            }
+            if target.starts_with("AmazonAthena")
+                || target.starts_with("AmazonAthena.")
+                || target.starts_with("Athena")
+                || target.starts_with("Athena.")
+            {
+                return AwsService::Athena;
+            }
+            if target.starts_with("AmazonBedrockControlPlaneService")
+                || target.starts_with("Bedrock")
+            {
+                return AwsService::Bedrock;
+            }
+            if target.starts_with("CertificateManager") || target.starts_with("ACM") {
+                return AwsService::Acm;
+            }
+            if target.starts_with("AWSWAF_20190729") || target.starts_with("WAF") {
+                return AwsService::WafV2;
+            }
+            if target.starts_with("AWSOrganizationsV20161128") || target.starts_with("Organizations") {
+                return AwsService::Organizations;
+            }
         }
 
         // 3. Check Authorization header (AWS SigV4 credential scope: .../us-east-1/<service>/aws4_request)
@@ -125,6 +174,24 @@ impl Dispatcher {
                     "lambda" => return AwsService::Lambda,
                     "monitoring" | "cloudwatch" => return AwsService::CloudWatch,
                     "dynamodbstreams" => return AwsService::DynamoDbStreams,
+                    "cognito-idp" | "cognito" => return AwsService::Cognito,
+                    "apigateway" => return AwsService::ApiGateway,
+                    "route53" => return AwsService::Route53,
+                    "states" | "stepfunctions" => return AwsService::StepFunctions,
+                    "cloudformation" => return AwsService::CloudFormation,
+                    "ecr" => return AwsService::Ecr,
+                    "ecs" => return AwsService::Ecs,
+                    "ec2" => return AwsService::Ec2,
+                    "elasticloadbalancing" | "elbv2" | "elb" => return AwsService::Elbv2,
+                    "bedrock" | "bedrock-runtime" => return AwsService::Bedrock,
+                    "es" | "opensearch" => return AwsService::OpenSearch,
+                    "athena" => return AwsService::Athena,
+                    "rds" => return AwsService::Rds,
+                    "elasticache" => return AwsService::ElastiCache,
+                    "redshift" => return AwsService::Redshift,
+                    "acm" => return AwsService::Acm,
+                    "wafv2" | "waf-regional" | "waf" => return AwsService::WafV2,
+                    "organizations" => return AwsService::Organizations,
                     _ => {}
                 }
             }
@@ -219,6 +286,15 @@ impl Dispatcher {
         if path.starts_with("/2015-03-31/functions") {
             return AwsService::Lambda;
         }
+        if path.ends_with("/.well-known/jwks.json") || path == "/.well-known/jwks.json" {
+            return AwsService::Cognito;
+        }
+        if path.starts_with("/restapis") || path.starts_with("/execute-api") {
+            return AwsService::ApiGateway;
+        }
+        if path.starts_with("/2013-04-01") || path.starts_with("/hostedzone") {
+            return AwsService::Route53;
+        }
 
         let segments: Vec<&str> = path
             .trim_matches('/')
@@ -227,6 +303,13 @@ impl Dispatcher {
             .collect();
         if !segments.is_empty() {
             let first = segments[0];
+            // 10-hex digit API Gateway ID e.g. /{api_id}/{stage}/...
+            if segments.len() >= 2
+                && first.len() == 10
+                && first.chars().all(|c| c.is_ascii_hexdigit())
+            {
+                return AwsService::ApiGateway;
+            }
             // 12-digit AWS account number for SQS queue URL
             if first.len() == 12 && first.chars().all(|c| c.is_ascii_digit()) {
                 return AwsService::Sqs;
@@ -264,9 +347,63 @@ impl Dispatcher {
             if first == "cloudwatch" || first == "monitoring" {
                 return AwsService::CloudWatch;
             }
+            if first == "cognito" || first == "cognito-idp" {
+                return AwsService::Cognito;
+            }
+            if first == "route53" {
+                return AwsService::Route53;
+            }
+            if first == "states" || first == "stepfunctions" {
+                return AwsService::StepFunctions;
+            }
+            if first == "cloudformation" {
+                return AwsService::CloudFormation;
+            }
+            if first == "ecr" {
+                return AwsService::Ecr;
+            }
+            if first == "ecs" {
+                return AwsService::Ecs;
+            }
+            if first == "ec2" {
+                return AwsService::Ec2;
+            }
+            if first == "elasticloadbalancing" || first == "elbv2" || first == "elb" {
+                return AwsService::Elbv2;
+            }
+            if first == "foundation-models" || first == "model" || first == "bedrock" {
+                return AwsService::Bedrock;
+            }
+            if first == "opensearch"
+                || (first == "2021-01-01" && path.contains("/opensearch/"))
+                || (first == "2015-01-01" && path.contains("/es/"))
+            {
+                return AwsService::OpenSearch;
+            }
+            if first == "athena" {
+                return AwsService::Athena;
+            }
+            if first == "rds" {
+                return AwsService::Rds;
+            }
+            if first == "elasticache" {
+                return AwsService::ElastiCache;
+            }
+            if first == "redshift" {
+                return AwsService::Redshift;
+            }
+            if first == "acm" {
+                return AwsService::Acm;
+            }
+            if first == "wafv2" || first == "waf" {
+                return AwsService::WafV2;
+            }
+            if first == "organizations" {
+                return AwsService::Organizations;
+            }
         }
 
-        // 6. Check Query Parameters for SQS, SNS, STS, IAM, SES, CloudWatch Actions
+        // 6. Check Query Parameters for SQS, SNS, STS, IAM, SES, CloudWatch, CloudFormation, EC2, ELBv2, RDS, ElastiCache, Redshift Actions
         if let Some(query) = uri.query() {
             if query.contains("Action=") {
                 let params = form_urlencoded::parse(query.as_bytes());
@@ -289,6 +426,24 @@ impl Dispatcher {
                         }
                         if is_cloudwatch_action(&v) {
                             return AwsService::CloudWatch;
+                        }
+                        if is_cloudformation_action(&v) {
+                            return AwsService::CloudFormation;
+                        }
+                        if is_ec2_action(&v) {
+                            return AwsService::Ec2;
+                        }
+                        if is_elbv2_action(&v) {
+                            return AwsService::Elbv2;
+                        }
+                        if is_rds_action(&v) {
+                            return AwsService::Rds;
+                        }
+                        if is_elasticache_action(&v) {
+                            return AwsService::ElastiCache;
+                        }
+                        if is_redshift_action(&v) {
+                            return AwsService::Redshift;
                         }
                     }
                 }
@@ -319,6 +474,24 @@ impl Dispatcher {
                             }
                             if is_cloudwatch_action(&v) {
                                 return AwsService::CloudWatch;
+                            }
+                            if is_cloudformation_action(&v) {
+                                return AwsService::CloudFormation;
+                            }
+                            if is_ec2_action(&v) {
+                                return AwsService::Ec2;
+                            }
+                            if is_elbv2_action(&v) {
+                                return AwsService::Elbv2;
+                            }
+                            if is_rds_action(&v) {
+                                return AwsService::Rds;
+                            }
+                            if is_elasticache_action(&v) {
+                                return AwsService::ElastiCache;
+                            }
+                            if is_redshift_action(&v) {
+                                return AwsService::Redshift;
                             }
                         }
                     }
@@ -473,6 +646,131 @@ fn is_cloudwatch_action(action: &str) -> bool {
             | "SetAlarmState"
             | "EnableAlarmActions"
             | "DisableAlarmActions"
+    )
+}
+
+fn is_cloudformation_action(action: &str) -> bool {
+    matches!(
+        action,
+        "CreateStack"
+            | "DescribeStacks"
+            | "DescribeStackResources"
+            | "DescribeStackEvents"
+            | "GetTemplate"
+            | "UpdateStack"
+            | "DeleteStack"
+            | "ListStacks"
+            | "CreateChangeSet"
+            | "DescribeChangeSet"
+            | "ExecuteChangeSet"
+            | "DeleteChangeSet"
+    )
+}
+
+fn is_ec2_action(action: &str) -> bool {
+    matches!(
+        action,
+        "CreateVpc"
+            | "DescribeVpcs"
+            | "DeleteVpc"
+            | "CreateSubnet"
+            | "DescribeSubnets"
+            | "DeleteSubnet"
+            | "CreateSecurityGroup"
+            | "DescribeSecurityGroups"
+            | "DeleteSecurityGroup"
+            | "AuthorizeSecurityGroupIngress"
+            | "RevokeSecurityGroupIngress"
+            | "AuthorizeSecurityGroupEgress"
+            | "RevokeSecurityGroupEgress"
+            | "CreateKeyPair"
+            | "DescribeKeyPairs"
+            | "DeleteKeyPair"
+            | "RunInstances"
+            | "DescribeInstances"
+            | "TerminateInstances"
+            | "StartInstances"
+            | "StopInstances"
+            | "DescribeAvailabilityZones"
+            | "DescribeImages"
+            | "DescribeTags"
+    )
+}
+
+fn is_elbv2_action(action: &str) -> bool {
+    matches!(
+        action,
+        "CreateLoadBalancer"
+            | "DescribeLoadBalancers"
+            | "DeleteLoadBalancer"
+            | "CreateTargetGroup"
+            | "DescribeTargetGroups"
+            | "DeleteTargetGroup"
+            | "RegisterTargets"
+            | "DeregisterTargets"
+            | "DescribeTargetHealth"
+            | "CreateListener"
+            | "DescribeListeners"
+            | "DeleteListener"
+            | "CreateRule"
+            | "DescribeRules"
+            | "DeleteRule"
+            | "AddTags"
+            | "RemoveTags"
+            | "DescribeTags"
+    )
+}
+
+fn is_rds_action(action: &str) -> bool {
+    matches!(
+        action,
+        "CreateDBInstance"
+            | "DescribeDBInstances"
+            | "DeleteDBInstance"
+            | "CreateDBCluster"
+            | "DescribeDBClusters"
+            | "DeleteDBCluster"
+            | "CreateDBSnapshot"
+            | "DescribeDBSnapshots"
+            | "DeleteDBSnapshot"
+            | "ModifyDBInstance"
+            | "RebootDBInstance"
+            | "AddTagsToResource"
+            | "ListTagsForResource"
+            | "RemoveTagsFromResource"
+    )
+}
+
+fn is_elasticache_action(action: &str) -> bool {
+    matches!(
+        action,
+        "CreateCacheCluster"
+            | "DescribeCacheClusters"
+            | "DeleteCacheCluster"
+            | "CreateReplicationGroup"
+            | "DescribeReplicationGroups"
+            | "DeleteReplicationGroup"
+            | "ModifyCacheCluster"
+            | "RebootCacheCluster"
+            | "AddTagsToResource"
+            | "ListTagsForResource"
+            | "RemoveTagsFromResource"
+    )
+}
+
+fn is_redshift_action(action: &str) -> bool {
+    matches!(
+        action,
+        "CreateCluster"
+            | "DescribeClusters"
+            | "DeleteCluster"
+            | "CreateClusterSnapshot"
+            | "DescribeClusterSnapshots"
+            | "DeleteClusterSnapshot"
+            | "ModifyCluster"
+            | "RebootCluster"
+            | "CreateClusterSubnetGroup"
+            | "DescribeClusterSubnetGroups"
     )
 }
 

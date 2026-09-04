@@ -1,0 +1,24 @@
+[package]
+name = "ruststack-ecs"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ruststack-core.workspace = true
+tokio.workspace = true
+axum.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+bytes.workspace = true
+http.workspace = true
+chrono.workspace = true
+dashmap = "6.1"
+uuid = { version = "1.11", features = ["v4"] }
+thiserror = "2.0"
+tracing.workspace = true
+
+[dev-dependencies]
+tower.workspace = true
+http-body-util.workspace = true

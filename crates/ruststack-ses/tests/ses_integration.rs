@@ -381,3 +381,66 @@ async fn test_ses_http_json_protocol() {
     assert_eq!(sent[0].source, "json_sender@example.com");
     assert_eq!(sent[0].subject.as_deref(), Some("JSON Subject"));
 }
+
+#[tokio::test]
+async fn test_ses_templates_and_templated_email() {
+    let state = SesState::new("000000000000", "us-east-1");
+
+    // 1. Create Template via Query HTTP
+    let uri: Uri = "/".parse().unwrap();
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        "content-type",
+        HeaderValue::from_static("application/x-www-form-urlencoded"),
+    );
+
+    let body = "Action=CreateTemplate&Template.TemplateName=WelcomeEmail&Template.SubjectPart=Hello+{{name}}&Template.TextPart=Welcome+{{name}}+to+{{service}}!&Template.HtmlPart=%3Ch1%3EWelcome+{{name}}%3C%2Fh1%3E";
+    let resp = handle_ses_request(
+        State(state.clone()),
+        uri.clone(),
+        headers.clone(),
+        Bytes::from(body),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 2. Get Template
+    let body = "Action=GetTemplate&TemplateName=WelcomeEmail";
+    let resp = handle_ses_request(
+        State(state.clone()),
+        uri.clone(),
+        headers.clone(),
+        Bytes::from(body),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body_bytes = http_body_util::BodyExt::collect(resp.into_body())
+        .await
+        .unwrap()
+        .to_bytes();
+    let xml = String::from_utf8_lossy(&body_bytes);
+    assert!(xml.contains("<TemplateName>WelcomeEmail</TemplateName>"));
+    assert!(xml.contains("<SubjectPart>Hello {{name}}</SubjectPart>"));
+
+    // 3. Send Templated Email
+    let template_data = "%7B%22name%22%3A%22Alice%22%2C%22service%22%3A%22RustStack%22%7D";
+    let body = format!(
+        "Action=SendTemplatedEmail&Source=noreply@example.com&Destination.ToAddresses.member.1=alice@example.com&Template=WelcomeEmail&TemplateData={}",
+        template_data
+    );
+    let resp = handle_ses_request(
+        State(state.clone()),
+        uri.clone(),
+        headers.clone(),
+        Bytes::from(body),
+    )
+    .await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 4. Verify rendered message in sent history
+    let sent = state.get_sent_emails();
+    assert_eq!(sent.len(), 1);
+    assert_eq!(sent[0].subject.as_deref(), Some("Hello Alice"));
+    assert_eq!(sent[0].body_text.as_deref(), Some("Welcome Alice to RustStack!"));
+    assert_eq!(sent[0].body_html.as_deref(), Some("<h1>Welcome Alice</h1>"));
+}

@@ -452,3 +452,82 @@ async fn test_http_handlers() {
     assert_eq!(get_json["Records"].as_array().unwrap().len(), 1);
     assert_eq!(get_json["Records"][0]["Data"].as_str().unwrap(), data);
 }
+
+#[tokio::test]
+async fn test_kinesis_resharding_split_merge_update_count() {
+    let state = KinesisState::new("000000000000".to_string(), "us-east-1".to_string());
+
+    // 1. Create Stream with 1 shard
+    state
+        .create_stream(CreateStreamRequest {
+            stream_name: "reshard-stream".to_string(),
+            shard_count: Some(1),
+            stream_mode_details: None,
+        })
+        .unwrap();
+
+    let desc = state
+        .describe_stream(DescribeStreamRequest {
+            stream_name: Some("reshard-stream".to_string()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(desc.shards.len(), 1);
+
+    // 2. Split Shard
+    let mid_hash = (u128::MAX / 2).to_string();
+    state
+        .split_shard(SplitShardRequest {
+            stream_name: Some("reshard-stream".to_string()),
+            stream_arn: None,
+            shard_to_split: "shardId-000000000000".to_string(),
+            new_starting_hash_key: mid_hash,
+        })
+        .unwrap();
+
+    let desc_after_split = state
+        .describe_stream(DescribeStreamRequest {
+            stream_name: Some("reshard-stream".to_string()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(desc_after_split.shards.len(), 3); // 1 closed parent + 2 open children
+
+    // 3. Merge the two children back
+    state
+        .merge_shards(MergeShardsRequest {
+            stream_name: Some("reshard-stream".to_string()),
+            stream_arn: None,
+            shard_to_merge: "shardId-000000000001".to_string(),
+            adjacent_shard_to_merge: "shardId-000000000002".to_string(),
+        })
+        .unwrap();
+
+    let desc_after_merge = state
+        .describe_stream(DescribeStreamRequest {
+            stream_name: Some("reshard-stream".to_string()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(desc_after_merge.shards.len(), 4); // 3 closed + 1 open merged
+
+    // 4. Update Shard Count to 4
+    let update_res = state
+        .update_shard_count(UpdateShardCountRequest {
+            stream_name: Some("reshard-stream".to_string()),
+            stream_arn: None,
+            target_shard_count: 4,
+            scaling_type: "UNIFORM_SCALING".to_string(),
+        })
+        .unwrap();
+    assert_eq!(update_res.current_shard_count, 1);
+    assert_eq!(update_res.target_shard_count, 4);
+
+    let summary = state
+        .describe_stream_summary(DescribeStreamSummaryRequest {
+            stream_name: Some("reshard-stream".to_string()),
+            ..Default::default()
+        })
+        .unwrap();
+    assert_eq!(summary.open_shard_count, 4);
+}

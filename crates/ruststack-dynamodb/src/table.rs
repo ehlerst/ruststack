@@ -128,6 +128,7 @@ impl Table {
             stream_specification: None,
             latest_stream_arn: None,
             latest_stream_label: None,
+            time_to_live_description: None,
         };
 
         Ok(Self {

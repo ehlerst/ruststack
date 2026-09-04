@@ -217,7 +217,71 @@ pub struct SentEmail {
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct Template {
+    pub template_name: String,
+    pub subject_part: Option<String>,
+    pub text_part: Option<String>,
+    pub html_part: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct CreateTemplateRequest {
+    pub template: Template,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct GetTemplateRequest {
+    pub template_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct GetTemplateResponse {
+    pub template: Template,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct TemplateMetadata {
+    pub name: String,
+    pub created_timestamp: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ListTemplatesResponse {
+    pub templates_metadata: Vec<TemplateMetadata>,
+    pub next_token: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct UpdateTemplateRequest {
+    pub template: Template,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct DeleteTemplateRequest {
+    pub template_name: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct SendTemplatedEmailRequest {
+    pub source: String,
+    pub destination: Destination,
+    pub template: String,
+    pub template_data: String,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SesStateSnapshot {
     pub identities: Vec<String>,
     pub sent_emails: Vec<SentEmail>,
+    #[serde(default)]
+    pub templates: Vec<Template>,
 }

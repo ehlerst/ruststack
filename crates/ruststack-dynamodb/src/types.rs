@@ -195,6 +195,24 @@ pub struct TableDescription {
     pub latest_stream_arn: Option<String>,
     #[serde(rename = "LatestStreamLabel")]
     pub latest_stream_label: Option<String>,
+    #[serde(rename = "TimeToLiveDescription")]
+    pub time_to_live_description: Option<TimeToLiveDescription>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeToLiveSpecification {
+    #[serde(rename = "AttributeName")]
+    pub attribute_name: String,
+    #[serde(rename = "Enabled")]
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TimeToLiveDescription {
+    #[serde(rename = "AttributeName")]
+    pub attribute_name: Option<String>,
+    #[serde(rename = "TimeToLiveStatus")]
+    pub time_to_live_status: String, // "ENABLED" or "DISABLED"
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -292,6 +310,95 @@ pub struct QueryOutput {
     pub items: Vec<HashMap<String, AttributeValue>>,
     pub count: usize,
     pub scanned_count: usize,
+}
+
+// Transactions
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactPut {
+    #[serde(rename = "TableName")]
+    pub table_name: String,
+    #[serde(rename = "Item")]
+    pub item: HashMap<String, AttributeValue>,
+    #[serde(rename = "ConditionExpression")]
+    pub condition_expression: Option<String>,
+    #[serde(rename = "ExpressionAttributeNames")]
+    pub expression_attribute_names: Option<HashMap<String, String>>,
+    #[serde(rename = "ExpressionAttributeValues")]
+    pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactDelete {
+    #[serde(rename = "TableName")]
+    pub table_name: String,
+    #[serde(rename = "Key")]
+    pub key: HashMap<String, AttributeValue>,
+    #[serde(rename = "ConditionExpression")]
+    pub condition_expression: Option<String>,
+    #[serde(rename = "ExpressionAttributeNames")]
+    pub expression_attribute_names: Option<HashMap<String, String>>,
+    #[serde(rename = "ExpressionAttributeValues")]
+    pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactUpdate {
+    #[serde(rename = "TableName")]
+    pub table_name: String,
+    #[serde(rename = "Key")]
+    pub key: HashMap<String, AttributeValue>,
+    #[serde(rename = "UpdateExpression")]
+    pub update_expression: Option<String>,
+    #[serde(rename = "ConditionExpression")]
+    pub condition_expression: Option<String>,
+    #[serde(rename = "ExpressionAttributeNames")]
+    pub expression_attribute_names: Option<HashMap<String, String>>,
+    #[serde(rename = "ExpressionAttributeValues")]
+    pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactConditionCheck {
+    #[serde(rename = "TableName")]
+    pub table_name: String,
+    #[serde(rename = "Key")]
+    pub key: HashMap<String, AttributeValue>,
+    #[serde(rename = "ConditionExpression")]
+    pub condition_expression: String,
+    #[serde(rename = "ExpressionAttributeNames")]
+    pub expression_attribute_names: Option<HashMap<String, String>>,
+    #[serde(rename = "ExpressionAttributeValues")]
+    pub expression_attribute_values: Option<HashMap<String, AttributeValue>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactWriteItem {
+    #[serde(rename = "Put")]
+    pub put: Option<TransactPut>,
+    #[serde(rename = "Delete")]
+    pub delete: Option<TransactDelete>,
+    #[serde(rename = "Update")]
+    pub update: Option<TransactUpdate>,
+    #[serde(rename = "ConditionCheck")]
+    pub condition_check: Option<TransactConditionCheck>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactGetItem {
+    #[serde(rename = "Get")]
+    pub get: TransactGet,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransactGet {
+    #[serde(rename = "TableName")]
+    pub table_name: String,
+    #[serde(rename = "Key")]
+    pub key: HashMap<String, AttributeValue>,
+    #[serde(rename = "ProjectionExpression")]
+    pub projection_expression: Option<String>,
+    #[serde(rename = "ExpressionAttributeNames")]
+    pub expression_attribute_names: Option<HashMap<String, String>>,
 }
 
 // Snapshot Structures

@@ -26,6 +26,7 @@ pub struct SesState {
     pub account_id: String,
     pub region: String,
     identities: Arc<DashMap<String, ()>>,
+    templates: Arc<DashMap<String, Template>>,
     sent_emails: Arc<RwLock<Vec<SentEmail>>>,
 }
 
@@ -41,6 +42,7 @@ impl SesState {
             account_id: account_id.into(),
             region: region.into(),
             identities: Arc::new(DashMap::new()),
+            templates: Arc::new(DashMap::new()),
             sent_emails: Arc::new(RwLock::new(Vec::new())),
         }
     }
@@ -251,12 +253,116 @@ impl SesState {
         })
     }
 
+    pub fn create_template(&self, req: CreateTemplateRequest) -> Result<(), SesError> {
+        let name = req.template.template_name.trim();
+        if name.is_empty() {
+            return Err(SesError::InvalidParameter("TemplateName is required".to_string()));
+        }
+        if self.templates.contains_key(name) {
+            return Err(SesError::AlreadyExists(format!("Template {} already exists", name)));
+        }
+        self.templates.insert(name.to_string(), req.template);
+        Ok(())
+    }
+
+    pub fn get_template(&self, template_name: &str) -> Result<Template, SesError> {
+        self.templates
+            .get(template_name)
+            .map(|t| t.clone())
+            .ok_or_else(|| SesError::NotFound(format!("Template {} does not exist", template_name)))
+    }
+
+    pub fn list_templates(&self) -> Result<Vec<TemplateMetadata>, SesError> {
+        let mut list: Vec<TemplateMetadata> = self
+            .templates
+            .iter()
+            .map(|item| TemplateMetadata {
+                name: item.key().clone(),
+                created_timestamp: Some(Utc::now().to_rfc3339()),
+            })
+            .collect();
+        list.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(list)
+    }
+
+    pub fn update_template(&self, req: UpdateTemplateRequest) -> Result<(), SesError> {
+        let name = req.template.template_name.trim();
+        if !self.templates.contains_key(name) {
+            return Err(SesError::NotFound(format!("Template {} does not exist", name)));
+        }
+        self.templates.insert(name.to_string(), req.template);
+        Ok(())
+    }
+
+    pub fn delete_template(&self, template_name: &str) -> Result<(), SesError> {
+        self.templates.remove(template_name);
+        Ok(())
+    }
+
+    pub fn send_templated_email(
+        &self,
+        req: SendTemplatedEmailRequest,
+    ) -> Result<SendEmailResponse, SesError> {
+        if req.source.trim().is_empty() {
+            return Err(SesError::InvalidParameter(
+                "Source email address must not be empty".to_string(),
+            ));
+        }
+
+        let mut destinations = Vec::new();
+        destinations.extend(req.destination.to_addresses.clone());
+        destinations.extend(req.destination.cc_addresses.clone());
+        destinations.extend(req.destination.bcc_addresses.clone());
+
+        if destinations.is_empty() {
+            return Err(SesError::InvalidParameter(
+                "At least one destination address (To, Cc, or Bcc) must be specified".to_string(),
+            ));
+        }
+
+        let template = self.get_template(&req.template)?;
+        let template_data_val: serde_json::Value =
+            serde_json::from_str(&req.template_data).unwrap_or(serde_json::json!({}));
+
+        let subject = template
+            .subject_part
+            .as_deref()
+            .map(|s| render_template(s, &template_data_val));
+        let body_text = template
+            .text_part
+            .as_deref()
+            .map(|t| render_template(t, &template_data_val));
+        let body_html = template
+            .html_part
+            .as_deref()
+            .map(|h| render_template(h, &template_data_val));
+
+        let message_id = self.generate_message_id();
+        let now = Utc::now().to_rfc3339();
+
+        let sent_email = SentEmail {
+            timestamp: now,
+            message_id: message_id.clone(),
+            source: req.source,
+            destinations,
+            subject,
+            body_text,
+            body_html,
+            raw_data: None,
+        };
+
+        self.sent_emails.write().push(sent_email);
+
+        Ok(SendEmailResponse { message_id })
+    }
+
     pub fn get_sent_emails(&self) -> Vec<SentEmail> {
         self.sent_emails.read().clone()
     }
 
     pub fn clear(&self) {
         self.identities.clear();
+        self.templates.clear();
         self.sent_emails.write().clear();
     }
 
@@ -264,13 +370,18 @@ impl SesState {
         SesStateSnapshot {
             identities: self.identities.iter().map(|kv| kv.key().clone()).collect(),
             sent_emails: self.sent_emails.read().clone(),
+            templates: self.templates.iter().map(|kv| kv.value().clone()).collect(),
         }
     }
 
     pub fn import_snapshot(&self, snapshot: SesStateSnapshot) {
         self.identities.clear();
+        self.templates.clear();
         for id in snapshot.identities {
             self.identities.insert(id, ());
+        }
+        for t in snapshot.templates {
+            self.templates.insert(t.template_name.clone(), t);
         }
         let mut emails = self.sent_emails.write();
         emails.clear();
@@ -280,6 +391,21 @@ impl SesState {
     pub fn reset(&self) {
         self.clear();
     }
+}
+
+fn render_template(template_str: &str, data: &serde_json::Value) -> String {
+    let mut rendered = template_str.to_string();
+    if let Some(obj) = data.as_object() {
+        for (k, v) in obj {
+            let placeholder = format!("{{{{{}}}}}", k);
+            let val_str = match v {
+                serde_json::Value::String(s) => s.clone(),
+                other => other.to_string(),
+            };
+            rendered = rendered.replace(&placeholder, &val_str);
+        }
+    }
+    rendered
 }
 
 fn parse_raw_email(

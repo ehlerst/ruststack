@@ -601,6 +601,7 @@ impl DynamoDbEngine {
                 table.description.stream_specification = desc.stream_specification;
                 table.description.latest_stream_arn = desc.latest_stream_arn;
                 table.description.latest_stream_label = desc.latest_stream_label;
+                table.description.time_to_live_description = desc.time_to_live_description;
                 table.stream_records = t_snap.stream_records;
                 for item in t_snap.items {
                     if let Ok(pk) = table.extract_primary_key(&item) {
@@ -612,6 +613,194 @@ impl DynamoDbEngine {
                     .insert(desc.table_name, Arc::new(RwLock::new(table)));
             }
         }
+    }
+    pub fn transact_write_items(
+        &self,
+        transact_items: &[crate::types::TransactWriteItem],
+    ) -> Result<(), RustStackError> {
+        // Step 1: Pre-validation and condition evaluation
+        for item in transact_items {
+            if let Some(ref put) = item.put {
+                let table_arc = self.tables.get(&put.table_name).ok_or_else(|| {
+                    RustStackError::dynamodb_not_found(
+                        "ResourceNotFoundException",
+                        format!("Table not found: {}", put.table_name),
+                    )
+                })?;
+                let table = table_arc.read();
+                if let Some(ref expr) = put.condition_expression {
+                    let pk = table.extract_primary_key(&put.item)?;
+                    let existing = table.items.get(&pk);
+                    let dummy_empty = HashMap::new();
+                    let check_item = existing.unwrap_or(&dummy_empty);
+                    if !evaluate_expression(
+                        expr,
+                        check_item,
+                        put.expression_attribute_names.as_ref(),
+                        put.expression_attribute_values.as_ref(),
+                    ) {
+                        return Err(RustStackError::dynamodb_bad_request(
+                            "TransactionCanceledException",
+                            "Transaction cancelled, please refer cancellation reasons for specific reasons [ConditionalCheckFailed]",
+                        ));
+                    }
+                }
+            } else if let Some(ref del) = item.delete {
+                let table_arc = self.tables.get(&del.table_name).ok_or_else(|| {
+                    RustStackError::dynamodb_not_found(
+                        "ResourceNotFoundException",
+                        format!("Table not found: {}", del.table_name),
+                    )
+                })?;
+                let table = table_arc.read();
+                if let Some(ref expr) = del.condition_expression {
+                    let pk = table.extract_primary_key(&del.key)?;
+                    let existing = table.items.get(&pk);
+                    let dummy_empty = HashMap::new();
+                    let check_item = existing.unwrap_or(&dummy_empty);
+                    if !evaluate_expression(
+                        expr,
+                        check_item,
+                        del.expression_attribute_names.as_ref(),
+                        del.expression_attribute_values.as_ref(),
+                    ) {
+                        return Err(RustStackError::dynamodb_bad_request(
+                            "TransactionCanceledException",
+                            "Transaction cancelled, please refer cancellation reasons for specific reasons [ConditionalCheckFailed]",
+                        ));
+                    }
+                }
+            } else if let Some(ref upd) = item.update {
+                let table_arc = self.tables.get(&upd.table_name).ok_or_else(|| {
+                    RustStackError::dynamodb_not_found(
+                        "ResourceNotFoundException",
+                        format!("Table not found: {}", upd.table_name),
+                    )
+                })?;
+                let table = table_arc.read();
+                if let Some(ref expr) = upd.condition_expression {
+                    let pk = table.extract_primary_key(&upd.key)?;
+                    let existing = table.items.get(&pk);
+                    let dummy_empty = HashMap::new();
+                    let check_item = existing.unwrap_or(&dummy_empty);
+                    if !evaluate_expression(
+                        expr,
+                        check_item,
+                        upd.expression_attribute_names.as_ref(),
+                        upd.expression_attribute_values.as_ref(),
+                    ) {
+                        return Err(RustStackError::dynamodb_bad_request(
+                            "TransactionCanceledException",
+                            "Transaction cancelled, please refer cancellation reasons for specific reasons [ConditionalCheckFailed]",
+                        ));
+                    }
+                }
+            } else if let Some(ref check) = item.condition_check {
+                let table_arc = self.tables.get(&check.table_name).ok_or_else(|| {
+                    RustStackError::dynamodb_not_found(
+                        "ResourceNotFoundException",
+                        format!("Table not found: {}", check.table_name),
+                    )
+                })?;
+                let table = table_arc.read();
+                let pk = table.extract_primary_key(&check.key)?;
+                let existing = table.items.get(&pk);
+                let dummy_empty = HashMap::new();
+                let check_item = existing.unwrap_or(&dummy_empty);
+                if !evaluate_expression(
+                    &check.condition_expression,
+                    check_item,
+                    check.expression_attribute_names.as_ref(),
+                    check.expression_attribute_values.as_ref(),
+                ) {
+                    return Err(RustStackError::dynamodb_bad_request(
+                        "TransactionCanceledException",
+                        "Transaction cancelled, please refer cancellation reasons for specific reasons [ConditionalCheckFailed]",
+                    ));
+                }
+            }
+        }
+
+        // Step 2: Atomic Execution
+        for item in transact_items {
+            if let Some(ref put) = item.put {
+                self.put_item(&put.table_name, put.item.clone(), None, None, None)?;
+            } else if let Some(ref del) = item.delete {
+                self.delete_item(&del.table_name, &del.key, None, None, None)?;
+            } else if let Some(ref upd) = item.update {
+                self.update_item(
+                    &upd.table_name,
+                    &upd.key,
+                    upd.update_expression.as_deref(),
+                    upd.expression_attribute_names.as_ref(),
+                    upd.expression_attribute_values.as_ref(),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn transact_get_items(
+        &self,
+        transact_items: &[crate::types::TransactGetItem],
+    ) -> Result<Vec<Option<HashMap<String, AttributeValue>>>, RustStackError> {
+        let mut results = Vec::new();
+        for item in transact_items {
+            let res = self.get_item(
+                &item.get.table_name,
+                &item.get.key,
+                item.get.projection_expression.as_deref(),
+                item.get.expression_attribute_names.as_ref(),
+            )?;
+            results.push(res);
+        }
+        Ok(results)
+    }
+
+    pub fn update_time_to_live(
+        &self,
+        table_name: &str,
+        spec: crate::types::TimeToLiveSpecification,
+    ) -> Result<crate::types::TimeToLiveSpecification, RustStackError> {
+        let table_arc = self.tables.get(table_name).ok_or_else(|| {
+            RustStackError::dynamodb_not_found(
+                "ResourceNotFoundException",
+                format!("Table not found: {}", table_name),
+            )
+        })?;
+        let mut table = table_arc.write();
+        table.description.time_to_live_description =
+            Some(crate::types::TimeToLiveDescription {
+                attribute_name: Some(spec.attribute_name.clone()),
+                time_to_live_status: if spec.enabled {
+                    "ENABLED".to_string()
+                } else {
+                    "DISABLED".to_string()
+                },
+            });
+        Ok(spec)
+    }
+
+    pub fn describe_time_to_live(
+        &self,
+        table_name: &str,
+    ) -> Result<crate::types::TimeToLiveDescription, RustStackError> {
+        let table_arc = self.tables.get(table_name).ok_or_else(|| {
+            RustStackError::dynamodb_not_found(
+                "ResourceNotFoundException",
+                format!("Table not found: {}", table_name),
+            )
+        })?;
+        let table = table_arc.read();
+        Ok(table
+            .description
+            .time_to_live_description
+            .clone()
+            .unwrap_or(crate::types::TimeToLiveDescription {
+                attribute_name: None,
+                time_to_live_status: "DISABLED".to_string(),
+            }))
     }
 }
 
@@ -644,47 +833,156 @@ fn apply_update_expression(
     attr_names: Option<&HashMap<String, String>>,
     attr_values: Option<&HashMap<String, AttributeValue>>,
 ) -> Result<(), RustStackError> {
-    let expr = expr.trim();
-    // Support SET a = :val, b = :val2 and REMOVE c, d
-    if let Some(set_part) = expr
-        .strip_prefix("SET ")
-        .or_else(|| expr.strip_prefix("set "))
-    {
-        for assignment in set_part.split(',') {
-            let parts: Vec<&str> = assignment.split('=').collect();
-            if parts.len() == 2 {
-                let left = parts[0].trim();
-                let right = parts[1].trim();
+    let mut rest = expr.trim();
+    while !rest.is_empty() {
+        if let Some(after_set) = rest.strip_prefix("SET ").or_else(|| rest.strip_prefix("set ")) {
+            let next_clause_idx = find_next_clause(after_set);
+            let set_part = after_set[..next_clause_idx].trim();
+            rest = after_set[next_clause_idx..].trim();
 
-                let real_name = if let Some(map) = attr_names {
-                    map.get(left).map(|s| s.as_str()).unwrap_or(left)
-                } else {
-                    left
-                };
+            for assignment in set_part.split(',') {
+                let parts: Vec<&str> = assignment.split('=').collect();
+                if parts.len() == 2 {
+                    let left = parts[0].trim();
+                    let right = parts[1].trim();
 
-                if let Some(map) = attr_values {
-                    if let Some(val) = map.get(right) {
-                        item.insert(real_name.to_string(), val.clone());
+                    let real_name = if let Some(map) = attr_names {
+                        map.get(left).map(|s| s.as_str()).unwrap_or(left)
+                    } else {
+                        left
+                    };
+
+                    if let Some(map) = attr_values {
+                        if let Some(val) = map.get(right) {
+                            item.insert(real_name.to_string(), val.clone());
+                        }
                     }
                 }
             }
-        }
-    } else if let Some(rem_part) = expr
-        .strip_prefix("REMOVE ")
-        .or_else(|| expr.strip_prefix("remove "))
-    {
-        for field in rem_part.split(',') {
-            let field_clean = field.trim();
-            let real_name = if let Some(map) = attr_names {
-                map.get(field_clean)
-                    .map(|s| s.as_str())
-                    .unwrap_or(field_clean)
-            } else {
-                field_clean
-            };
-            item.remove(real_name);
+        } else if let Some(after_rem) = rest.strip_prefix("REMOVE ").or_else(|| rest.strip_prefix("remove ")) {
+            let next_clause_idx = find_next_clause(after_rem);
+            let rem_part = after_rem[..next_clause_idx].trim();
+            rest = after_rem[next_clause_idx..].trim();
+
+            for field in rem_part.split(',') {
+                let field_clean = field.trim();
+                let real_name = if let Some(map) = attr_names {
+                    map.get(field_clean)
+                        .map(|s| s.as_str())
+                        .unwrap_or(field_clean)
+                } else {
+                    field_clean
+                };
+                item.remove(real_name);
+            }
+        } else if let Some(after_add) = rest.strip_prefix("ADD ").or_else(|| rest.strip_prefix("add ")) {
+            let next_clause_idx = find_next_clause(after_add);
+            let add_part = after_add[..next_clause_idx].trim();
+            rest = after_add[next_clause_idx..].trim();
+
+            for assignment in add_part.split(',') {
+                let parts: Vec<&str> = assignment.split_whitespace().collect();
+                if parts.len() == 2 {
+                    let left = parts[0];
+                    let right = parts[1];
+                    let real_name = if let Some(map) = attr_names {
+                        map.get(left).map(|s| s.as_str()).unwrap_or(left)
+                    } else {
+                        left
+                    };
+                    if let Some(map) = attr_values {
+                        if let Some(val) = map.get(right) {
+                            match val {
+                                AttributeValue::N(n_str) => {
+                                    let inc_val = n_str.parse::<f64>().unwrap_or(0.0);
+                                    let current_val = match item.get(real_name) {
+                                        Some(AttributeValue::N(curr)) => curr.parse::<f64>().unwrap_or(0.0),
+                                        _ => 0.0,
+                                    };
+                                    let new_val = current_val + inc_val;
+                                    item.insert(real_name.to_string(), AttributeValue::N(new_val.to_string()));
+                                }
+                                AttributeValue::SS(new_set) => {
+                                    let mut set = match item.get(real_name) {
+                                        Some(AttributeValue::SS(existing)) => existing.clone(),
+                                        _ => Vec::new(),
+                                    };
+                                    for elem in new_set {
+                                        if !set.contains(elem) {
+                                            set.push(elem.clone());
+                                        }
+                                    }
+                                    item.insert(real_name.to_string(), AttributeValue::SS(set));
+                                }
+                                AttributeValue::NS(new_set) => {
+                                    let mut set = match item.get(real_name) {
+                                        Some(AttributeValue::NS(existing)) => existing.clone(),
+                                        _ => Vec::new(),
+                                    };
+                                    for elem in new_set {
+                                        if !set.contains(elem) {
+                                            set.push(elem.clone());
+                                        }
+                                    }
+                                    item.insert(real_name.to_string(), AttributeValue::NS(set));
+                                }
+                                _ => {
+                                    item.insert(real_name.to_string(), val.clone());
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if let Some(after_del) = rest.strip_prefix("DELETE ").or_else(|| rest.strip_prefix("delete ")) {
+            let next_clause_idx = find_next_clause(after_del);
+            let del_part = after_del[..next_clause_idx].trim();
+            rest = after_del[next_clause_idx..].trim();
+
+            for assignment in del_part.split(',') {
+                let parts: Vec<&str> = assignment.split_whitespace().collect();
+                if parts.len() == 2 {
+                    let left = parts[0];
+                    let right = parts[1];
+                    let real_name = if let Some(map) = attr_names {
+                        map.get(left).map(|s| s.as_str()).unwrap_or(left)
+                    } else {
+                        left
+                    };
+                    if let Some(map) = attr_values {
+                        if let Some(val) = map.get(right) {
+                            match val {
+                                AttributeValue::SS(rem_set) => {
+                                    if let Some(AttributeValue::SS(existing)) = item.get_mut(real_name) {
+                                        existing.retain(|x| !rem_set.contains(x));
+                                    }
+                                }
+                                AttributeValue::NS(rem_set) => {
+                                    if let Some(AttributeValue::NS(existing)) = item.get_mut(real_name) {
+                                        existing.retain(|x| !rem_set.contains(x));
+                                    }
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            break;
         }
     }
 
     Ok(())
+}
+
+fn find_next_clause(s: &str) -> usize {
+    let s_upper = s.to_uppercase();
+    let set_idx = s_upper.find(" SET ").map(|i| i + 1);
+    let rem_idx = s_upper.find(" REMOVE ").map(|i| i + 1);
+    let add_idx = s_upper.find(" ADD ").map(|i| i + 1);
+    let del_idx = s_upper.find(" DELETE ").map(|i| i + 1);
+
+    let candidates = [set_idx, rem_idx, add_idx, del_idx];
+    candidates.into_iter().flatten().min().unwrap_or(s.len())
 }

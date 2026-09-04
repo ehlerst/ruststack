@@ -270,6 +270,34 @@ pub fn xml_empty_response(action: &str, request_id: &str) -> String {
     )
 }
 
+pub fn xml_list_queue_tags_response(tags: &HashMap<String, String>, request_id: &str) -> String {
+    let mut xml = r#"<?xml version="1.0"?>
+<ListQueueTagsResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
+    <ListQueueTagsResult>"#
+        .to_string();
+    for (k, v) in tags {
+        xml.push_str(&format!(
+            r#"
+        <Tag>
+            <Key>{}</Key>
+            <Value>{}</Value>
+        </Tag>"#,
+            quick_xml::escape::escape(k),
+            quick_xml::escape::escape(v)
+        ));
+    }
+    xml.push_str(&format!(
+        r#"
+    </ListQueueTagsResult>
+    <ResponseMetadata>
+        <RequestId>{}</RequestId>
+    </ResponseMetadata>
+</ListQueueTagsResponse>"#,
+        quick_xml::escape::escape(request_id)
+    ));
+    xml
+}
+
 pub fn xml_delete_message_batch_response(
     successful: &[String],
     failed: &[BatchErrorEntry],

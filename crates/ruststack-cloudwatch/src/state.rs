@@ -110,6 +110,7 @@ pub struct CloudWatchState {
     pub region: String,
     pub series: Arc<DashMap<MetricKey, Arc<RwLock<MetricSeries>>>>,
     pub alarms: Arc<DashMap<String, MetricAlarm>>,
+    pub sns_engine: Arc<RwLock<Option<Arc<ruststack_sns::SnsEngine>>>>,
 }
 
 impl CloudWatchState {
@@ -119,7 +120,12 @@ impl CloudWatchState {
             region,
             series: Arc::new(DashMap::new()),
             alarms: Arc::new(DashMap::new()),
+            sns_engine: Arc::new(RwLock::new(None)),
         }
+    }
+
+    pub fn set_sns_engine(&self, engine: Arc<ruststack_sns::SnsEngine>) {
+        *self.sns_engine.write() = Some(engine);
     }
 
     pub fn alarm_arn(&self, alarm_name: &str) -> String {
@@ -657,18 +663,63 @@ impl CloudWatchState {
     }
 
     pub fn set_alarm_state(&self, req: SetAlarmStateRequest) -> Result<(), CloudWatchError> {
-        if let Some(mut entry) = self.alarms.get_mut(&req.alarm_name) {
-            entry.state_value = req.state_value;
-            entry.state_reason = Some(req.state_reason);
-            entry.state_reason_data = req.state_reason_data;
+        let (alarm_clone, old_state) = if let Some(mut entry) = self.alarms.get_mut(&req.alarm_name) {
+            let old_state = entry.state_value.clone();
+            entry.state_value = req.state_value.clone();
+            entry.state_reason = Some(req.state_reason.clone());
+            entry.state_reason_data = req.state_reason_data.clone();
             entry.state_updated_timestamp = Some(Utc::now());
-            Ok(())
+            (entry.clone(), old_state)
         } else {
-            Err(CloudWatchError::ResourceNotFound(format!(
+            return Err(CloudWatchError::ResourceNotFound(format!(
                 "Alarm {} not found",
                 req.alarm_name
-            )))
+            )));
+        };
+
+        // Dispatch Alarm Actions if enabled
+        if alarm_clone.actions_enabled.unwrap_or(true) {
+            let actions = match req.state_value.to_uppercase().as_str() {
+                "ALARM" => alarm_clone.alarm_actions.clone().unwrap_or_default(),
+                "OK" => alarm_clone.ok_actions.clone().unwrap_or_default(),
+                "INSUFFICIENT_DATA" => {
+                    alarm_clone.insufficient_data_actions.clone().unwrap_or_default()
+                }
+                _ => Vec::new(),
+            };
+
+            let sns_opt = self.sns_engine.read().clone();
+            if let Some(sns) = sns_opt {
+                let msg_payload = serde_json::json!({
+                    "AlarmName": req.alarm_name,
+                    "AlarmDescription": alarm_clone.alarm_description,
+                    "AWSAccountId": self.account_id,
+                    "NewStateValue": req.state_value,
+                    "NewStateReason": req.state_reason,
+                    "StateChangeTime": Utc::now().to_rfc3339(),
+                    "Region": self.region,
+                    "OldStateValue": old_state
+                })
+                .to_string();
+
+                let subject = format!("ALARM: \"{}\" in {}", req.alarm_name, self.region);
+
+                for action_arn in actions {
+                    if action_arn.starts_with("arn:aws:sns:") {
+                        let _ = sns.publish(
+                            &action_arn,
+                            msg_payload.clone(),
+                            Some(subject.clone()),
+                            None,
+                            None,
+                            None,
+                        );
+                    }
+                }
+            }
         }
+
+        Ok(())
     }
 
     pub fn enable_alarm_actions(&self, alarm_names: &[String]) -> Result<(), CloudWatchError> {
