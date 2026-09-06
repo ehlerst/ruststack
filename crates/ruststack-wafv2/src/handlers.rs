@@ -31,14 +31,25 @@ pub async fn handle_wafv2_request(
             let default_action = val["DefaultAction"].clone();
             let description = val["Description"].as_str().map(String::from);
             let rules = val["Rules"].as_array().cloned();
-            let vis_cfg: VisibilityConfig = match serde_json::from_value(val["VisibilityConfig"].clone()) {
-                Ok(c) => c,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "WAFInvalidParameterException", &e.to_string()),
-            };
+            let vis_cfg: VisibilityConfig =
+                match serde_json::from_value(val["VisibilityConfig"].clone()) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        return error_response(
+                            StatusCode::BAD_REQUEST,
+                            "WAFInvalidParameterException",
+                            &e.to_string(),
+                        )
+                    }
+                };
 
             match state.create_web_acl(name, scope, default_action, description, rules, vis_cfg) {
                 Ok(summary) => json_response(StatusCode::OK, json!({ "Summary": summary })),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "WAFDuplicateItemException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "WAFDuplicateItemException",
+                    &e.to_string(),
+                ),
             }
         }
         "GetWebACL" => {
@@ -47,12 +58,19 @@ pub async fn handle_wafv2_request(
             match state.get_web_acl(name, id) {
                 Ok(acl) => {
                     let lock_token = acl.lock_token.clone();
-                    json_response(StatusCode::OK, json!({
-                        "WebACL": acl,
-                        "LockToken": lock_token
-                    }))
+                    json_response(
+                        StatusCode::OK,
+                        json!({
+                            "WebACL": acl,
+                            "LockToken": lock_token
+                        }),
+                    )
                 }
-                Err(e) => error_response(StatusCode::NOT_FOUND, "WAFNonexistentItemException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::NOT_FOUND,
+                    "WAFNonexistentItemException",
+                    &e.to_string(),
+                ),
             }
         }
         "ListWebACLs" => {
@@ -63,7 +81,11 @@ pub async fn handle_wafv2_request(
             let id = val["Id"].as_str().unwrap_or_default();
             match state.delete_web_acl(id) {
                 Ok(_) => json_response(StatusCode::OK, json!({})),
-                Err(e) => error_response(StatusCode::NOT_FOUND, "WAFNonexistentItemException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::NOT_FOUND,
+                    "WAFNonexistentItemException",
+                    &e.to_string(),
+                ),
             }
         }
         "AssociateWebACL" => {
@@ -89,15 +111,26 @@ pub async fn handle_wafv2_request(
             let name = val["Name"].as_str().unwrap_or_default().to_string();
             let scope = val["Scope"].as_str().unwrap_or("REGIONAL");
             let description = val["Description"].as_str().map(String::from);
-            let ip_version = val["IPAddressVersion"].as_str().unwrap_or("IPV4").to_string();
+            let ip_version = val["IPAddressVersion"]
+                .as_str()
+                .unwrap_or("IPV4")
+                .to_string();
             let addresses = val["Addresses"]
                 .as_array()
-                .map(|a| a.iter().filter_map(|s| s.as_str().map(String::from)).collect())
+                .map(|a| {
+                    a.iter()
+                        .filter_map(|s| s.as_str().map(String::from))
+                        .collect()
+                })
                 .unwrap_or_default();
 
             match state.create_ip_set(name, scope, description, ip_version, addresses) {
                 Ok(summary) => json_response(StatusCode::OK, json!({ "Summary": summary })),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "WAFDuplicateItemException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "WAFDuplicateItemException",
+                    &e.to_string(),
+                ),
             }
         }
         "GetIPSet" => {
@@ -106,12 +139,19 @@ pub async fn handle_wafv2_request(
             match state.get_ip_set(name, id) {
                 Ok(set) => {
                     let lock_token = set.lock_token.clone();
-                    json_response(StatusCode::OK, json!({
-                        "IPSet": set,
-                        "LockToken": lock_token
-                    }))
+                    json_response(
+                        StatusCode::OK,
+                        json!({
+                            "IPSet": set,
+                            "LockToken": lock_token
+                        }),
+                    )
                 }
-                Err(e) => error_response(StatusCode::NOT_FOUND, "WAFNonexistentItemException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::NOT_FOUND,
+                    "WAFNonexistentItemException",
+                    &e.to_string(),
+                ),
             }
         }
         "ListIPSets" => {

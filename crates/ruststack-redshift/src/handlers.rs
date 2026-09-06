@@ -38,7 +38,9 @@ pub async fn handle_redshift_request(
             let node_type = params.get("NodeType").cloned();
             let master_username = params.get("MasterUsername").cloned();
             let db_name = params.get("DBName").cloned();
-            let number_of_nodes = params.get("NumberOfNodes").and_then(|s| s.parse::<i32>().ok());
+            let number_of_nodes = params
+                .get("NumberOfNodes")
+                .and_then(|s| s.parse::<i32>().ok());
             let encrypted = params.get("Encrypted").map(|s| s == "true");
 
             match state.create_cluster(
@@ -69,7 +71,9 @@ pub async fn handle_redshift_request(
                         .body(Body::from(xml))
                         .unwrap()
                 }
-                Err(e) => render_redshift_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id),
+                Err(e) => {
+                    render_redshift_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id)
+                }
             }
         }
         "DescribeClusters" => {
@@ -126,7 +130,10 @@ pub async fn handle_redshift_request(
             }
         }
         "CreateClusterSnapshot" => {
-            let snapshot_id = params.get("SnapshotIdentifier").cloned().unwrap_or_default();
+            let snapshot_id = params
+                .get("SnapshotIdentifier")
+                .cloned()
+                .unwrap_or_default();
             let cluster_id = params.get("ClusterIdentifier").cloned().unwrap_or_default();
             match state.create_cluster_snapshot(snapshot_id, cluster_id) {
                 Ok(sn) => {
@@ -148,7 +155,16 @@ pub async fn handle_redshift_request(
     <RequestId>{}</RequestId>
   </ResponseMetadata>
 </CreateClusterSnapshotResponse>"#,
-                        REDSHIFT_XMLNS, sn.snapshot_identifier, sn.cluster_identifier, sn.status, sn.node_type, sn.number_of_nodes, sn.db_name, sn.master_username, sn.encrypted, request_id
+                        REDSHIFT_XMLNS,
+                        sn.snapshot_identifier,
+                        sn.cluster_identifier,
+                        sn.status,
+                        sn.node_type,
+                        sn.number_of_nodes,
+                        sn.db_name,
+                        sn.master_username,
+                        sn.encrypted,
+                        request_id
                     );
                     Response::builder()
                         .status(StatusCode::OK)
@@ -156,15 +172,20 @@ pub async fn handle_redshift_request(
                         .body(Body::from(xml))
                         .unwrap()
                 }
-                Err(e) => render_redshift_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id),
+                Err(e) => {
+                    render_redshift_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id)
+                }
             }
         }
         "DescribeClusterSnapshots" => {
             let snapshot_id = params.get("SnapshotIdentifier").map(|s| s.as_str());
             match state.describe_cluster_snapshots(snapshot_id) {
                 Ok(snapshots) => {
-                    let items_xml: String = snapshots.iter().map(|sn| format!(
-                        r#"<Snapshot>
+                    let items_xml: String = snapshots
+                        .iter()
+                        .map(|sn| {
+                            format!(
+                                r#"<Snapshot>
   <SnapshotIdentifier>{}</SnapshotIdentifier>
   <ClusterIdentifier>{}</ClusterIdentifier>
   <Status>{}</Status>
@@ -174,8 +195,17 @@ pub async fn handle_redshift_request(
   <MasterUsername>{}</MasterUsername>
   <Encrypted>{}</Encrypted>
 </Snapshot>"#,
-                        sn.snapshot_identifier, sn.cluster_identifier, sn.status, sn.node_type, sn.number_of_nodes, sn.db_name, sn.master_username, sn.encrypted
-                    )).collect();
+                                sn.snapshot_identifier,
+                                sn.cluster_identifier,
+                                sn.status,
+                                sn.node_type,
+                                sn.number_of_nodes,
+                                sn.db_name,
+                                sn.master_username,
+                                sn.encrypted
+                            )
+                        })
+                        .collect();
 
                     let xml = format!(
                         r#"<DescribeClusterSnapshotsResponse xmlns="{}">
@@ -199,13 +229,20 @@ pub async fn handle_redshift_request(
                 Err(e) => render_redshift_error(&e.to_string(), StatusCode::NOT_FOUND, &request_id),
             }
         }
-        _ => render_redshift_error(&format!("Unknown Action: {}", action), StatusCode::BAD_REQUEST, &request_id),
+        _ => render_redshift_error(
+            &format!("Unknown Action: {}", action),
+            StatusCode::BAD_REQUEST,
+            &request_id,
+        ),
     }
 }
 
 fn render_cluster(cl: &RedshiftCluster) -> String {
     let ep_xml = if let Some(ref ep) = cl.endpoint {
-        format!("<Endpoint><Address>{}</Address><Port>{}</Port></Endpoint>", ep.address, ep.port)
+        format!(
+            "<Endpoint><Address>{}</Address><Port>{}</Port></Endpoint>",
+            ep.address, ep.port
+        )
     } else {
         "".to_string()
     };

@@ -33,14 +33,14 @@ async fn test_acm_request_and_describe_compat() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["Certificate"]["DomainName"], "app.domain.com");
     assert_eq!(body["Certificate"]["Status"], "ISSUED");
-    assert!(body["Certificate"]["DomainValidationOptions"].as_array().unwrap().len() >= 1);
+    assert!(!body["Certificate"]["DomainValidationOptions"]
+        .as_array()
+        .unwrap()
+        .is_empty());
 
     // 3. List Certificates
     let (status, body) = client
-        .call_json(
-            "CertificateManager.ListCertificates",
-            json!({}),
-        )
+        .call_json("CertificateManager.ListCertificates", json!({}))
         .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["CertificateSummaryList"].as_array().unwrap().len(), 1);

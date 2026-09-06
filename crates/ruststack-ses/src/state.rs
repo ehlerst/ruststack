@@ -256,10 +256,15 @@ impl SesState {
     pub fn create_template(&self, req: CreateTemplateRequest) -> Result<(), SesError> {
         let name = req.template.template_name.trim();
         if name.is_empty() {
-            return Err(SesError::InvalidParameter("TemplateName is required".to_string()));
+            return Err(SesError::InvalidParameter(
+                "TemplateName is required".to_string(),
+            ));
         }
         if self.templates.contains_key(name) {
-            return Err(SesError::AlreadyExists(format!("Template {} already exists", name)));
+            return Err(SesError::AlreadyExists(format!(
+                "Template {} already exists",
+                name
+            )));
         }
         self.templates.insert(name.to_string(), req.template);
         Ok(())
@@ -288,7 +293,10 @@ impl SesState {
     pub fn update_template(&self, req: UpdateTemplateRequest) -> Result<(), SesError> {
         let name = req.template.template_name.trim();
         if !self.templates.contains_key(name) {
-            return Err(SesError::NotFound(format!("Template {} does not exist", name)));
+            return Err(SesError::NotFound(format!(
+                "Template {} does not exist",
+                name
+            )));
         }
         self.templates.insert(name.to_string(), req.template);
         Ok(())
@@ -408,6 +416,7 @@ fn render_template(template_str: &str, data: &serde_json::Value) -> String {
     rendered
 }
 
+#[allow(clippy::type_complexity)]
 fn parse_raw_email(
     raw_input: &str,
 ) -> (

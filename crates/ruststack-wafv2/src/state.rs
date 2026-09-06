@@ -59,8 +59,18 @@ impl Wafv2State {
         rules: Option<Vec<serde_json::Value>>,
         visibility_config: VisibilityConfig,
     ) -> Result<WebACLSummary, Wafv2Error> {
-        let region = if scope == "CLOUDFRONT" { "global" } else { &self.region };
-        let arn_prefix = format!("arn:aws:wafv2:{}:{}:{}/webacl/{}", region, self.account_id, scope.to_lowercase(), name);
+        let region = if scope == "CLOUDFRONT" {
+            "global"
+        } else {
+            &self.region
+        };
+        let arn_prefix = format!(
+            "arn:aws:wafv2:{}:{}:{}/webacl/{}",
+            region,
+            self.account_id,
+            scope.to_lowercase(),
+            name
+        );
 
         for kv in self.web_acls.iter() {
             if kv.value().name == name {
@@ -159,10 +169,18 @@ impl Wafv2State {
         addresses: Vec<String>,
     ) -> Result<IPSetSummary, Wafv2Error> {
         let id = Uuid::new_v4().to_string();
-        let region = if scope == "CLOUDFRONT" { "global" } else { &self.region };
+        let region = if scope == "CLOUDFRONT" {
+            "global"
+        } else {
+            &self.region
+        };
         let arn = format!(
             "arn:aws:wafv2:{}:{}:{}/ipset/{}/{}",
-            region, self.account_id, scope.to_lowercase(), name, id
+            region,
+            self.account_id,
+            scope.to_lowercase(),
+            name,
+            id
         );
         let lock_token = Uuid::new_v4().to_string();
 

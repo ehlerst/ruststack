@@ -242,7 +242,7 @@ pub async fn handle_cloudwatch_request(
 
                         let xml = format!(
                             r#"<GetMetricStatisticsResponse xmlns="http://monitoring.amazonaws.com/doc/2010-08-01/"><GetMetricStatisticsResult><Label>{}</Label><Datapoints>{}</Datapoints></GetMetricStatisticsResult><ResponseMetadata><RequestId>{}</RequestId></ResponseMetadata></GetMetricStatisticsResponse>"#,
-                            escape(&resp.label.unwrap_or_default()),
+                            escape(resp.label.as_deref().unwrap_or_default()),
                             points_xml,
                             request_id
                         );

@@ -580,7 +580,9 @@ pub fn parse_put_bucket_versioning(body: &[u8]) -> Result<String, RustStackError
     let text = String::from_utf8_lossy(body);
     if text.contains("<Status>Enabled</Status>") || text.contains("<Status>enabled</Status>") {
         Ok("Enabled".to_string())
-    } else if text.contains("<Status>Suspended</Status>") || text.contains("<Status>suspended</Status>") {
+    } else if text.contains("<Status>Suspended</Status>")
+        || text.contains("<Status>suspended</Status>")
+    {
         Ok("Suspended".to_string())
     } else {
         Ok("Enabled".to_string())
@@ -602,16 +604,28 @@ pub fn serialize_list_object_versions(res: &crate::types::ListObjectVersionsResu
     );
 
     if let Some(ref km) = res.key_marker {
-        xml.push_str(&format!("\n    <KeyMarker>{}</KeyMarker>", quick_xml::escape::escape(km)));
+        xml.push_str(&format!(
+            "\n    <KeyMarker>{}</KeyMarker>",
+            quick_xml::escape::escape(km)
+        ));
     }
     if let Some(ref vm) = res.version_id_marker {
-        xml.push_str(&format!("\n    <VersionIdMarker>{}</VersionIdMarker>", quick_xml::escape::escape(vm)));
+        xml.push_str(&format!(
+            "\n    <VersionIdMarker>{}</VersionIdMarker>",
+            quick_xml::escape::escape(vm)
+        ));
     }
     if let Some(ref nkm) = res.next_key_marker {
-        xml.push_str(&format!("\n    <NextKeyMarker>{}</NextKeyMarker>", quick_xml::escape::escape(nkm)));
+        xml.push_str(&format!(
+            "\n    <NextKeyMarker>{}</NextKeyMarker>",
+            quick_xml::escape::escape(nkm)
+        ));
     }
     if let Some(ref nvm) = res.next_version_id_marker {
-        xml.push_str(&format!("\n    <NextVersionIdMarker>{}</NextVersionIdMarker>", quick_xml::escape::escape(nvm)));
+        xml.push_str(&format!(
+            "\n    <NextVersionIdMarker>{}</NextVersionIdMarker>",
+            quick_xml::escape::escape(nvm)
+        ));
     }
 
     for v in &res.versions {
@@ -668,14 +682,23 @@ pub fn serialize_get_bucket_lifecycle(config: &crate::types::BucketLifecycleConf
     for r in &config.rules {
         xml.push_str("\n    <Rule>");
         if let Some(ref id) = r.id {
-            xml.push_str(&format!("\n        <ID>{}</ID>", quick_xml::escape::escape(id)));
+            xml.push_str(&format!(
+                "\n        <ID>{}</ID>",
+                quick_xml::escape::escape(id)
+            ));
         }
         xml.push_str(&format!("\n        <Status>{}</Status>", r.status));
         if let Some(ref prefix) = r.prefix {
-            xml.push_str(&format!("\n        <Filter><Prefix>{}</Prefix></Filter>", quick_xml::escape::escape(prefix)));
+            xml.push_str(&format!(
+                "\n        <Filter><Prefix>{}</Prefix></Filter>",
+                quick_xml::escape::escape(prefix)
+            ));
         }
         if let Some(days) = r.expiration_days {
-            xml.push_str(&format!("\n        <Expiration><Days>{}</Days></Expiration>", days));
+            xml.push_str(&format!(
+                "\n        <Expiration><Days>{}</Days></Expiration>",
+                days
+            ));
         }
         xml.push_str("\n    </Rule>");
     }
@@ -683,7 +706,9 @@ pub fn serialize_get_bucket_lifecycle(config: &crate::types::BucketLifecycleConf
     xml
 }
 
-pub fn parse_put_bucket_lifecycle(body: &[u8]) -> Result<crate::types::BucketLifecycleConfig, RustStackError> {
+pub fn parse_put_bucket_lifecycle(
+    body: &[u8],
+) -> Result<crate::types::BucketLifecycleConfig, RustStackError> {
     use quick_xml::events::Event;
     use quick_xml::Reader;
 
@@ -704,7 +729,9 @@ pub fn parse_put_bucket_lifecycle(body: &[u8]) -> Result<crate::types::BucketLif
                 current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
             }
             Ok(Event::Text(e)) => {
-                let text = e.unescape().map_err(|err| RustStackError::BadRequest(err.to_string()))?;
+                let text = e
+                    .unescape()
+                    .map_err(|err| RustStackError::BadRequest(err.to_string()))?;
                 match current_tag.as_str() {
                     "ID" => current_id = Some(text.to_string()),
                     "Status" => current_status = text.to_string(),
@@ -725,7 +752,12 @@ pub fn parse_put_bucket_lifecycle(body: &[u8]) -> Result<crate::types::BucketLif
                 }
             }
             Ok(Event::Eof) => break,
-            Err(e) => return Err(RustStackError::BadRequest(format!("XML parse error: {}", e))),
+            Err(e) => {
+                return Err(RustStackError::BadRequest(format!(
+                    "XML parse error: {}",
+                    e
+                )))
+            }
             _ => {}
         }
         buf.clear();
@@ -739,22 +771,40 @@ pub fn serialize_get_bucket_cors(config: &crate::types::BucketCorsConfig) -> Str
     for r in &config.rules {
         xml.push_str("\n    <CORSRule>");
         if let Some(ref id) = r.id {
-            xml.push_str(&format!("\n        <ID>{}</ID>", quick_xml::escape::escape(id)));
+            xml.push_str(&format!(
+                "\n        <ID>{}</ID>",
+                quick_xml::escape::escape(id)
+            ));
         }
         for m in &r.allowed_methods {
-            xml.push_str(&format!("\n        <AllowedMethod>{}</AllowedMethod>", quick_xml::escape::escape(m)));
+            xml.push_str(&format!(
+                "\n        <AllowedMethod>{}</AllowedMethod>",
+                quick_xml::escape::escape(m)
+            ));
         }
         for o in &r.allowed_origins {
-            xml.push_str(&format!("\n        <AllowedOrigin>{}</AllowedOrigin>", quick_xml::escape::escape(o)));
+            xml.push_str(&format!(
+                "\n        <AllowedOrigin>{}</AllowedOrigin>",
+                quick_xml::escape::escape(o)
+            ));
         }
         for h in &r.allowed_headers {
-            xml.push_str(&format!("\n        <AllowedHeader>{}</AllowedHeader>", quick_xml::escape::escape(h)));
+            xml.push_str(&format!(
+                "\n        <AllowedHeader>{}</AllowedHeader>",
+                quick_xml::escape::escape(h)
+            ));
         }
         for eh in &r.expose_headers {
-            xml.push_str(&format!("\n        <ExposeHeader>{}</ExposeHeader>", quick_xml::escape::escape(eh)));
+            xml.push_str(&format!(
+                "\n        <ExposeHeader>{}</ExposeHeader>",
+                quick_xml::escape::escape(eh)
+            ));
         }
         if let Some(max_age) = r.max_age_seconds {
-            xml.push_str(&format!("\n        <MaxAgeSeconds>{}</MaxAgeSeconds>", max_age));
+            xml.push_str(&format!(
+                "\n        <MaxAgeSeconds>{}</MaxAgeSeconds>",
+                max_age
+            ));
         }
         xml.push_str("\n    </CORSRule>");
     }
@@ -762,7 +812,9 @@ pub fn serialize_get_bucket_cors(config: &crate::types::BucketCorsConfig) -> Str
     xml
 }
 
-pub fn parse_put_bucket_cors(body: &[u8]) -> Result<crate::types::BucketCorsConfig, RustStackError> {
+pub fn parse_put_bucket_cors(
+    body: &[u8],
+) -> Result<crate::types::BucketCorsConfig, RustStackError> {
     use quick_xml::events::Event;
     use quick_xml::Reader;
 
@@ -785,7 +837,9 @@ pub fn parse_put_bucket_cors(body: &[u8]) -> Result<crate::types::BucketCorsConf
                 current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
             }
             Ok(Event::Text(e)) => {
-                let text = e.unescape().map_err(|err| RustStackError::BadRequest(err.to_string()))?;
+                let text = e
+                    .unescape()
+                    .map_err(|err| RustStackError::BadRequest(err.to_string()))?;
                 match current_tag.as_str() {
                     "ID" => current_id = Some(text.to_string()),
                     "AllowedMethod" => methods.push(text.to_string()),
@@ -810,7 +864,12 @@ pub fn parse_put_bucket_cors(body: &[u8]) -> Result<crate::types::BucketCorsConf
                 }
             }
             Ok(Event::Eof) => break,
-            Err(e) => return Err(RustStackError::BadRequest(format!("XML parse error: {}", e))),
+            Err(e) => {
+                return Err(RustStackError::BadRequest(format!(
+                    "XML parse error: {}",
+                    e
+                )))
+            }
             _ => {}
         }
         buf.clear();
@@ -832,7 +891,9 @@ pub fn serialize_get_bucket_tagging(tags: &std::collections::HashMap<String, Str
     xml
 }
 
-pub fn parse_put_bucket_tagging(body: &[u8]) -> Result<std::collections::HashMap<String, String>, RustStackError> {
+pub fn parse_put_bucket_tagging(
+    body: &[u8],
+) -> Result<std::collections::HashMap<String, String>, RustStackError> {
     use quick_xml::events::Event;
     use quick_xml::Reader;
 
@@ -851,7 +912,9 @@ pub fn parse_put_bucket_tagging(body: &[u8]) -> Result<std::collections::HashMap
                 current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
             }
             Ok(Event::Text(e)) => {
-                let text = e.unescape().map_err(|err| RustStackError::BadRequest(err.to_string()))?;
+                let text = e
+                    .unescape()
+                    .map_err(|err| RustStackError::BadRequest(err.to_string()))?;
                 if current_tag == "Key" {
                     current_key = Some(text.to_string());
                 } else if current_tag == "Value" {
@@ -867,7 +930,12 @@ pub fn parse_put_bucket_tagging(body: &[u8]) -> Result<std::collections::HashMap
                 }
             }
             Ok(Event::Eof) => break,
-            Err(e) => return Err(RustStackError::BadRequest(format!("XML parse error: {}", e))),
+            Err(e) => {
+                return Err(RustStackError::BadRequest(format!(
+                    "XML parse error: {}",
+                    e
+                )))
+            }
             _ => {}
         }
         buf.clear();

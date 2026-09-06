@@ -2,8 +2,8 @@ use axum::extract::State;
 use axum::http::{HeaderMap, Method, StatusCode, Uri};
 use bytes::Bytes;
 use ruststack_route53::handle_route53_request;
-use ruststack_route53::Route53State;
 use ruststack_route53::types::*;
+use ruststack_route53::Route53State;
 
 #[tokio::test]
 async fn test_route53_hosted_zone_and_rrset_lifecycle() {
@@ -83,7 +83,10 @@ async fn test_route53_hosted_zone_and_rrset_lifecycle() {
     .await;
 
     assert_eq!(resp.status(), StatusCode::OK);
-    let body = http_body_util::BodyExt::collect(resp.into_body()).await.unwrap().to_bytes();
+    let body = http_body_util::BodyExt::collect(resp.into_body())
+        .await
+        .unwrap()
+        .to_bytes();
     let json_resp: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(json_resp.get("ResourceRecordSets").is_some());
 }

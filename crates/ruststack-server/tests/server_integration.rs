@@ -503,7 +503,10 @@ async fn test_server_unified_routing() {
             Request::builder()
                 .method(Method::POST)
                 .uri("/")
-                .header("x-amz-target", "AWSCognitoIdentityProviderService.CreateUserPool")
+                .header(
+                    "x-amz-target",
+                    "AWSCognitoIdentityProviderService.CreateUserPool",
+                )
                 .header("content-type", "application/x-amz-json-1.1")
                 .body(Body::from(
                     serde_json::json!({
@@ -605,7 +608,10 @@ async fn test_server_unified_routing() {
             Request::builder()
                 .method(Method::POST)
                 .uri("/")
-                .header("x-amz-target", "AmazonEC2ContainerRegistry_V20150921.CreateRepository")
+                .header(
+                    "x-amz-target",
+                    "AmazonEC2ContainerRegistry_V20150921.CreateRepository",
+                )
                 .header("content-type", "application/x-amz-json-1.1")
                 .body(Body::from(
                     serde_json::json!({
@@ -626,7 +632,10 @@ async fn test_server_unified_routing() {
             Request::builder()
                 .method(Method::POST)
                 .uri("/")
-                .header("x-amz-target", "AmazonEC2ContainerServiceV20141113.CreateCluster")
+                .header(
+                    "x-amz-target",
+                    "AmazonEC2ContainerServiceV20141113.CreateCluster",
+                )
                 .header("content-type", "application/x-amz-json-1.1")
                 .body(Body::from(
                     serde_json::json!({
@@ -648,9 +657,7 @@ async fn test_server_unified_routing() {
                 .method(Method::POST)
                 .uri("/")
                 .header("content-type", "application/x-www-form-urlencoded")
-                .body(Body::from(
-                    "Action=CreateVpc&CidrBlock=192.168.0.0/16",
-                ))
+                .body(Body::from("Action=CreateVpc&CidrBlock=192.168.0.0/16"))
                 .unwrap(),
         )
         .await
@@ -837,7 +844,10 @@ async fn test_server_unified_routing() {
             Request::builder()
                 .method(Method::POST)
                 .uri("/")
-                .header("x-amz-target", "AWSOrganizationsV20161128.CreateOrganization")
+                .header(
+                    "x-amz-target",
+                    "AWSOrganizationsV20161128.CreateOrganization",
+                )
                 .header("content-type", "application/x-amz-json-1.1")
                 .body(Body::from("{}"))
                 .unwrap(),

@@ -102,12 +102,15 @@ impl StepFunctionsState {
         &self,
         req: DescribeStateMachineRequest,
     ) -> Result<DescribeStateMachineResponse, StepFunctionsError> {
-        let sm_entry = self.state_machines.get(&req.state_machine_arn).ok_or_else(|| {
-            StepFunctionsError::StateMachineDoesNotExist(format!(
-                "State Machine {} not found",
-                req.state_machine_arn
-            ))
-        })?;
+        let sm_entry = self
+            .state_machines
+            .get(&req.state_machine_arn)
+            .ok_or_else(|| {
+                StepFunctionsError::StateMachineDoesNotExist(format!(
+                    "State Machine {} not found",
+                    req.state_machine_arn
+                ))
+            })?;
 
         let sm = sm_entry.read();
         Ok(DescribeStateMachineResponse {
@@ -166,12 +169,15 @@ impl StepFunctionsState {
         &self,
         req: StartExecutionRequest,
     ) -> Result<StartExecutionResponse, StepFunctionsError> {
-        let sm_entry = self.state_machines.get(&req.state_machine_arn).ok_or_else(|| {
-            StepFunctionsError::StateMachineDoesNotExist(format!(
-                "State Machine {} not found",
-                req.state_machine_arn
-            ))
-        })?;
+        let sm_entry = self
+            .state_machines
+            .get(&req.state_machine_arn)
+            .ok_or_else(|| {
+                StepFunctionsError::StateMachineDoesNotExist(format!(
+                    "State Machine {} not found",
+                    req.state_machine_arn
+                ))
+            })?;
 
         let sm = sm_entry.read().clone();
         let exec_name = req
@@ -211,7 +217,8 @@ impl StepFunctionsState {
         });
 
         // Run ASL interpreter engine
-        let execution_result = self.execute_asl(&sm.definition, input_val, &mut events, &mut event_id);
+        let execution_result =
+            self.execute_asl(&sm.definition, input_val, &mut events, &mut event_id);
 
         let stop_time = Utc::now().timestamp_millis() as f64 / 1000.0;
         let (status, output, error, cause) = match execution_result {
@@ -230,7 +237,12 @@ impl StepFunctionsState {
                     state_entered_event_details: None,
                     state_exited_event_details: None,
                 });
-                (ExecutionStatus::Succeeded, Some(out.to_string()), None, None)
+                (
+                    ExecutionStatus::Succeeded,
+                    Some(out.to_string()),
+                    None,
+                    None,
+                )
             }
             Err(e) => {
                 event_id += 1;
@@ -248,7 +260,12 @@ impl StepFunctionsState {
                     state_entered_event_details: None,
                     state_exited_event_details: None,
                 });
-                (ExecutionStatus::Failed, None, Some("ExecutionError".to_string()), Some(e))
+                (
+                    ExecutionStatus::Failed,
+                    None,
+                    Some("ExecutionError".to_string()),
+                    Some(e),
+                )
             }
         };
 
@@ -351,7 +368,9 @@ impl StepFunctionsState {
                                 )
                                 .map_err(|e| format!("Lambda task error: {}", e))?;
 
-                            if let Ok(res_val) = serde_json::from_slice::<serde_json::Value>(&inv.payload) {
+                            if let Ok(res_val) =
+                                serde_json::from_slice::<serde_json::Value>(&inv.payload)
+                            {
                                 current_data = res_val;
                             }
                         }
@@ -367,18 +386,25 @@ impl StepFunctionsState {
                                 let key = var_path.trim_start_matches("$.");
                                 let var_val = current_data.get(key);
 
-                                let is_match = if let Some(target_str) = rule.get("StringEquals").and_then(|v| v.as_str()) {
+                                let is_match = if let Some(target_str) =
+                                    rule.get("StringEquals").and_then(|v| v.as_str())
+                                {
                                     var_val.and_then(|v| v.as_str()) == Some(target_str)
-                                } else if let Some(target_num) = rule.get("NumericEquals").and_then(|v| v.as_f64()) {
+                                } else if let Some(target_num) =
+                                    rule.get("NumericEquals").and_then(|v| v.as_f64())
+                                {
                                     var_val.and_then(|v| v.as_f64()) == Some(target_num)
-                                } else if let Some(target_bool) = rule.get("BooleanEquals").and_then(|v| v.as_bool()) {
+                                } else if let Some(target_bool) =
+                                    rule.get("BooleanEquals").and_then(|v| v.as_bool())
+                                {
                                     var_val.and_then(|v| v.as_bool()) == Some(target_bool)
                                 } else {
                                     false
                                 };
 
                                 if is_match {
-                                    matched_next = rule.get("Next").and_then(|v| v.as_str()).map(String::from);
+                                    matched_next =
+                                        rule.get("Next").and_then(|v| v.as_str()).map(String::from);
                                     break;
                                 }
                             }
@@ -386,14 +412,20 @@ impl StepFunctionsState {
                     }
 
                     if matched_next.is_none() {
-                        matched_next = state_def.get("Default").and_then(|v| v.as_str()).map(String::from);
+                        matched_next = state_def
+                            .get("Default")
+                            .and_then(|v| v.as_str())
+                            .map(String::from);
                     }
 
                     if let Some(next_state) = matched_next {
                         current_state_name = next_state;
                         continue;
                     } else {
-                        return Err(format!("Choice state {} had no matching rule or Default", current_state_name));
+                        return Err(format!(
+                            "Choice state {} had no matching rule or Default",
+                            current_state_name
+                        ));
                     }
                 }
                 "Wait" => {
@@ -418,8 +450,14 @@ impl StepFunctionsState {
                     return Ok(current_data);
                 }
                 "Fail" => {
-                    let err = state_def.get("Error").and_then(|v| v.as_str()).unwrap_or("FailState");
-                    let cause = state_def.get("Cause").and_then(|v| v.as_str()).unwrap_or("FailState execution");
+                    let err = state_def
+                        .get("Error")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("FailState");
+                    let cause = state_def
+                        .get("Cause")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("FailState execution");
                     return Err(format!("{}: {}", err, cause));
                 }
                 _ => {}
@@ -441,7 +479,11 @@ impl StepFunctionsState {
                 })),
             });
 
-            if state_def.get("End").and_then(|v| v.as_bool()).unwrap_or(false) {
+            if state_def
+                .get("End")
+                .and_then(|v| v.as_bool())
+                .unwrap_or(false)
+            {
                 return Ok(current_data);
             }
 

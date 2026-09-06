@@ -213,12 +213,14 @@ fn xml_response(status: StatusCode, xml: &str) -> Response<Body> {
 
 fn error_response(err: CloudFormationError) -> Response<Body> {
     let (code, msg) = match &err {
-        CloudFormationError::StackAlreadyExists(name) => {
-            ("AlreadyExistsException", format!("Stack [{}] already exists", name))
-        }
-        CloudFormationError::StackNotFound(name) => {
-            ("ValidationError", format!("Stack with id {} does not exist", name))
-        }
+        CloudFormationError::StackAlreadyExists(name) => (
+            "AlreadyExistsException",
+            format!("Stack [{}] already exists", name),
+        ),
+        CloudFormationError::StackNotFound(name) => (
+            "ValidationError",
+            format!("Stack with id {} does not exist", name),
+        ),
         CloudFormationError::TemplateFormatError(msg) => {
             ("ValidationError", format!("Template format error: {}", msg))
         }

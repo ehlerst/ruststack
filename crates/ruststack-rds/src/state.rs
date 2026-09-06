@@ -56,6 +56,7 @@ impl RdsState {
         &self.region
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_db_instance(
         &self,
         identifier: String,
@@ -80,7 +81,10 @@ impl RdsState {
         };
 
         let endpoint = Endpoint {
-            address: format!("{}.{}.rds.localhost.localstack.cloud", identifier, self.region),
+            address: format!(
+                "{}.{}.rds.localhost.localstack.cloud",
+                identifier, self.region
+            ),
             port,
             hosted_zone_id: "Z2YGUSBFPMUBSH".to_string(),
         };
@@ -107,7 +111,10 @@ impl RdsState {
         Ok(instance)
     }
 
-    pub fn describe_db_instances(&self, identifier: Option<&str>) -> Result<Vec<DBInstance>, RdsError> {
+    pub fn describe_db_instances(
+        &self,
+        identifier: Option<&str>,
+    ) -> Result<Vec<DBInstance>, RdsError> {
         if let Some(id) = identifier {
             let inst = self
                 .instances
@@ -156,8 +163,14 @@ impl RdsState {
             status: "available".to_string(),
             master_username,
             database_name,
-            endpoint: Some(format!("{}.cluster-{}.rds.localhost.localstack.cloud", identifier, self.region)),
-            reader_endpoint: Some(format!("{}.cluster-ro-{}.rds.localhost.localstack.cloud", identifier, self.region)),
+            endpoint: Some(format!(
+                "{}.cluster-{}.rds.localhost.localstack.cloud",
+                identifier, self.region
+            )),
+            reader_endpoint: Some(format!(
+                "{}.cluster-ro-{}.rds.localhost.localstack.cloud",
+                identifier, self.region
+            )),
             port,
             cluster_create_time: Utc::now(),
             multi_az: true,
@@ -168,7 +181,10 @@ impl RdsState {
         Ok(cluster)
     }
 
-    pub fn describe_db_clusters(&self, identifier: Option<&str>) -> Result<Vec<DBCluster>, RdsError> {
+    pub fn describe_db_clusters(
+        &self,
+        identifier: Option<&str>,
+    ) -> Result<Vec<DBCluster>, RdsError> {
         if let Some(id) = identifier {
             let cl = self
                 .clusters
@@ -224,7 +240,8 @@ impl RdsState {
         self.clusters.clear();
         self.snapshots.clear();
         for inst in snapshot.instances {
-            self.instances.insert(inst.db_instance_identifier.clone(), inst);
+            self.instances
+                .insert(inst.db_instance_identifier.clone(), inst);
         }
         for cl in snapshot.clusters {
             self.clusters.insert(cl.db_cluster_identifier.clone(), cl);

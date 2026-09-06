@@ -65,14 +65,21 @@ impl RedshiftState {
         let num_nodes = number_of_nodes.unwrap_or(1);
         let now = Utc::now();
         let endpoint = RedshiftEndpoint {
-            address: format!("{}.{}.redshift.localhost.localstack.cloud", identifier, self.region),
+            address: format!(
+                "{}.{}.redshift.localhost.localstack.cloud",
+                identifier, self.region
+            ),
             port: 5439,
         };
 
         let mut nodes = Vec::new();
         for i in 0..num_nodes {
             nodes.push(ClusterNode {
-                node_role: if i == 0 { "LEADER".to_string() } else { "COMPUTE".to_string() },
+                node_role: if i == 0 {
+                    "LEADER".to_string()
+                } else {
+                    "COMPUTE".to_string()
+                },
                 private_ip_address: format!("10.0.0.{}", 10 + i),
                 public_ip_address: format!("54.214.13.{}", 10 + i),
             });
@@ -99,7 +106,10 @@ impl RedshiftState {
         Ok(cluster)
     }
 
-    pub fn describe_clusters(&self, identifier: Option<&str>) -> Result<Vec<RedshiftCluster>, RedshiftError> {
+    pub fn describe_clusters(
+        &self,
+        identifier: Option<&str>,
+    ) -> Result<Vec<RedshiftCluster>, RedshiftError> {
         if let Some(id) = identifier {
             let cl = self
                 .clusters
@@ -150,7 +160,10 @@ impl RedshiftState {
         Ok(snapshot)
     }
 
-    pub fn describe_cluster_snapshots(&self, snapshot_id: Option<&str>) -> Result<Vec<ClusterSnapshot>, RedshiftError> {
+    pub fn describe_cluster_snapshots(
+        &self,
+        snapshot_id: Option<&str>,
+    ) -> Result<Vec<ClusterSnapshot>, RedshiftError> {
         if let Some(id) = snapshot_id {
             let sn = self
                 .snapshots

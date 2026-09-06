@@ -43,7 +43,10 @@ impl EcsState {
 
         // Create default cluster
         let default_name = "default".to_string();
-        let default_arn = format!("arn:aws:ecs:{}:{}:cluster/{}", region, account_id, default_name);
+        let default_arn = format!(
+            "arn:aws:ecs:{}:{}:cluster/{}",
+            region, account_id, default_name
+        );
         state.clusters.insert(
             default_name.clone(),
             Cluster {
@@ -68,7 +71,10 @@ impl EcsState {
 
         // Restore default cluster
         let default_name = "default".to_string();
-        let default_arn = format!("arn:aws:ecs:{}:{}:cluster/{}", self.region, self.account_id, default_name);
+        let default_arn = format!(
+            "arn:aws:ecs:{}:{}:cluster/{}",
+            self.region, self.account_id, default_name
+        );
         self.clusters.insert(
             default_name.clone(),
             Cluster {
@@ -119,14 +125,20 @@ impl EcsState {
     }
 
     // Cluster APIs
-    pub fn create_cluster(&self, req: CreateClusterRequest) -> Result<CreateClusterResponse, EcsError> {
+    pub fn create_cluster(
+        &self,
+        req: CreateClusterRequest,
+    ) -> Result<CreateClusterResponse, EcsError> {
         let name = req.cluster_name.unwrap_or_else(|| "default".to_string());
         if self.clusters.contains_key(&name) {
             let cluster = self.clusters.get(&name).unwrap().clone();
             return Ok(CreateClusterResponse { cluster });
         }
 
-        let cluster_arn = format!("arn:aws:ecs:{}:{}:cluster/{}", self.region, self.account_id, name);
+        let cluster_arn = format!(
+            "arn:aws:ecs:{}:{}:cluster/{}",
+            self.region, self.account_id, name
+        );
         let cluster = Cluster {
             cluster_arn,
             cluster_name: name.clone(),
@@ -162,18 +174,31 @@ impl EcsState {
     }
 
     pub fn list_clusters(&self) -> ListClustersResponse {
-        let cluster_arns = self.clusters.iter().map(|kv| kv.value().cluster_arn.clone()).collect();
+        let cluster_arns = self
+            .clusters
+            .iter()
+            .map(|kv| kv.value().cluster_arn.clone())
+            .collect();
         ListClustersResponse { cluster_arns }
     }
 
-    pub fn delete_cluster(&self, req: DeleteClusterRequest) -> Result<DeleteClusterResponse, EcsError> {
+    pub fn delete_cluster(
+        &self,
+        req: DeleteClusterRequest,
+    ) -> Result<DeleteClusterResponse, EcsError> {
         let clean_name = req.cluster.rsplit('/').next().unwrap_or(&req.cluster);
-        let (_, cluster) = self.clusters.remove(clean_name).ok_or_else(|| EcsError::ClusterNotFound(req.cluster))?;
+        let (_, cluster) = self
+            .clusters
+            .remove(clean_name)
+            .ok_or(EcsError::ClusterNotFound(req.cluster))?;
         Ok(DeleteClusterResponse { cluster })
     }
 
     // Task Definition APIs
-    pub fn register_task_definition(&self, req: RegisterTaskDefinitionRequest) -> Result<RegisterTaskDefinitionResponse, EcsError> {
+    pub fn register_task_definition(
+        &self,
+        req: RegisterTaskDefinitionRequest,
+    ) -> Result<RegisterTaskDefinitionResponse, EcsError> {
         let mut entry = self.task_definitions.entry(req.family.clone()).or_default();
         let revision = (entry.len() + 1) as i32;
         let arn = format!(
@@ -196,11 +221,20 @@ impl EcsState {
         };
 
         entry.push(td.clone());
-        Ok(RegisterTaskDefinitionResponse { task_definition: td })
+        Ok(RegisterTaskDefinitionResponse {
+            task_definition: td,
+        })
     }
 
-    pub fn describe_task_definition(&self, req: DescribeTaskDefinitionRequest) -> Result<DescribeTaskDefinitionResponse, EcsError> {
-        let target = req.task_definition.rsplit('/').next().unwrap_or(&req.task_definition);
+    pub fn describe_task_definition(
+        &self,
+        req: DescribeTaskDefinitionRequest,
+    ) -> Result<DescribeTaskDefinitionResponse, EcsError> {
+        let target = req
+            .task_definition
+            .rsplit('/')
+            .next()
+            .unwrap_or(&req.task_definition);
         let (family, rev) = if target.contains(':') {
             let mut parts = target.split(':');
             let f = parts.next().unwrap();
@@ -210,25 +244,43 @@ impl EcsState {
             (target, None)
         };
 
-        let entry = self.task_definitions.get(family).ok_or_else(|| EcsError::TaskDefinitionNotFound(req.task_definition.clone()))?;
+        let entry = self
+            .task_definitions
+            .get(family)
+            .ok_or_else(|| EcsError::TaskDefinitionNotFound(req.task_definition.clone()))?;
         let td = if let Some(r) = rev {
-            entry.iter().find(|t| t.revision == r).ok_or_else(|| EcsError::TaskDefinitionNotFound(req.task_definition.clone()))?
+            entry
+                .iter()
+                .find(|t| t.revision == r)
+                .ok_or_else(|| EcsError::TaskDefinitionNotFound(req.task_definition.clone()))?
         } else {
-            entry.last().ok_or_else(|| EcsError::TaskDefinitionNotFound(req.task_definition.clone()))?
+            entry
+                .last()
+                .ok_or_else(|| EcsError::TaskDefinitionNotFound(req.task_definition.clone()))?
         };
 
-        Ok(DescribeTaskDefinitionResponse { task_definition: td.clone() })
+        Ok(DescribeTaskDefinitionResponse {
+            task_definition: td.clone(),
+        })
     }
 
-    pub fn deregister_task_definition(&self, req: DeregisterTaskDefinitionRequest) -> Result<DeregisterTaskDefinitionResponse, EcsError> {
+    pub fn deregister_task_definition(
+        &self,
+        req: DeregisterTaskDefinitionRequest,
+    ) -> Result<DeregisterTaskDefinitionResponse, EcsError> {
         let mut resp = self.describe_task_definition(DescribeTaskDefinitionRequest {
             task_definition: req.task_definition,
         })?;
         resp.task_definition.status = "INACTIVE".to_string();
-        Ok(DeregisterTaskDefinitionResponse { task_definition: resp.task_definition })
+        Ok(DeregisterTaskDefinitionResponse {
+            task_definition: resp.task_definition,
+        })
     }
 
-    pub fn list_task_definitions(&self, req: ListTaskDefinitionsRequest) -> ListTaskDefinitionsResponse {
+    pub fn list_task_definitions(
+        &self,
+        req: ListTaskDefinitionsRequest,
+    ) -> ListTaskDefinitionsResponse {
         let mut arns = Vec::new();
         for item in self.task_definitions.iter() {
             if let Some(ref prefix) = req.family_prefix {
@@ -245,14 +297,19 @@ impl EcsState {
                 arns.push(td.task_definition_arn.clone());
             }
         }
-        ListTaskDefinitionsResponse { task_definition_arns: arns }
+        ListTaskDefinitionsResponse {
+            task_definition_arns: arns,
+        }
     }
 
     // Task Execution APIs
     pub fn run_task(&self, req: RunTaskRequest) -> Result<RunTaskResponse, EcsError> {
         let cluster_name = req.cluster.unwrap_or_else(|| "default".to_string());
         let cluster_clean = cluster_name.rsplit('/').next().unwrap_or(&cluster_name);
-        let cluster = self.clusters.get(cluster_clean).ok_or_else(|| EcsError::ClusterNotFound(cluster_clean.to_string()))?;
+        let cluster = self
+            .clusters
+            .get(cluster_clean)
+            .ok_or_else(|| EcsError::ClusterNotFound(cluster_clean.to_string()))?;
 
         let td_resp = self.describe_task_definition(DescribeTaskDefinitionRequest {
             task_definition: req.task_definition,
@@ -264,18 +321,24 @@ impl EcsState {
 
         for _ in 0..count {
             let task_id = Uuid::new_v4().to_string();
-            let task_arn = format!("arn:aws:ecs:{}:{}:task/{}/{}", self.region, self.account_id, cluster_clean, task_id);
-            
-            let containers = td_resp.task_definition.container_definitions.iter().map(|cd| {
-                Container {
+            let task_arn = format!(
+                "arn:aws:ecs:{}:{}:task/{}/{}",
+                self.region, self.account_id, cluster_clean, task_id
+            );
+
+            let containers = td_resp
+                .task_definition
+                .container_definitions
+                .iter()
+                .map(|cd| Container {
                     container_arn: format!("{}/{}", task_arn, cd.name),
                     task_arn: task_arn.clone(),
                     name: cd.name.clone(),
                     last_status: "RUNNING".to_string(),
                     exit_code: None,
                     image: cd.image.clone(),
-                }
-            }).collect();
+                })
+                .collect();
 
             let task = Task {
                 task_arn: task_arn.clone(),
@@ -286,14 +349,20 @@ impl EcsState {
                 containers,
                 started_at: Some(now),
                 created_at: now,
-                launch_type: req.launch_type.clone().or_else(|| Some("FARGATE".to_string())),
+                launch_type: req
+                    .launch_type
+                    .clone()
+                    .or_else(|| Some("FARGATE".to_string())),
             };
 
             self.tasks.insert(task_arn, task.clone());
             tasks.push(task);
         }
 
-        Ok(RunTaskResponse { tasks, failures: vec![] })
+        Ok(RunTaskResponse {
+            tasks,
+            failures: vec![],
+        })
     }
 
     pub fn describe_tasks(&self, req: DescribeTasksRequest) -> DescribeTasksResponse {
@@ -320,7 +389,10 @@ impl EcsState {
     }
 
     pub fn stop_task(&self, req: StopTaskRequest) -> Result<StopTaskResponse, EcsError> {
-        let mut task = self.tasks.get_mut(&req.task).ok_or_else(|| EcsError::InvalidParameter("Task not found".to_string()))?;
+        let mut task = self
+            .tasks
+            .get_mut(&req.task)
+            .ok_or_else(|| EcsError::InvalidParameter("Task not found".to_string()))?;
         task.last_status = "STOPPED".to_string();
         task.desired_status = "STOPPED".to_string();
         for c in &mut task.containers {
@@ -331,16 +403,25 @@ impl EcsState {
     }
 
     // Service APIs
-    pub fn create_service(&self, req: CreateServiceRequest) -> Result<CreateServiceResponse, EcsError> {
+    pub fn create_service(
+        &self,
+        req: CreateServiceRequest,
+    ) -> Result<CreateServiceResponse, EcsError> {
         let cluster_name = req.cluster.unwrap_or_else(|| "default".to_string());
         let cluster_clean = cluster_name.rsplit('/').next().unwrap_or(&cluster_name);
-        let cluster = self.clusters.get(cluster_clean).ok_or_else(|| EcsError::ClusterNotFound(cluster_clean.to_string()))?;
+        let cluster = self
+            .clusters
+            .get(cluster_clean)
+            .ok_or_else(|| EcsError::ClusterNotFound(cluster_clean.to_string()))?;
 
         let td_resp = self.describe_task_definition(DescribeTaskDefinitionRequest {
             task_definition: req.task_definition.clone(),
         })?;
 
-        let service_arn = format!("arn:aws:ecs:{}:{}:service/{}/{}", self.region, self.account_id, cluster_clean, req.service_name);
+        let service_arn = format!(
+            "arn:aws:ecs:{}:{}:service/{}/{}",
+            self.region, self.account_id, cluster_clean, req.service_name
+        );
         let count = req.desired_count.unwrap_or(1);
         let now = Utc::now().timestamp_millis() as f64 / 1000.0;
 
@@ -380,9 +461,15 @@ impl EcsState {
         DescribeServicesResponse { services, failures }
     }
 
-    pub fn update_service(&self, req: UpdateServiceRequest) -> Result<UpdateServiceResponse, EcsError> {
+    pub fn update_service(
+        &self,
+        req: UpdateServiceRequest,
+    ) -> Result<UpdateServiceResponse, EcsError> {
         let clean = req.service.rsplit('/').next().unwrap_or(&req.service);
-        let mut service = self.services.get_mut(clean).ok_or_else(|| EcsError::ServiceNotFound(req.service))?;
+        let mut service = self
+            .services
+            .get_mut(clean)
+            .ok_or(EcsError::ServiceNotFound(req.service))?;
         if let Some(count) = req.desired_count {
             service.desired_count = count;
             service.running_count = count;
@@ -393,17 +480,29 @@ impl EcsState {
             })?;
             service.task_definition = td_resp.task_definition.task_definition_arn;
         }
-        Ok(UpdateServiceResponse { service: service.clone() })
+        Ok(UpdateServiceResponse {
+            service: service.clone(),
+        })
     }
 
-    pub fn delete_service(&self, req: DeleteServiceRequest) -> Result<DeleteServiceResponse, EcsError> {
+    pub fn delete_service(
+        &self,
+        req: DeleteServiceRequest,
+    ) -> Result<DeleteServiceResponse, EcsError> {
         let clean = req.service.rsplit('/').next().unwrap_or(&req.service);
-        let (_, service) = self.services.remove(clean).ok_or_else(|| EcsError::ServiceNotFound(req.service))?;
+        let (_, service) = self
+            .services
+            .remove(clean)
+            .ok_or(EcsError::ServiceNotFound(req.service))?;
         Ok(DeleteServiceResponse { service })
     }
 
     pub fn list_services(&self, _req: ListServicesRequest) -> ListServicesResponse {
-        let service_arns = self.services.iter().map(|kv| kv.value().service_arn.clone()).collect();
+        let service_arns = self
+            .services
+            .iter()
+            .map(|kv| kv.value().service_arn.clone())
+            .collect();
         ListServicesResponse { service_arns }
     }
 }

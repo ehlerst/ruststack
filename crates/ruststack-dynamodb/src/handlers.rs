@@ -672,16 +672,14 @@ async fn handle_dynamodb_json(
                         "TableName is required.",
                     )
                 })?;
-            let spec_val = json_val
-                .get("TimeToLiveSpecification")
-                .ok_or_else(|| {
-                    RustStackError::dynamodb_bad_request(
-                        "ValidationException",
-                        "TimeToLiveSpecification is required.",
-                    )
-                })?;
-            let spec: crate::types::TimeToLiveSpecification = serde_json::from_value(spec_val.clone())
-                .map_err(|e| {
+            let spec_val = json_val.get("TimeToLiveSpecification").ok_or_else(|| {
+                RustStackError::dynamodb_bad_request(
+                    "ValidationException",
+                    "TimeToLiveSpecification is required.",
+                )
+            })?;
+            let spec: crate::types::TimeToLiveSpecification =
+                serde_json::from_value(spec_val.clone()).map_err(|e| {
                     RustStackError::dynamodb_bad_request("ValidationException", e.to_string())
                 })?;
 
@@ -703,68 +701,58 @@ async fn handle_dynamodb_json(
             make_json_response(json!({ "TimeToLiveDescription": desc }), StatusCode::OK)
         }
 
-        "DescribeLimits" => {
-            make_json_response(
-                json!({
-                    "AccountMaxReadCapacityUnits": 80000,
-                    "AccountMaxWriteCapacityUnits": 80000,
-                    "TableMaxReadCapacityUnits": 40000,
-                    "TableMaxWriteCapacityUnits": 40000
-                }),
-                StatusCode::OK,
-            )
-        }
+        "DescribeLimits" => make_json_response(
+            json!({
+                "AccountMaxReadCapacityUnits": 80000,
+                "AccountMaxWriteCapacityUnits": 80000,
+                "TableMaxReadCapacityUnits": 40000,
+                "TableMaxWriteCapacityUnits": 40000
+            }),
+            StatusCode::OK,
+        ),
 
-        "DescribeEndpoints" => {
-            make_json_response(
-                json!({
-                    "Endpoints": [
-                        {
-                            "Address": "localhost:4566",
-                            "CachePeriodInMinutes": 1440
-                        }
-                    ]
-                }),
-                StatusCode::OK,
-            )
-        }
-
-        "ListGlobalTables" => {
-            make_json_response(
-                json!({
-                    "GlobalTables": []
-                }),
-                StatusCode::OK,
-            )
-        }
-
-        "DescribeContinuousBackups" => {
-            make_json_response(
-                json!({
-                    "ContinuousBackupsDescription": {
-                        "ContinuousBackupsStatus": "ENABLED",
-                        "PointInTimeRecoveryDescription": {
-                            "PointInTimeRecoveryStatus": "DISABLED"
-                        }
+        "DescribeEndpoints" => make_json_response(
+            json!({
+                "Endpoints": [
+                    {
+                        "Address": "localhost:4566",
+                        "CachePeriodInMinutes": 1440
                     }
-                }),
-                StatusCode::OK,
-            )
-        }
+                ]
+            }),
+            StatusCode::OK,
+        ),
 
-        "UpdateContinuousBackups" => {
-            make_json_response(
-                json!({
-                    "ContinuousBackupsDescription": {
-                        "ContinuousBackupsStatus": "ENABLED",
-                        "PointInTimeRecoveryDescription": {
-                            "PointInTimeRecoveryStatus": "ENABLED"
-                        }
+        "ListGlobalTables" => make_json_response(
+            json!({
+                "GlobalTables": []
+            }),
+            StatusCode::OK,
+        ),
+
+        "DescribeContinuousBackups" => make_json_response(
+            json!({
+                "ContinuousBackupsDescription": {
+                    "ContinuousBackupsStatus": "ENABLED",
+                    "PointInTimeRecoveryDescription": {
+                        "PointInTimeRecoveryStatus": "DISABLED"
                     }
-                }),
-                StatusCode::OK,
-            )
-        }
+                }
+            }),
+            StatusCode::OK,
+        ),
+
+        "UpdateContinuousBackups" => make_json_response(
+            json!({
+                "ContinuousBackupsDescription": {
+                    "ContinuousBackupsStatus": "ENABLED",
+                    "PointInTimeRecoveryDescription": {
+                        "PointInTimeRecoveryStatus": "ENABLED"
+                    }
+                }
+            }),
+            StatusCode::OK,
+        ),
 
         _ => Err(RustStackError::dynamodb_bad_request(
             "InvalidAction",

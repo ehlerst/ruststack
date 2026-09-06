@@ -157,13 +157,17 @@ async fn test_cloudwatch_alarm_action_sns_notification() {
     let set_state_req = SetAlarmStateRequest {
         alarm_name: "CpuUtilizationHigh".to_string(),
         state_value: "ALARM".to_string(),
-        state_reason: "Threshold Crossed: 1 out of 1 datapoints [95.0] > threshold [90.0]".to_string(),
+        state_reason: "Threshold Crossed: 1 out of 1 datapoints [95.0] > threshold [90.0]"
+            .to_string(),
         state_reason_data: None,
     };
     cw_state.set_alarm_state(set_state_req).unwrap();
 
     // 4. Verify message received in SQS queue
-    let msgs = sqs.receive_message(&queue_url, 10, None, None).await.unwrap();
+    let msgs = sqs
+        .receive_message(&queue_url, 10, None, None)
+        .await
+        .unwrap();
     assert_eq!(msgs.len(), 1);
     let body_str = &msgs[0].body;
     assert!(body_str.contains("CpuUtilizationHigh"));

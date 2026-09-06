@@ -312,7 +312,14 @@ fn dispatch_s3_op(
                     .get("max-keys")
                     .and_then(|v| v.parse().ok())
                     .unwrap_or(1000);
-                let list_res = storage.list_object_versions(bucket, prefix, delimiter, key_marker, version_id_marker, max_keys)?;
+                let list_res = storage.list_object_versions(
+                    bucket,
+                    prefix,
+                    delimiter,
+                    key_marker,
+                    version_id_marker,
+                    max_keys,
+                )?;
                 let xml_body = xml::serialize_list_object_versions(&list_res);
                 let mut res = Response::new(Body::from(xml_body));
                 *res.status_mut() = StatusCode::OK;
@@ -698,10 +705,13 @@ fn dispatch_s3_op(
             *res.status_mut() = StatusCode::NO_CONTENT;
             if let Some(id) = del_result {
                 if vid_opt.is_some() {
-                    res.headers_mut().insert("x-amz-version-id", HeaderValue::from_str(&id).unwrap());
+                    res.headers_mut()
+                        .insert("x-amz-version-id", HeaderValue::from_str(&id).unwrap());
                 } else {
-                    res.headers_mut().insert("x-amz-delete-marker", HeaderValue::from_static("true"));
-                    res.headers_mut().insert("x-amz-version-id", HeaderValue::from_str(&id).unwrap());
+                    res.headers_mut()
+                        .insert("x-amz-delete-marker", HeaderValue::from_static("true"));
+                    res.headers_mut()
+                        .insert("x-amz-version-id", HeaderValue::from_str(&id).unwrap());
                 }
             }
             res.headers_mut().insert(

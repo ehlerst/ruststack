@@ -37,7 +37,13 @@ pub async fn handle_cognito_request(
         "CreateUserPool" => {
             let req: CreateUserPoolRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.create_user_pool(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -47,7 +53,13 @@ pub async fn handle_cognito_request(
         "DescribeUserPool" => {
             let req: DescribeUserPoolRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.describe_user_pool(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -64,7 +76,13 @@ pub async fn handle_cognito_request(
         "DeleteUserPool" => {
             let req: DeleteUserPoolRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.delete_user_pool(req) {
                 Ok(()) => json_response(StatusCode::OK, json!({})),
@@ -74,7 +92,13 @@ pub async fn handle_cognito_request(
         "CreateUserPoolClient" => {
             let req: CreateUserPoolClientRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.create_user_pool_client(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -84,7 +108,13 @@ pub async fn handle_cognito_request(
         "DescribeUserPoolClient" => {
             let req: DescribeUserPoolClientRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.describe_user_pool_client(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -94,7 +124,13 @@ pub async fn handle_cognito_request(
         "ListUserPoolClients" => {
             let req: ListUserPoolClientsRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.list_user_pool_clients(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -104,7 +140,13 @@ pub async fn handle_cognito_request(
         "DeleteUserPoolClient" => {
             let req: DeleteUserPoolClientRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.delete_user_pool_client(req) {
                 Ok(()) => json_response(StatusCode::OK, json!({})),
@@ -114,7 +156,13 @@ pub async fn handle_cognito_request(
         "SignUp" => {
             let req: SignUpRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.sign_up(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -124,7 +172,13 @@ pub async fn handle_cognito_request(
         "AdminCreateUser" => {
             let req: AdminCreateUserRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.admin_create_user(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -134,7 +188,13 @@ pub async fn handle_cognito_request(
         "AdminGetUser" => {
             let req: AdminGetUserRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.admin_get_user(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -144,7 +204,13 @@ pub async fn handle_cognito_request(
         "AdminSetUserPassword" => {
             let req: AdminSetUserPasswordRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.admin_set_user_password(req) {
                 Ok(()) => json_response(StatusCode::OK, json!({})),
@@ -154,7 +220,13 @@ pub async fn handle_cognito_request(
         "AdminDeleteUser" => {
             let req: AdminDeleteUserRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.admin_delete_user(req) {
                 Ok(()) => json_response(StatusCode::OK, json!({})),
@@ -164,7 +236,13 @@ pub async fn handle_cognito_request(
         "ListUsers" => {
             let req: ListUsersRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.list_users(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -174,7 +252,13 @@ pub async fn handle_cognito_request(
         "InitiateAuth" => {
             let req: InitiateAuthRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.initiate_auth(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),
@@ -184,7 +268,13 @@ pub async fn handle_cognito_request(
         "AdminInitiateAuth" => {
             let req: AdminInitiateAuthRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.admin_initiate_auth(req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),

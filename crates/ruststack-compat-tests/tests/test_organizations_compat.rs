@@ -21,10 +21,7 @@ async fn test_organizations_lifecycle_compat() {
 
     // 2. Describe Organization
     let (status, body) = client
-        .call_json(
-            "AWSOrganizationsV20161128.DescribeOrganization",
-            json!({}),
-        )
+        .call_json("AWSOrganizationsV20161128.DescribeOrganization", json!({}))
         .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["Organization"]["Id"], org_id);
@@ -44,10 +41,7 @@ async fn test_organizations_lifecycle_compat() {
 
     // 4. List Accounts
     let (status, body) = client
-        .call_json(
-            "AWSOrganizationsV20161128.ListAccounts",
-            json!({}),
-        )
+        .call_json("AWSOrganizationsV20161128.ListAccounts", json!({}))
         .await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["Accounts"].as_array().unwrap().len(), 2);

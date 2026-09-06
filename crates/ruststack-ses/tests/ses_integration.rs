@@ -441,6 +441,9 @@ async fn test_ses_templates_and_templated_email() {
     let sent = state.get_sent_emails();
     assert_eq!(sent.len(), 1);
     assert_eq!(sent[0].subject.as_deref(), Some("Hello Alice"));
-    assert_eq!(sent[0].body_text.as_deref(), Some("Welcome Alice to RustStack!"));
+    assert_eq!(
+        sent[0].body_text.as_deref(),
+        Some("Welcome Alice to RustStack!")
+    );
     assert_eq!(sent[0].body_html.as_deref(), Some("<h1>Welcome Alice</h1>"));
 }

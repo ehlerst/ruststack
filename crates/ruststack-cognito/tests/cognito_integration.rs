@@ -2,8 +2,8 @@ use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode, Uri};
 use bytes::Bytes;
 use ruststack_cognito::handle_cognito_request;
-use ruststack_cognito::CognitoState;
 use ruststack_cognito::types::*;
+use ruststack_cognito::CognitoState;
 
 #[tokio::test]
 async fn test_cognito_user_pool_and_auth_lifecycle() {
@@ -75,10 +75,16 @@ async fn test_cognito_user_pool_and_auth_lifecycle() {
 
     // 6. Test HTTP Gateway and JWKS endpoint
     let headers = HeaderMap::new();
-    let uri: Uri = format!("/{}/.well-known/jwks.json", pool_id).parse().unwrap();
-    let resp = handle_cognito_request(State(state.clone()), uri, headers.clone(), Bytes::new()).await;
+    let uri: Uri = format!("/{}/.well-known/jwks.json", pool_id)
+        .parse()
+        .unwrap();
+    let resp =
+        handle_cognito_request(State(state.clone()), uri, headers.clone(), Bytes::new()).await;
     assert_eq!(resp.status(), StatusCode::OK);
-    let body = http_body_util::BodyExt::collect(resp.into_body()).await.unwrap().to_bytes();
+    let body = http_body_util::BodyExt::collect(resp.into_body())
+        .await
+        .unwrap()
+        .to_bytes();
     let jwks: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert!(jwks.get("keys").is_some());
 }

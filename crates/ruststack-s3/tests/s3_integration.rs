@@ -354,8 +354,20 @@ async fn test_bucket_versioning_and_object_versions() {
     assert!(xml.contains("<IsLatest>false</IsLatest>"));
 
     // Extract first versionId from xml
-    let vid1 = xml.split("<VersionId>").nth(1).unwrap().split("</VersionId>").next().unwrap();
-    let vid2 = xml.split("<VersionId>").nth(2).unwrap().split("</VersionId>").next().unwrap();
+    let vid1 = xml
+        .split("<VersionId>")
+        .nth(1)
+        .unwrap()
+        .split("</VersionId>")
+        .next()
+        .unwrap();
+    let vid2 = xml
+        .split("<VersionId>")
+        .nth(2)
+        .unwrap()
+        .split("</VersionId>")
+        .next()
+        .unwrap();
 
     // 7. Get specific version
     let req = Request::builder()
@@ -414,7 +426,9 @@ async fn test_bucket_lifecycle_cors_policy_tagging() {
     let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
-    assert!(String::from_utf8(body.to_vec()).unwrap().contains("expire-logs"));
+    assert!(String::from_utf8(body.to_vec())
+        .unwrap()
+        .contains("expire-logs"));
 
     // 3. CORS
     let cors_xml = r#"<CORSConfiguration>
@@ -460,7 +474,9 @@ async fn test_bucket_lifecycle_cors_policy_tagging() {
     let resp = handle_s3_request(storage.clone(), req).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
-    assert!(String::from_utf8(body.to_vec()).unwrap().contains("s3:GetObject"));
+    assert!(String::from_utf8(body.to_vec())
+        .unwrap()
+        .contains("s3:GetObject"));
 
     // 5. Tagging
     let tag_xml = r#"<Tagging>

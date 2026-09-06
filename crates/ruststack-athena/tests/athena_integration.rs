@@ -8,13 +8,19 @@ use ruststack_athena::{handle_athena_request, AthenaState};
 async fn test_athena_query_and_results_lifecycle() {
     let state = AthenaState::new("000000000000".to_string(), "us-east-1".to_string());
     let mut headers = HeaderMap::new();
-    headers.insert("x-amz-target", "AmazonAthena.StartQueryExecution".parse().unwrap());
+    headers.insert(
+        "x-amz-target",
+        "AmazonAthena.StartQueryExecution".parse().unwrap(),
+    );
 
     // 1. StartQueryExecution
-    let body = Bytes::from(serde_json::json!({
-        "QueryString": "SELECT COUNT(*) FROM cloudtrail_logs",
-        "WorkGroup": "primary"
-    }).to_string());
+    let body = Bytes::from(
+        serde_json::json!({
+            "QueryString": "SELECT COUNT(*) FROM cloudtrail_logs",
+            "WorkGroup": "primary"
+        })
+        .to_string(),
+    );
 
     let resp = handle_athena_request(State(state.clone()), headers.clone(), body).await;
     assert_eq!(resp.status(), StatusCode::OK);
@@ -24,10 +30,16 @@ async fn test_athena_query_and_results_lifecycle() {
 
     // 2. GetQueryExecution
     let mut headers = HeaderMap::new();
-    headers.insert("x-amz-target", "AmazonAthena.GetQueryExecution".parse().unwrap());
-    let body = Bytes::from(serde_json::json!({
-        "QueryExecutionId": qid
-    }).to_string());
+    headers.insert(
+        "x-amz-target",
+        "AmazonAthena.GetQueryExecution".parse().unwrap(),
+    );
+    let body = Bytes::from(
+        serde_json::json!({
+            "QueryExecutionId": qid
+        })
+        .to_string(),
+    );
 
     let resp = handle_athena_request(State(state.clone()), headers.clone(), body).await;
     assert_eq!(resp.status(), StatusCode::OK);
@@ -37,10 +49,16 @@ async fn test_athena_query_and_results_lifecycle() {
 
     // 3. GetQueryResults
     let mut headers = HeaderMap::new();
-    headers.insert("x-amz-target", "AmazonAthena.GetQueryResults".parse().unwrap());
-    let body = Bytes::from(serde_json::json!({
-        "QueryExecutionId": qid
-    }).to_string());
+    headers.insert(
+        "x-amz-target",
+        "AmazonAthena.GetQueryResults".parse().unwrap(),
+    );
+    let body = Bytes::from(
+        serde_json::json!({
+            "QueryExecutionId": qid
+        })
+        .to_string(),
+    );
 
     let resp = handle_athena_request(State(state.clone()), headers.clone(), body).await;
     assert_eq!(resp.status(), StatusCode::OK);

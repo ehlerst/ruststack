@@ -127,6 +127,9 @@ async fn test_lambda_active_sqs_event_source_poller() {
     assert_eq!(processed, 3);
 
     // 6. Verify SQS queue is now empty (messages were consumed and deleted by lambda poller)
-    let remaining = sqs.receive_message(&queue_url, 10, None, None).await.unwrap();
+    let remaining = sqs
+        .receive_message(&queue_url, 10, None, None)
+        .await
+        .unwrap();
     assert_eq!(remaining.len(), 0);
 }

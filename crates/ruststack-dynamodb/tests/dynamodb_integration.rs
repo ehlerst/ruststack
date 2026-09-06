@@ -574,7 +574,12 @@ async fn test_dynamodb_transactions_and_ttl() {
     assert_eq!(resp.status(), StatusCode::OK);
     let body = resp.into_body().collect().await.unwrap().to_bytes();
     let val: Value = serde_json::from_slice(&body).unwrap();
-    assert_eq!(val["TimeToLiveDescription"]["TimeToLiveStatus"].as_str().unwrap(), "ENABLED");
+    assert_eq!(
+        val["TimeToLiveDescription"]["TimeToLiveStatus"]
+            .as_str()
+            .unwrap(),
+        "ENABLED"
+    );
 }
 
 #[tokio::test]

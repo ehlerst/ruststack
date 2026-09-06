@@ -107,7 +107,10 @@ impl BedrockState {
         self.models.iter().map(|kv| kv.value().clone()).collect()
     }
 
-    pub fn get_foundation_model(&self, model_id: &str) -> Result<FoundationModelSummary, BedrockError> {
+    pub fn get_foundation_model(
+        &self,
+        model_id: &str,
+    ) -> Result<FoundationModelSummary, BedrockError> {
         self.models
             .get(model_id)
             .map(|kv| kv.value().clone())
@@ -128,11 +131,9 @@ impl BedrockState {
             messages
                 .iter()
                 .filter_map(|msg| {
-                    if let Some(c) = msg.get("content").and_then(|c| c.as_str()) {
-                        Some(c.to_string())
-                    } else {
-                        None
-                    }
+                    msg.get("content")
+                        .and_then(|c| c.as_str())
+                        .map(|c| c.to_string())
                 })
                 .collect::<Vec<_>>()
                 .join(" ")
@@ -148,7 +149,10 @@ impl BedrockState {
                 role: "assistant".to_string(),
                 content: vec![ClaudeContentBlock {
                     block_type: "text".to_string(),
-                    text: format!("RustStack Bedrock Response: Processed input [{}] successfully.", request_text),
+                    text: format!(
+                        "RustStack Bedrock Response: Processed input [{}] successfully.",
+                        request_text
+                    ),
                 }],
                 model: model_id.to_string(),
                 stop_reason: "end_turn".to_string(),

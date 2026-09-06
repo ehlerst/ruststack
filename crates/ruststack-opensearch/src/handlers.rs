@@ -16,14 +16,20 @@ pub async fn handle_opensearch_request(
     let path = uri.path();
 
     // 1. Create Domain POST /2021-01-01/opensearch/domain
-    if method == Method::POST && (path == "/2021-01-01/opensearch/domain" || path == "/opensearch/domain" || path == "/2015-01-01/es/domain") {
+    if method == Method::POST
+        && (path == "/2021-01-01/opensearch/domain"
+            || path == "/opensearch/domain"
+            || path == "/2015-01-01/es/domain")
+    {
         let req: CreateDomainRequest = match serde_json::from_slice(&body_bytes) {
             Ok(r) => r,
             Err(e) => {
                 return Response::builder()
                     .status(StatusCode::BAD_REQUEST)
                     .header("content-type", "application/json")
-                    .body(Body::from(json!({ "message": format!("Invalid JSON: {}", e) }).to_string()))
+                    .body(Body::from(
+                        json!({ "message": format!("Invalid JSON: {}", e) }).to_string(),
+                    ))
                     .unwrap();
             }
         };
@@ -48,7 +54,11 @@ pub async fn handle_opensearch_request(
     }
 
     // 2. List Domain Names GET /2021-01-01/opensearch/domain-names
-    if method == Method::GET && (path == "/2021-01-01/opensearch/domain-names" || path == "/opensearch/domain-names" || path == "/2015-01-01/es/domain-names") {
+    if method == Method::GET
+        && (path == "/2021-01-01/opensearch/domain-names"
+            || path == "/opensearch/domain-names"
+            || path == "/2015-01-01/es/domain-names")
+    {
         let domain_names = state.list_domain_names();
         let resp = ListDomainNamesResponse { domain_names };
         return Response::builder()
@@ -59,7 +69,9 @@ pub async fn handle_opensearch_request(
     }
 
     // 3. Describe Domain GET /2021-01-01/opensearch/domain/{DomainName}
-    if method == Method::GET && (path.contains("/opensearch/domain/") || path.contains("/es/domain/")) {
+    if method == Method::GET
+        && (path.contains("/opensearch/domain/") || path.contains("/es/domain/"))
+    {
         let domain_name = path.rsplit('/').next().unwrap_or("");
         match state.describe_domain(domain_name) {
             Ok(domain_status) => {
@@ -81,7 +93,9 @@ pub async fn handle_opensearch_request(
     }
 
     // 4. Delete Domain DELETE /2021-01-01/opensearch/domain/{DomainName}
-    if method == Method::DELETE && (path.contains("/opensearch/domain/") || path.contains("/es/domain/")) {
+    if method == Method::DELETE
+        && (path.contains("/opensearch/domain/") || path.contains("/es/domain/"))
+    {
         let domain_name = path.rsplit('/').next().unwrap_or("");
         match state.delete_domain(domain_name) {
             Ok(domain_status) => {
@@ -105,6 +119,8 @@ pub async fn handle_opensearch_request(
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .header("content-type", "application/json")
-        .body(Body::from(json!({ "message": "Unknown OpenSearch operation or path" }).to_string()))
+        .body(Body::from(
+            json!({ "message": "Unknown OpenSearch operation or path" }).to_string(),
+        ))
         .unwrap()
 }

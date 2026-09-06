@@ -13,7 +13,9 @@ async fn test_ecr_repository_and_image_lifecycle() {
     let mut headers = HeaderMap::new();
     headers.insert(
         "x-amz-target",
-        "AmazonEC2ContainerRegistry_V20150921.CreateRepository".parse().unwrap(),
+        "AmazonEC2ContainerRegistry_V20150921.CreateRepository"
+            .parse()
+            .unwrap(),
     );
     let body = Bytes::from(
         json!({
@@ -31,7 +33,9 @@ async fn test_ecr_repository_and_image_lifecycle() {
     let mut headers = HeaderMap::new();
     headers.insert(
         "x-amz-target",
-        "AmazonEC2ContainerRegistry_V20150921.GetAuthorizationToken".parse().unwrap(),
+        "AmazonEC2ContainerRegistry_V20150921.GetAuthorizationToken"
+            .parse()
+            .unwrap(),
     );
     let resp = handle_ecr_request(State(state.clone()), headers, Bytes::from("{}")).await;
     assert_eq!(resp.status(), http::StatusCode::OK);
@@ -43,7 +47,9 @@ async fn test_ecr_repository_and_image_lifecycle() {
     let mut headers = HeaderMap::new();
     headers.insert(
         "x-amz-target",
-        "AmazonEC2ContainerRegistry_V20150921.PutImage".parse().unwrap(),
+        "AmazonEC2ContainerRegistry_V20150921.PutImage"
+            .parse()
+            .unwrap(),
     );
     let body = Bytes::from(
         json!({
@@ -60,7 +66,9 @@ async fn test_ecr_repository_and_image_lifecycle() {
     let mut headers = HeaderMap::new();
     headers.insert(
         "x-amz-target",
-        "AmazonEC2ContainerRegistry_V20150921.BatchGetImage".parse().unwrap(),
+        "AmazonEC2ContainerRegistry_V20150921.BatchGetImage"
+            .parse()
+            .unwrap(),
     );
     let body = Bytes::from(
         json!({

@@ -242,7 +242,7 @@ impl IamState {
                 .policies
                 .get(arn)
                 .map(|p| p.policy_name.clone())
-                .unwrap_or_else(|| arn.split('/').last().unwrap_or("policy").to_string());
+                .unwrap_or_else(|| arn.split('/').next_back().unwrap_or("policy").to_string());
             list.push((name, arn.clone()));
         }
         Ok(list)

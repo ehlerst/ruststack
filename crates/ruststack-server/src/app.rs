@@ -510,29 +510,13 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
             .await
         }
         AwsService::Ecr => {
-            handle_ecr_request(
-                State((*state.ecr_state).clone()),
-                headers,
-                body_bytes,
-            )
-            .await
+            handle_ecr_request(State((*state.ecr_state).clone()), headers, body_bytes).await
         }
         AwsService::Ecs => {
-            handle_ecs_request(
-                State((*state.ecs_state).clone()),
-                headers,
-                body_bytes,
-            )
-            .await
+            handle_ecs_request(State((*state.ecs_state).clone()), headers, body_bytes).await
         }
         AwsService::Ec2 => {
-            handle_ec2_request(
-                State((*state.ec2_state).clone()),
-                uri,
-                headers,
-                body_bytes,
-            )
-            .await
+            handle_ec2_request(State((*state.ec2_state).clone()), uri, headers, body_bytes).await
         }
         AwsService::Elbv2 => {
             handle_elbv2_request(
@@ -564,21 +548,10 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
             .await
         }
         AwsService::Athena => {
-            handle_athena_request(
-                State((*state.athena_state).clone()),
-                headers,
-                body_bytes,
-            )
-            .await
+            handle_athena_request(State((*state.athena_state).clone()), headers, body_bytes).await
         }
         AwsService::Rds => {
-            handle_rds_request(
-                State((*state.rds_state).clone()),
-                uri,
-                headers,
-                body_bytes,
-            )
-            .await
+            handle_rds_request(State((*state.rds_state).clone()), uri, headers, body_bytes).await
         }
         AwsService::ElastiCache => {
             handle_elasticache_request(
@@ -599,20 +572,10 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
             .await
         }
         AwsService::Acm => {
-            handle_acm_request(
-                State((*state.acm_state).clone()),
-                headers,
-                body_bytes,
-            )
-            .await
+            handle_acm_request(State((*state.acm_state).clone()), headers, body_bytes).await
         }
         AwsService::WafV2 => {
-            handle_wafv2_request(
-                State((*state.wafv2_state).clone()),
-                headers,
-                body_bytes,
-            )
-            .await
+            handle_wafv2_request(State((*state.wafv2_state).clone()), headers, body_bytes).await
         }
         AwsService::Organizations => {
             handle_organizations_request(

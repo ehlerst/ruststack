@@ -34,7 +34,9 @@ impl Route53State {
     }
 
     fn normalize_zone_id(zone_id: &str) -> String {
-        let trimmed = zone_id.trim_start_matches("/hostedzone/").trim_start_matches('/');
+        let trimmed = zone_id
+            .trim_start_matches("/hostedzone/")
+            .trim_start_matches('/');
         trimmed.to_string()
     }
 
@@ -81,8 +83,15 @@ impl Route53State {
             id: zone_id.clone(),
             name: zone_name.clone(),
             caller_reference: req.caller_reference.clone(),
-            comment: req.hosted_zone_config.as_ref().and_then(|c| c.comment.clone()),
-            private_zone: req.hosted_zone_config.as_ref().and_then(|c| c.private_zone).unwrap_or(false),
+            comment: req
+                .hosted_zone_config
+                .as_ref()
+                .and_then(|c| c.comment.clone()),
+            private_zone: req
+                .hosted_zone_config
+                .as_ref()
+                .and_then(|c| c.private_zone)
+                .unwrap_or(false),
             record_sets,
         };
 
@@ -226,7 +235,11 @@ impl Route53State {
 
         let zone = zone_entry.read();
         let mut list: Vec<ResourceRecordSet> = zone.record_sets.values().cloned().collect();
-        list.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.record_type.cmp(&b.record_type)));
+        list.sort_by(|a, b| {
+            a.name
+                .cmp(&b.name)
+                .then_with(|| a.record_type.cmp(&b.record_type))
+        });
 
         Ok(ListResourceRecordSetsResponse {
             resource_record_sets: list,

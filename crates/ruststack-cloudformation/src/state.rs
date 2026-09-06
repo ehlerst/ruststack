@@ -115,11 +115,14 @@ impl CloudFormationState {
             .join("\n");
 
         // Parse template as JSON or YAML
-        let template_val: serde_json::Value = if let Ok(json_v) = serde_json::from_str(&template_body) {
+        let template_val: serde_json::Value = if let Ok(json_v) =
+            serde_json::from_str(&template_body)
+        {
             json_v
         } else if let Ok(yaml_v) = serde_yaml::from_str::<serde_json::Value>(&normalized_template) {
             yaml_v
-        } else if let Ok(yaml_raw) = serde_yaml::from_str::<serde_yaml::Value>(&normalized_template) {
+        } else if let Ok(yaml_raw) = serde_yaml::from_str::<serde_yaml::Value>(&normalized_template)
+        {
             serde_json::to_value(yaml_raw).map_err(|e| {
                 CloudFormationError::TemplateFormatError(format!("YAML conversion error: {}", e))
             })?
@@ -154,7 +157,10 @@ impl CloudFormationState {
         if let Some(res_obj) = template_val.get("Resources").and_then(|v| v.as_object()) {
             for (logical_id, def) in res_obj {
                 let res_type = def.get("Type").and_then(|v| v.as_str()).unwrap_or("");
-                let props = def.get("Properties").cloned().unwrap_or(serde_json::json!({}));
+                let props = def
+                    .get("Properties")
+                    .cloned()
+                    .unwrap_or(serde_json::json!({}));
 
                 let physical_id = match res_type {
                     "AWS::S3::Bucket" => {
@@ -162,7 +168,13 @@ impl CloudFormationState {
                             .get("BucketName")
                             .and_then(|v| v.as_str())
                             .map(String::from)
-                            .unwrap_or_else(|| format!("{}-{}", stack_name.to_lowercase(), logical_id.to_lowercase()));
+                            .unwrap_or_else(|| {
+                                format!(
+                                    "{}-{}",
+                                    stack_name.to_lowercase(),
+                                    logical_id.to_lowercase()
+                                )
+                            });
                         if let Some(s3) = self.s3_storage.read().clone() {
                             let _ = s3.create_bucket(&bucket_name, &self.region);
                         }
@@ -177,7 +189,10 @@ impl CloudFormationState {
                         if let Some(sqs) = self.sqs_engine.read().clone() {
                             let _ = sqs.create_queue(&q_name, Some(HashMap::new()));
                         }
-                        format!("https://sqs.{}.amazonaws.com/{}/{}", self.region, self.account_id, q_name)
+                        format!(
+                            "https://sqs.{}.amazonaws.com/{}/{}",
+                            self.region, self.account_id, q_name
+                        )
                     }
                     "AWS::SNS::Topic" => {
                         let topic_name = props
@@ -188,7 +203,10 @@ impl CloudFormationState {
                         if let Some(sns) = self.sns_engine.read().clone() {
                             let _ = sns.create_topic(&topic_name, Some(HashMap::new()));
                         }
-                        format!("arn:aws:sns:{}:{}:{}", self.region, self.account_id, topic_name)
+                        format!(
+                            "arn:aws:sns:{}:{}:{}",
+                            self.region, self.account_id, topic_name
+                        )
                     }
                     "AWS::DynamoDB::Table" => {
                         let table_name = props
@@ -228,7 +246,10 @@ impl CloudFormationState {
         let mut outputs = Vec::new();
         if let Some(out_obj) = template_val.get("Outputs").and_then(|v| v.as_object()) {
             for (out_key, out_def) in out_obj {
-                let desc = out_def.get("Description").and_then(|v| v.as_str()).map(String::from);
+                let desc = out_def
+                    .get("Description")
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
                 let exp = out_def
                     .get("Export")
                     .and_then(|v| v.get("Name"))
@@ -238,7 +259,9 @@ impl CloudFormationState {
                 let raw_val = out_def.get("Value");
                 let resolved_val = if let Some(s) = raw_val.and_then(|v| v.as_str()) {
                     s.to_string()
-                } else if let Some(ref_val) = raw_val.and_then(|v| v.get("Ref")).and_then(|v| v.as_str()) {
+                } else if let Some(ref_val) =
+                    raw_val.and_then(|v| v.get("Ref")).and_then(|v| v.as_str())
+                {
                     if let Some(phys) = resource_map.get(ref_val) {
                         phys.clone()
                     } else if let Some(param) = param_map.get(ref_val) {
@@ -285,13 +308,18 @@ impl CloudFormationState {
             events,
         };
 
-        self.stacks.insert(stack_name.clone(), Arc::new(RwLock::new(stored.clone())));
-        self.stacks.insert(stack_id.clone(), Arc::new(RwLock::new(stored)));
+        self.stacks
+            .insert(stack_name.clone(), Arc::new(RwLock::new(stored.clone())));
+        self.stacks
+            .insert(stack_id.clone(), Arc::new(RwLock::new(stored)));
 
         Ok(stack_id)
     }
 
-    pub fn describe_stacks(&self, stack_name_or_id: Option<&str>) -> Result<Vec<StoredStack>, CloudFormationError> {
+    pub fn describe_stacks(
+        &self,
+        stack_name_or_id: Option<&str>,
+    ) -> Result<Vec<StoredStack>, CloudFormationError> {
         if let Some(name_or_id) = stack_name_or_id {
             if let Some(entry) = self.stacks.get(name_or_id) {
                 return Ok(vec![entry.read().clone()]);
@@ -312,27 +340,36 @@ impl CloudFormationState {
         Ok(list)
     }
 
-    pub fn describe_stack_resources(&self, stack_name: &str) -> Result<Vec<StackResource>, CloudFormationError> {
-        let entry = self.stacks.get(stack_name).ok_or_else(|| {
-            CloudFormationError::StackNotFound(stack_name.to_string())
-        })?;
+    pub fn describe_stack_resources(
+        &self,
+        stack_name: &str,
+    ) -> Result<Vec<StackResource>, CloudFormationError> {
+        let entry = self
+            .stacks
+            .get(stack_name)
+            .ok_or_else(|| CloudFormationError::StackNotFound(stack_name.to_string()))?;
         let res = entry.read().resources.clone();
         Ok(res)
     }
 
-    pub fn describe_stack_events(&self, stack_name: &str) -> Result<Vec<StackEvent>, CloudFormationError> {
-        let entry = self.stacks.get(stack_name).ok_or_else(|| {
-            CloudFormationError::StackNotFound(stack_name.to_string())
-        })?;
+    pub fn describe_stack_events(
+        &self,
+        stack_name: &str,
+    ) -> Result<Vec<StackEvent>, CloudFormationError> {
+        let entry = self
+            .stacks
+            .get(stack_name)
+            .ok_or_else(|| CloudFormationError::StackNotFound(stack_name.to_string()))?;
         let mut events = entry.read().events.clone();
         events.reverse();
         Ok(events)
     }
 
     pub fn get_template(&self, stack_name: &str) -> Result<String, CloudFormationError> {
-        let entry = self.stacks.get(stack_name).ok_or_else(|| {
-            CloudFormationError::StackNotFound(stack_name.to_string())
-        })?;
+        let entry = self
+            .stacks
+            .get(stack_name)
+            .ok_or_else(|| CloudFormationError::StackNotFound(stack_name.to_string()))?;
         let body = entry.read().template_body.clone();
         Ok(body)
     }

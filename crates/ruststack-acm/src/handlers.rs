@@ -41,7 +41,11 @@ pub async fn handle_acm_request(
                     });
                     json_response(StatusCode::OK, resp)
                 }
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidParameterException",
+                    &e.to_string(),
+                ),
             }
         }
         "DescribeCertificate" => {
@@ -53,7 +57,11 @@ pub async fn handle_acm_request(
                     });
                     json_response(StatusCode::OK, resp)
                 }
-                Err(e) => error_response(StatusCode::NOT_FOUND, "ResourceNotFoundException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::NOT_FOUND,
+                    "ResourceNotFoundException",
+                    &e.to_string(),
+                ),
             }
         }
         "ListCertificates" => {
@@ -67,7 +75,11 @@ pub async fn handle_acm_request(
             let cert_arn = val["CertificateArn"].as_str().unwrap_or_default();
             match state.delete_certificate(cert_arn) {
                 Ok(_) => json_response(StatusCode::OK, json!({})),
-                Err(e) => error_response(StatusCode::NOT_FOUND, "ResourceNotFoundException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::NOT_FOUND,
+                    "ResourceNotFoundException",
+                    &e.to_string(),
+                ),
             }
         }
         "GetCertificate" => {
@@ -80,7 +92,11 @@ pub async fn handle_acm_request(
                     });
                     json_response(StatusCode::OK, resp)
                 }
-                Err(e) => error_response(StatusCode::NOT_FOUND, "ResourceNotFoundException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::NOT_FOUND,
+                    "ResourceNotFoundException",
+                    &e.to_string(),
+                ),
             }
         }
         _ => error_response(

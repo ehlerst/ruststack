@@ -35,7 +35,10 @@ pub async fn handle_ec2_request(
 
     match action {
         "CreateVpc" => {
-            let cidr = params.get("CidrBlock").cloned().unwrap_or_else(|| "10.0.0.0/16".to_string());
+            let cidr = params
+                .get("CidrBlock")
+                .cloned()
+                .unwrap_or_else(|| "10.0.0.0/16".to_string());
             let tags = parse_tags(&params);
             let vpc = state.create_vpc(cidr, tags);
             let xml = format!(
@@ -89,12 +92,20 @@ pub async fn handle_ec2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => ec2_error_response(StatusCode::BAD_REQUEST, "InvalidVpcID.NotFound", &e.to_string(), &request_id),
+                Err(e) => ec2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidVpcID.NotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "CreateSubnet" => {
             let vpc_id = params.get("VpcId").cloned().unwrap_or_default();
-            let cidr = params.get("CidrBlock").cloned().unwrap_or_else(|| "10.0.1.0/24".to_string());
+            let cidr = params
+                .get("CidrBlock")
+                .cloned()
+                .unwrap_or_else(|| "10.0.1.0/24".to_string());
             let az = params.get("AvailabilityZone").cloned();
             let tags = parse_tags(&params);
             match state.create_subnet(vpc_id, cidr, az, tags) {
@@ -112,11 +123,23 @@ pub async fn handle_ec2_request(
         <defaultForAz>{}</defaultForAz>
     </subnet>
 </CreateSubnetResponse>"#,
-                        request_id, s.subnet_id, s.vpc_id, s.cidr_block, s.availability_zone, s.state, s.available_ip_address_count, s.default_for_az
+                        request_id,
+                        s.subnet_id,
+                        s.vpc_id,
+                        s.cidr_block,
+                        s.availability_zone,
+                        s.state,
+                        s.available_ip_address_count,
+                        s.default_for_az
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => ec2_error_response(StatusCode::BAD_REQUEST, "InvalidVpcID.NotFound", &e.to_string(), &request_id),
+                Err(e) => ec2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidVpcID.NotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "DescribeSubnets" => {
@@ -134,7 +157,13 @@ pub async fn handle_ec2_request(
         <availableIpAddressCount>{}</availableIpAddressCount>
         <defaultForAz>{}</defaultForAz>
     </item>"#,
-                    s.subnet_id, s.vpc_id, s.cidr_block, s.availability_zone, s.state, s.available_ip_address_count, s.default_for_az
+                    s.subnet_id,
+                    s.vpc_id,
+                    s.cidr_block,
+                    s.availability_zone,
+                    s.state,
+                    s.available_ip_address_count,
+                    s.default_for_az
                 ));
             }
             let xml = format!(
@@ -159,12 +188,23 @@ pub async fn handle_ec2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => ec2_error_response(StatusCode::BAD_REQUEST, "InvalidSubnetID.NotFound", &e.to_string(), &request_id),
+                Err(e) => ec2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidSubnetID.NotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "CreateSecurityGroup" => {
-            let name = params.get("GroupName").cloned().unwrap_or_else(|| "default".to_string());
-            let desc = params.get("GroupDescription").cloned().unwrap_or_else(|| "Security group".to_string());
+            let name = params
+                .get("GroupName")
+                .cloned()
+                .unwrap_or_else(|| "default".to_string());
+            let desc = params
+                .get("GroupDescription")
+                .cloned()
+                .unwrap_or_else(|| "Security group".to_string());
             let vpc_id = params.get("VpcId").cloned();
             let tags = parse_tags(&params);
             let sg = state.create_security_group(name, desc, vpc_id, tags);
@@ -208,16 +248,29 @@ pub async fn handle_ec2_request(
         }
         "AuthorizeSecurityGroupIngress" => {
             let group_id = params.get("GroupId").map(|s| s.as_str()).unwrap_or("");
-            let protocol = params.get("IpPermissions.1.IpProtocol").cloned().unwrap_or_else(|| "tcp".to_string());
-            let from_port = params.get("IpPermissions.1.FromPort").and_then(|p| p.parse().ok());
-            let to_port = params.get("IpPermissions.1.ToPort").and_then(|p| p.parse().ok());
-            let cidr = params.get("IpPermissions.1.IpRanges.1.CidrIp").cloned().unwrap_or_else(|| "0.0.0.0/0".to_string());
+            let protocol = params
+                .get("IpPermissions.1.IpProtocol")
+                .cloned()
+                .unwrap_or_else(|| "tcp".to_string());
+            let from_port = params
+                .get("IpPermissions.1.FromPort")
+                .and_then(|p| p.parse().ok());
+            let to_port = params
+                .get("IpPermissions.1.ToPort")
+                .and_then(|p| p.parse().ok());
+            let cidr = params
+                .get("IpPermissions.1.IpRanges.1.CidrIp")
+                .cloned()
+                .unwrap_or_else(|| "0.0.0.0/0".to_string());
 
             let perm = IpPermission {
                 ip_protocol: protocol,
                 from_port,
                 to_port,
-                ip_ranges: vec![IpRange { cidr_ip: cidr, description: None }],
+                ip_ranges: vec![IpRange {
+                    cidr_ip: cidr,
+                    description: None,
+                }],
             };
 
             match state.authorize_security_group_ingress(group_id, vec![perm]) {
@@ -231,7 +284,12 @@ pub async fn handle_ec2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => ec2_error_response(StatusCode::BAD_REQUEST, "InvalidGroupID.NotFound", &e.to_string(), &request_id),
+                Err(e) => ec2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidGroupID.NotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "DeleteSecurityGroup" => {
@@ -247,11 +305,19 @@ pub async fn handle_ec2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => ec2_error_response(StatusCode::BAD_REQUEST, "InvalidGroupID.NotFound", &e.to_string(), &request_id),
+                Err(e) => ec2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidGroupID.NotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "CreateKeyPair" => {
-            let key_name = params.get("KeyName").cloned().unwrap_or_else(|| "my-key".to_string());
+            let key_name = params
+                .get("KeyName")
+                .cloned()
+                .unwrap_or_else(|| "my-key".to_string());
             let kp = state.create_key_pair(key_name);
             let xml = format!(
                 r#"<CreateKeyPairResponse xmlns="http://ec2.amazonaws.com/doc/2016-11-15/">
@@ -261,13 +327,18 @@ pub async fn handle_ec2_request(
     <keyFingerprint>{}</keyFingerprint>
     <keyMaterial>{}</keyMaterial>
 </CreateKeyPairResponse>"#,
-                request_id, kp.key_name, kp.key_pair_id, kp.key_fingerprint, kp.key_material.unwrap_or_default()
+                request_id,
+                kp.key_name,
+                kp.key_pair_id,
+                kp.key_fingerprint,
+                kp.key_material.unwrap_or_default()
             );
             xml_response(StatusCode::OK, xml)
         }
         "DescribeKeyPairs" => {
             let names = parse_indexed_list(&params, "KeyName");
-            let key_pairs = state.describe_key_pairs(if names.is_empty() { None } else { Some(names) });
+            let key_pairs =
+                state.describe_key_pairs(if names.is_empty() { None } else { Some(names) });
             let mut kps_xml = String::new();
             for kp in key_pairs {
                 kps_xml.push_str(&format!(
@@ -301,15 +372,23 @@ pub async fn handle_ec2_request(
             xml_response(StatusCode::OK, xml)
         }
         "RunInstances" => {
-            let image_id = params.get("ImageId").cloned().unwrap_or_else(|| "ami-12345678".to_string());
+            let image_id = params
+                .get("ImageId")
+                .cloned()
+                .unwrap_or_else(|| "ami-12345678".to_string());
             let inst_type = params.get("InstanceType").cloned();
             let key_name = params.get("KeyName").cloned();
             let subnet_id = params.get("SubnetId").cloned();
             let sg_ids = parse_indexed_list(&params, "SecurityGroupId");
-            let count = params.get("MaxCount").and_then(|c| c.parse().ok()).or_else(|| params.get("MinCount").and_then(|c| c.parse().ok()));
+            let count = params
+                .get("MaxCount")
+                .and_then(|c| c.parse().ok())
+                .or_else(|| params.get("MinCount").and_then(|c| c.parse().ok()));
             let tags = parse_tags(&params);
 
-            let instances = state.run_instances(image_id, inst_type, key_name, subnet_id, sg_ids, count, tags);
+            let instances = state.run_instances(
+                image_id, inst_type, key_name, subnet_id, sg_ids, count, tags,
+            );
             let mut inst_xml = String::new();
             for inst in instances {
                 inst_xml.push_str(&format!(
@@ -325,7 +404,14 @@ pub async fn handle_ec2_request(
         <ipAddress>{}</ipAddress>
         <launchTime>{}</launchTime>
     </item>"#,
-                    inst.instance_id, inst.image_id, inst.instance_type, inst.state_code, inst.state, inst.private_ip_address, inst.public_ip_address.unwrap_or_default(), inst.launch_time
+                    inst.instance_id,
+                    inst.image_id,
+                    inst.instance_type,
+                    inst.state_code,
+                    inst.state,
+                    inst.private_ip_address,
+                    inst.public_ip_address.unwrap_or_default(),
+                    inst.launch_time
                 ));
             }
             let xml = format!(
@@ -355,7 +441,14 @@ pub async fn handle_ec2_request(
         <ipAddress>{}</ipAddress>
         <launchTime>{}</launchTime>
     </item>"#,
-                    inst.instance_id, inst.image_id, inst.instance_type, inst.state_code, inst.state, inst.private_ip_address, inst.public_ip_address.unwrap_or_default(), inst.launch_time
+                    inst.instance_id,
+                    inst.image_id,
+                    inst.instance_type,
+                    inst.state_code,
+                    inst.state,
+                    inst.private_ip_address,
+                    inst.public_ip_address.unwrap_or_default(),
+                    inst.launch_time
                 ));
             }
             let xml = format!(
@@ -427,8 +520,14 @@ fn parse_tags(params: &HashMap<String, String>) -> Vec<Tag> {
     let mut tags = Vec::new();
     let mut i = 1;
     while let Some(key) = params.get(&format!("TagSpecification.1.Tag.{}.Key", i)) {
-        let value = params.get(&format!("TagSpecification.1.Tag.{}.Value", i)).cloned().unwrap_or_default();
-        tags.push(Tag { key: key.clone(), value });
+        let value = params
+            .get(&format!("TagSpecification.1.Tag.{}.Value", i))
+            .cloned()
+            .unwrap_or_default();
+        tags.push(Tag {
+            key: key.clone(),
+            value,
+        });
         i += 1;
     }
     tags
@@ -442,7 +541,12 @@ fn xml_response(status: StatusCode, body: String) -> Response<Body> {
         .unwrap()
 }
 
-fn ec2_error_response(status: StatusCode, code: &str, message: &str, request_id: &str) -> Response<Body> {
+fn ec2_error_response(
+    status: StatusCode,
+    code: &str,
+    message: &str,
+    request_id: &str,
+) -> Response<Body> {
     let xml = format!(
         r#"<Response><Errors><Error><Code>{}</Code><Message>{}</Message></Error></Errors><RequestID>{}</RequestID></Response>"#,
         code, message, request_id

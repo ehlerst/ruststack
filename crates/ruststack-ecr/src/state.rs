@@ -116,7 +116,7 @@ impl EcrState {
         let (_, entry) = self
             .repositories
             .remove(&req.repository_name)
-            .ok_or_else(|| EcrError::RepositoryNotFound(req.repository_name))?;
+            .ok_or(EcrError::RepositoryNotFound(req.repository_name))?;
 
         let repo = entry.read().repository.clone();
         Ok(DeleteRepositoryResponse { repository: repo })
@@ -183,7 +183,10 @@ impl EcrState {
         })
     }
 
-    pub fn batch_get_image(&self, req: BatchGetImageRequest) -> Result<BatchGetImageResponse, EcrError> {
+    pub fn batch_get_image(
+        &self,
+        req: BatchGetImageRequest,
+    ) -> Result<BatchGetImageResponse, EcrError> {
         let entry = self
             .repositories
             .get(&req.repository_name)
@@ -231,7 +234,7 @@ impl EcrState {
         let entry = self
             .repositories
             .get(&req.repository_name)
-            .ok_or_else(|| EcrError::RepositoryNotFound(req.repository_name))?;
+            .ok_or(EcrError::RepositoryNotFound(req.repository_name))?;
 
         let repo = entry.read();
         let mut image_ids = Vec::new();
@@ -252,11 +255,14 @@ impl EcrState {
         })
     }
 
-    pub fn batch_delete_image(&self, req: BatchDeleteImageRequest) -> Result<BatchDeleteImageResponse, EcrError> {
+    pub fn batch_delete_image(
+        &self,
+        req: BatchDeleteImageRequest,
+    ) -> Result<BatchDeleteImageResponse, EcrError> {
         let entry = self
             .repositories
             .get(&req.repository_name)
-            .ok_or_else(|| EcrError::RepositoryNotFound(req.repository_name))?;
+            .ok_or(EcrError::RepositoryNotFound(req.repository_name))?;
 
         let mut repo = entry.write();
         let mut deleted = Vec::new();

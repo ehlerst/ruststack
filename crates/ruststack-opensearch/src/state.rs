@@ -49,8 +49,14 @@ impl OpenSearchState {
             return Err(OpenSearchError::DomainAlreadyExists(name));
         }
 
-        let arn = format!("arn:aws:es:{}:{}:domain/{}", self.region, self.account_id, name);
-        let endpoint = format!("{}.{}.es.localhost.localstack.cloud:4566", name, self.region);
+        let arn = format!(
+            "arn:aws:es:{}:{}:domain/{}",
+            self.region, self.account_id, name
+        );
+        let endpoint = format!(
+            "{}.{}.es.localhost.localstack.cloud:4566",
+            name, self.region
+        );
         let status = DomainStatus {
             domain_id: format!("{}/{}", self.account_id, name),
             domain_name: name.clone(),
@@ -58,7 +64,9 @@ impl OpenSearchState {
             created: true,
             deleted: false,
             endpoint: Some(endpoint),
-            engine_version: req.engine_version.unwrap_or_else(|| "OpenSearch_2.11".to_string()),
+            engine_version: req
+                .engine_version
+                .unwrap_or_else(|| "OpenSearch_2.11".to_string()),
             cluster_config: req.cluster_config,
             ebs_options: req.ebs_options,
             node_to_node_encryption_options: req.node_to_node_encryption_options,

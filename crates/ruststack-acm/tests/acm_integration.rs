@@ -11,7 +11,10 @@ async fn test_acm_certificate_lifecycle() {
     let mut headers = HeaderMap::new();
 
     // 1. Request Certificate
-    headers.insert("x-amz-target", "CertificateManager.RequestCertificate".parse().unwrap());
+    headers.insert(
+        "x-amz-target",
+        "CertificateManager.RequestCertificate".parse().unwrap(),
+    );
     let body = Bytes::from(
         json!({
             "DomainName": "api.example.com",
@@ -28,7 +31,10 @@ async fn test_acm_certificate_lifecycle() {
     assert!(arn.contains("arn:aws:acm:us-east-1:000000000000:certificate/"));
 
     // 2. Describe Certificate
-    headers.insert("x-amz-target", "CertificateManager.DescribeCertificate".parse().unwrap());
+    headers.insert(
+        "x-amz-target",
+        "CertificateManager.DescribeCertificate".parse().unwrap(),
+    );
     let body = Bytes::from(json!({ "CertificateArn": arn }).to_string());
     let resp = handle_acm_request(State(state.clone()), headers.clone(), body).await;
     assert_eq!(resp.status(), StatusCode::OK);
@@ -38,7 +44,10 @@ async fn test_acm_certificate_lifecycle() {
     assert_eq!(json["Certificate"]["DomainName"], "api.example.com");
 
     // 3. List Certificates
-    headers.insert("x-amz-target", "CertificateManager.ListCertificates".parse().unwrap());
+    headers.insert(
+        "x-amz-target",
+        "CertificateManager.ListCertificates".parse().unwrap(),
+    );
     let resp = handle_acm_request(State(state.clone()), headers.clone(), Bytes::new()).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();

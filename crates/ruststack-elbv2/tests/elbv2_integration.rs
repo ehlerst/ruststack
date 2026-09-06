@@ -1,4 +1,3 @@
-use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode, Uri};
 use bytes::Bytes;
@@ -12,7 +11,9 @@ async fn test_elbv2_load_balancer_and_target_group_lifecycle() {
     let headers = HeaderMap::new();
 
     // 1. Create Target Group
-    let body = Bytes::from("Action=CreateTargetGroup&Name=web-targets&Protocol=HTTP&Port=80&TargetType=instance");
+    let body = Bytes::from(
+        "Action=CreateTargetGroup&Name=web-targets&Protocol=HTTP&Port=80&TargetType=instance",
+    );
     let resp = handle_elbv2_request(State(state.clone()), uri.clone(), headers.clone(), body).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();

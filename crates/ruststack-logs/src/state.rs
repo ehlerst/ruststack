@@ -186,7 +186,7 @@ impl LogsState {
         })?;
 
         let mut list = Vec::new();
-        for (_, stored) in &group_entry.streams {
+        for stored in group_entry.streams.values() {
             if let Some(ref prefix) = req.log_stream_name_prefix {
                 if !stored.stream.log_stream_name.starts_with(prefix) {
                     continue;
@@ -247,7 +247,7 @@ impl LogsState {
             let mut added_bytes = 0i64;
 
             for event in req.log_events {
-                let msg_len = event.message.as_bytes().len() as i64 + 26;
+                let msg_len = event.message.len() as i64 + 26;
                 added_bytes += msg_len;
 
                 let ts = event.timestamp;

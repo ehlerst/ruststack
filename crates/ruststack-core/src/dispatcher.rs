@@ -149,7 +149,9 @@ impl Dispatcher {
             if target.starts_with("AWSWAF_20190729") || target.starts_with("WAF") {
                 return AwsService::WafV2;
             }
-            if target.starts_with("AWSOrganizationsV20161128") || target.starts_with("Organizations") {
+            if target.starts_with("AWSOrganizationsV20161128")
+                || target.starts_with("Organizations")
+            {
                 return AwsService::Organizations;
             }
         }

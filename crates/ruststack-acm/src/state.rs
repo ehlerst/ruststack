@@ -154,7 +154,11 @@ impl AcmState {
 
     pub fn export_snapshot(&self) -> AcmStateSnapshot {
         AcmStateSnapshot {
-            certificates: self.certificates.iter().map(|kv| kv.value().clone()).collect(),
+            certificates: self
+                .certificates
+                .iter()
+                .map(|kv| kv.value().clone())
+                .collect(),
         }
     }
 

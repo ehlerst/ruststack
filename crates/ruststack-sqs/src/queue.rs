@@ -283,7 +283,11 @@ impl SqsEngine {
         let all = attribute_names.is_empty() || attribute_names.iter().any(|a| a == "All");
 
         let now = Instant::now();
-        let visible_count = state.messages.iter().filter(|m| m.visible_at <= now).count();
+        let visible_count = state
+            .messages
+            .iter()
+            .filter(|m| m.visible_at <= now)
+            .count();
         let delayed_count = state.messages.iter().filter(|m| m.visible_at > now).count();
         let in_flight_count = state.in_flight.len();
 
@@ -753,7 +757,10 @@ impl SqsEngine {
         Ok(())
     }
 
-    pub fn list_queue_tags(&self, queue_id: &str) -> Result<HashMap<String, String>, RustStackError> {
+    pub fn list_queue_tags(
+        &self,
+        queue_id: &str,
+    ) -> Result<HashMap<String, String>, RustStackError> {
         let name = self.resolve_queue_name(queue_id);
         let q = self.queues.get(&name).ok_or_else(|| {
             RustStackError::sqs_not_found(

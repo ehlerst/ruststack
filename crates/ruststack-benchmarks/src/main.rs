@@ -907,11 +907,11 @@ fn run_kms_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     // 3. Decrypt
     let mut latencies = Vec::with_capacity(iterations);
     let start_total = Instant::now();
-    for i in 0..iterations {
+    for ct in ciphertexts.iter().take(iterations) {
         let start = Instant::now();
         let _ = kms
             .decrypt(DecryptRequest {
-                ciphertext_blob: ciphertexts[i].clone(),
+                ciphertext_blob: ct.clone(),
                 key_id: None,
                 encryption_algorithm: "SYMMETRIC_DEFAULT".to_string(),
                 encryption_context: None,

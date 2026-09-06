@@ -34,13 +34,27 @@ pub async fn handle_rds_request(
 
     match action.as_str() {
         "CreateDBInstance" => {
-            let identifier = params.get("DBInstanceIdentifier").cloned().unwrap_or_default();
-            let db_instance_class = params.get("DBInstanceClass").cloned().unwrap_or_else(|| "db.t3.micro".to_string());
-            let engine = params.get("Engine").cloned().unwrap_or_else(|| "postgres".to_string());
+            let identifier = params
+                .get("DBInstanceIdentifier")
+                .cloned()
+                .unwrap_or_default();
+            let db_instance_class = params
+                .get("DBInstanceClass")
+                .cloned()
+                .unwrap_or_else(|| "db.t3.micro".to_string());
+            let engine = params
+                .get("Engine")
+                .cloned()
+                .unwrap_or_else(|| "postgres".to_string());
             let engine_version = params.get("EngineVersion").cloned();
-            let master_username = params.get("MasterUsername").cloned().unwrap_or_else(|| "postgres".to_string());
+            let master_username = params
+                .get("MasterUsername")
+                .cloned()
+                .unwrap_or_else(|| "postgres".to_string());
             let db_name = params.get("DBName").cloned();
-            let allocated_storage = params.get("AllocatedStorage").and_then(|s| s.parse::<i32>().ok());
+            let allocated_storage = params
+                .get("AllocatedStorage")
+                .and_then(|s| s.parse::<i32>().ok());
             let db_cluster_identifier = params.get("DBClusterIdentifier").cloned();
 
             match state.create_db_instance(
@@ -104,7 +118,10 @@ pub async fn handle_rds_request(
             }
         }
         "DeleteDBInstance" => {
-            let identifier = params.get("DBInstanceIdentifier").cloned().unwrap_or_default();
+            let identifier = params
+                .get("DBInstanceIdentifier")
+                .cloned()
+                .unwrap_or_default();
             match state.delete_db_instance(&identifier) {
                 Ok(inst) => {
                     let xml = format!(
@@ -130,13 +147,28 @@ pub async fn handle_rds_request(
             }
         }
         "CreateDBCluster" => {
-            let identifier = params.get("DBClusterIdentifier").cloned().unwrap_or_default();
-            let engine = params.get("Engine").cloned().unwrap_or_else(|| "aurora-postgresql".to_string());
+            let identifier = params
+                .get("DBClusterIdentifier")
+                .cloned()
+                .unwrap_or_default();
+            let engine = params
+                .get("Engine")
+                .cloned()
+                .unwrap_or_else(|| "aurora-postgresql".to_string());
             let engine_version = params.get("EngineVersion").cloned();
-            let master_username = params.get("MasterUsername").cloned().unwrap_or_else(|| "postgres".to_string());
+            let master_username = params
+                .get("MasterUsername")
+                .cloned()
+                .unwrap_or_else(|| "postgres".to_string());
             let database_name = params.get("DatabaseName").cloned();
 
-            match state.create_db_cluster(identifier, engine, engine_version, master_username, database_name) {
+            match state.create_db_cluster(
+                identifier,
+                engine,
+                engine_version,
+                master_username,
+                database_name,
+            ) {
                 Ok(cl) => {
                     let xml = format!(
                         r#"<CreateDBClusterResponse xmlns="{}">
@@ -188,8 +220,14 @@ pub async fn handle_rds_request(
             }
         }
         "CreateDBSnapshot" => {
-            let snapshot_id = params.get("DBSnapshotIdentifier").cloned().unwrap_or_default();
-            let instance_id = params.get("DBInstanceIdentifier").cloned().unwrap_or_default();
+            let snapshot_id = params
+                .get("DBSnapshotIdentifier")
+                .cloned()
+                .unwrap_or_default();
+            let instance_id = params
+                .get("DBInstanceIdentifier")
+                .cloned()
+                .unwrap_or_default();
             match state.create_db_snapshot(snapshot_id, instance_id) {
                 Ok(sn) => {
                     let xml = format!(
@@ -208,7 +246,14 @@ pub async fn handle_rds_request(
     <RequestId>{}</RequestId>
   </ResponseMetadata>
 </CreateDBSnapshotResponse>"#,
-                        RDS_XMLNS, sn.db_snapshot_identifier, sn.db_instance_identifier, sn.engine, sn.allocated_storage, sn.status, sn.master_username, request_id
+                        RDS_XMLNS,
+                        sn.db_snapshot_identifier,
+                        sn.db_instance_identifier,
+                        sn.engine,
+                        sn.allocated_storage,
+                        sn.status,
+                        sn.master_username,
+                        request_id
                     );
                     Response::builder()
                         .status(StatusCode::OK)
@@ -219,7 +264,11 @@ pub async fn handle_rds_request(
                 Err(e) => render_rds_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id),
             }
         }
-        _ => render_rds_error(&format!("Unknown Action: {}", action), StatusCode::BAD_REQUEST, &request_id),
+        _ => render_rds_error(
+            &format!("Unknown Action: {}", action),
+            StatusCode::BAD_REQUEST,
+            &request_id,
+        ),
     }
 }
 

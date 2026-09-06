@@ -25,15 +25,24 @@ pub async fn handle_ecs_request(
         "CreateCluster" => {
             let req: CreateClusterRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.create_cluster(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string()),
+                Err(e) => {
+                    error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string())
+                }
             }
         }
         "DescribeClusters" => {
-            let req: DescribeClustersRequest = serde_json::from_slice(&body).unwrap_or(DescribeClustersRequest { clusters: None });
+            let req: DescribeClustersRequest =
+                serde_json::from_slice(&body).unwrap_or(DescribeClustersRequest { clusters: None });
             let resp = state.describe_clusters(req);
             json_response(StatusCode::OK, &resp)
         }
@@ -44,65 +53,114 @@ pub async fn handle_ecs_request(
         "DeleteCluster" => {
             let req: DeleteClusterRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.delete_cluster(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ClusterNotFoundException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "ClusterNotFoundException",
+                    &e.to_string(),
+                ),
             }
         }
         "RegisterTaskDefinition" => {
             let req: RegisterTaskDefinitionRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.register_task_definition(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string()),
+                Err(e) => {
+                    error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string())
+                }
             }
         }
         "DescribeTaskDefinition" => {
             let req: DescribeTaskDefinitionRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.describe_task_definition(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string()),
+                Err(e) => {
+                    error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string())
+                }
             }
         }
         "DeregisterTaskDefinition" => {
             let req: DeregisterTaskDefinitionRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.deregister_task_definition(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string()),
+                Err(e) => {
+                    error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string())
+                }
             }
         }
         "ListTaskDefinitions" => {
-            let req: ListTaskDefinitionsRequest = serde_json::from_slice(&body).unwrap_or(ListTaskDefinitionsRequest {
-                family_prefix: None,
-                status: None,
-            });
+            let req: ListTaskDefinitionsRequest =
+                serde_json::from_slice(&body).unwrap_or(ListTaskDefinitionsRequest {
+                    family_prefix: None,
+                    status: None,
+                });
             let resp = state.list_task_definitions(req);
             json_response(StatusCode::OK, &resp)
         }
         "RunTask" => {
             let req: RunTaskRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.run_task(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string()),
+                Err(e) => {
+                    error_response(StatusCode::BAD_REQUEST, "ClientException", &e.to_string())
+                }
             }
         }
         "DescribeTasks" => {
             let req: DescribeTasksRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             let resp = state.describe_tasks(req);
             json_response(StatusCode::OK, &resp)
@@ -110,11 +168,21 @@ pub async fn handle_ecs_request(
         "StopTask" => {
             let req: StopTaskRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.stop_task(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidParameterException",
+                    &e.to_string(),
+                ),
             }
         }
         "ListTasks" => {
@@ -129,17 +197,33 @@ pub async fn handle_ecs_request(
         "CreateService" => {
             let req: CreateServiceRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.create_service(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ClusterNotFoundException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "ClusterNotFoundException",
+                    &e.to_string(),
+                ),
             }
         }
         "DescribeServices" => {
             let req: DescribeServicesRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             let resp = state.describe_services(req);
             json_response(StatusCode::OK, &resp)
@@ -147,25 +231,46 @@ pub async fn handle_ecs_request(
         "UpdateService" => {
             let req: UpdateServiceRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.update_service(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ServiceNotFoundException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "ServiceNotFoundException",
+                    &e.to_string(),
+                ),
             }
         }
         "DeleteService" => {
             let req: DeleteServiceRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidParameterException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "InvalidParameterException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.delete_service(req) {
                 Ok(resp) => json_response(StatusCode::OK, &resp),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "ServiceNotFoundException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "ServiceNotFoundException",
+                    &e.to_string(),
+                ),
             }
         }
         "ListServices" => {
-            let req: ListServicesRequest = serde_json::from_slice(&body).unwrap_or(ListServicesRequest { cluster: None });
+            let req: ListServicesRequest =
+                serde_json::from_slice(&body).unwrap_or(ListServicesRequest { cluster: None });
             let resp = state.list_services(req);
             json_response(StatusCode::OK, &resp)
         }

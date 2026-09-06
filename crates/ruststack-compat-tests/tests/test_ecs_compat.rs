@@ -37,7 +37,9 @@ async fn test_ecs_fargate_cluster_task_service_compat() {
         )
         .await;
     assert_eq!(status, StatusCode::OK);
-    let td_arn = body["taskDefinition"]["taskDefinitionArn"].as_str().unwrap();
+    let td_arn = body["taskDefinition"]["taskDefinitionArn"]
+        .as_str()
+        .unwrap();
 
     // 3. CreateService
     let (status, body) = client

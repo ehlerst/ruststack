@@ -14,7 +14,11 @@ pub async fn handle_route53_request(
     body: Bytes,
 ) -> Response {
     let path = uri.path();
-    let segments: Vec<&str> = path.trim_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+    let segments: Vec<&str> = path
+        .trim_matches('/')
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
 
     // Standard Route 53 URLs:
     // /2013-04-01/hostedzone
@@ -33,7 +37,9 @@ pub async fn handle_route53_request(
         (Method::POST, ["hostedzone"]) => {
             let req: CreateHostedZoneRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidInput", &e.to_string()),
+                Err(e) => {
+                    return error_response(StatusCode::BAD_REQUEST, "InvalidInput", &e.to_string())
+                }
             };
             match state.create_hosted_zone(req) {
                 Ok(res) => json_response(StatusCode::CREATED, serde_json::to_value(res).unwrap()),
@@ -59,7 +65,9 @@ pub async fn handle_route53_request(
         (Method::POST, ["hostedzone", zone_id, "rrset"]) => {
             let req: ChangeResourceRecordSetsRequest = match serde_json::from_slice(&body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "InvalidInput", &e.to_string()),
+                Err(e) => {
+                    return error_response(StatusCode::BAD_REQUEST, "InvalidInput", &e.to_string())
+                }
             };
             match state.change_resource_record_sets(zone_id, req) {
                 Ok(res) => json_response(StatusCode::OK, serde_json::to_value(res).unwrap()),

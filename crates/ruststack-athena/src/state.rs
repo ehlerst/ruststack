@@ -73,7 +73,12 @@ impl AthenaState {
             .result_configuration
             .as_ref()
             .and_then(|r| r.output_location.clone())
-            .unwrap_or_else(|| format!("s3://aws-athena-query-results-{}-{}/", self.account_id, self.region));
+            .unwrap_or_else(|| {
+                format!(
+                    "s3://aws-athena-query-results-{}-{}/",
+                    self.account_id, self.region
+                )
+            });
 
         let execution = QueryExecution {
             query_execution_id: qid.clone(),
@@ -107,7 +112,10 @@ impl AthenaState {
             .ok_or_else(|| AthenaError::QueryNotFound(query_id.to_string()))
     }
 
-    pub fn get_query_results(&self, query_id: &str) -> Result<GetQueryResultsResponse, AthenaError> {
+    pub fn get_query_results(
+        &self,
+        query_id: &str,
+    ) -> Result<GetQueryResultsResponse, AthenaError> {
         let query = self.get_query_execution(query_id)?;
 
         let (cols, rows) = if query.query.to_uppercase().contains("COUNT") {
@@ -198,11 +206,17 @@ impl AthenaState {
     }
 
     pub fn list_named_queries(&self) -> Vec<String> {
-        self.named_queries.iter().map(|kv| kv.key().clone()).collect()
+        self.named_queries
+            .iter()
+            .map(|kv| kv.key().clone())
+            .collect()
     }
 
     pub fn list_work_groups(&self) -> Vec<WorkGroupSummary> {
-        self.work_groups.iter().map(|kv| kv.value().clone()).collect()
+        self.work_groups
+            .iter()
+            .map(|kv| kv.value().clone())
+            .collect()
     }
 
     pub fn reset(&self) {
@@ -215,7 +229,11 @@ impl AthenaState {
     pub fn export_snapshot(&self) -> AthenaStateSnapshot {
         AthenaStateSnapshot {
             queries: self.queries.iter().map(|kv| kv.value().clone()).collect(),
-            named_queries: self.named_queries.iter().map(|kv| kv.value().clone()).collect(),
+            named_queries: self
+                .named_queries
+                .iter()
+                .map(|kv| kv.value().clone())
+                .collect(),
         }
     }
 

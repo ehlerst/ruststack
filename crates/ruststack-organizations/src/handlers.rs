@@ -28,15 +28,21 @@ pub async fn handle_organizations_request(
             let feature_set = val["FeatureSet"].as_str().map(String::from);
             match state.create_organization(feature_set) {
                 Ok(org) => json_response(StatusCode::OK, json!({ "Organization": org })),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "AlreadyInOrganizationException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "AlreadyInOrganizationException",
+                    &e.to_string(),
+                ),
             }
         }
-        "DescribeOrganization" => {
-            match state.describe_organization() {
-                Ok(org) => json_response(StatusCode::OK, json!({ "Organization": org })),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "AWSOrganizationsNotInUseException", &e.to_string()),
-            }
-        }
+        "DescribeOrganization" => match state.describe_organization() {
+            Ok(org) => json_response(StatusCode::OK, json!({ "Organization": org })),
+            Err(e) => error_response(
+                StatusCode::BAD_REQUEST,
+                "AWSOrganizationsNotInUseException",
+                &e.to_string(),
+            ),
+        },
         "CreateAccount" => {
             let account_name = val["AccountName"].as_str().unwrap_or_default().to_string();
             let email = val["Email"].as_str().unwrap_or_default().to_string();
@@ -53,7 +59,11 @@ pub async fn handle_organizations_request(
                     });
                     json_response(StatusCode::OK, status)
                 }
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "DuplicateAccountException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "DuplicateAccountException",
+                    &e.to_string(),
+                ),
             }
         }
         "ListAccounts" => {
@@ -70,7 +80,11 @@ pub async fn handle_organizations_request(
 
             match state.create_organizational_unit(parent_id, name) {
                 Ok(ou) => json_response(StatusCode::OK, json!({ "OrganizationalUnit": ou })),
-                Err(e) => error_response(StatusCode::BAD_REQUEST, "InvalidInputException", &e.to_string()),
+                Err(e) => error_response(
+                    StatusCode::BAD_REQUEST,
+                    "InvalidInputException",
+                    &e.to_string(),
+                ),
             }
         }
         "ListOrganizationalUnitsForParent" => {

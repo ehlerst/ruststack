@@ -16,7 +16,9 @@ pub enum Elbv2Error {
     ListenerNotFound(String),
     #[error("DuplicateLoadBalancerNameException: A load balancer with the specified name already exists.")]
     DuplicateLoadBalancerName(String),
-    #[error("DuplicateTargetGroupNameException: A target group with the specified name already exists.")]
+    #[error(
+        "DuplicateTargetGroupNameException: A target group with the specified name already exists."
+    )]
     DuplicateTargetGroupName(String),
     #[error("InvalidConfigurationRequest: {0}")]
     InvalidConfiguration(String),
@@ -28,7 +30,7 @@ pub struct Elbv2State {
     region: String,
     load_balancers: Arc<DashMap<String, LoadBalancer>>, // ARN -> LoadBalancer
     target_groups: Arc<DashMap<String, TargetGroup>>,   // ARN -> TargetGroup
-    listeners: Arc<DashMap<String, Listener>>,           // ARN -> Listener
+    listeners: Arc<DashMap<String, Listener>>,          // ARN -> Listener
 }
 
 impl Elbv2State {
@@ -50,8 +52,16 @@ impl Elbv2State {
 
     pub fn export_snapshot(&self) -> Elbv2StateSnapshot {
         Elbv2StateSnapshot {
-            load_balancers: self.load_balancers.iter().map(|kv| kv.value().clone()).collect(),
-            target_groups: self.target_groups.iter().map(|kv| kv.value().clone()).collect(),
+            load_balancers: self
+                .load_balancers
+                .iter()
+                .map(|kv| kv.value().clone())
+                .collect(),
+            target_groups: self
+                .target_groups
+                .iter()
+                .map(|kv| kv.value().clone())
+                .collect(),
             listeners: self.listeners.iter().map(|kv| kv.value().clone()).collect(),
         }
     }
@@ -86,13 +96,20 @@ impl Elbv2State {
         }
 
         let lb_type_val = lb_type.unwrap_or_else(|| "application".to_string());
-        let short_type = if lb_type_val == "network" { "net" } else { "app" };
+        let short_type = if lb_type_val == "network" {
+            "net"
+        } else {
+            "app"
+        };
         let hex_id = &Uuid::new_v4().to_string().replace('-', "")[..16];
         let arn = format!(
             "arn:aws:elasticloadbalancing:{}:{}:loadbalancer/{}/{}/{}",
             self.region, self.account_id, short_type, name, hex_id
         );
-        let dns_name = format!("{}-{}.{}.elb.localhost.localstack.cloud", name, hex_id, self.region);
+        let dns_name = format!(
+            "{}-{}.{}.elb.localhost.localstack.cloud",
+            name, hex_id, self.region
+        );
 
         let lb = LoadBalancer {
             load_balancer_arn: arn.clone(),
@@ -219,8 +236,15 @@ impl Elbv2State {
         Ok(())
     }
 
-    pub fn register_targets(&self, tg_arn: &str, targets: Vec<TargetDescription>) -> Result<(), Elbv2Error> {
-        let mut tg = self.target_groups.get_mut(tg_arn).ok_or_else(|| Elbv2Error::TargetGroupNotFound(tg_arn.to_string()))?;
+    pub fn register_targets(
+        &self,
+        tg_arn: &str,
+        targets: Vec<TargetDescription>,
+    ) -> Result<(), Elbv2Error> {
+        let mut tg = self
+            .target_groups
+            .get_mut(tg_arn)
+            .ok_or_else(|| Elbv2Error::TargetGroupNotFound(tg_arn.to_string()))?;
         for t in targets {
             if !tg.targets.iter().any(|existing| existing.id == t.id) {
                 tg.targets.push(t);
@@ -229,19 +253,36 @@ impl Elbv2State {
         Ok(())
     }
 
-    pub fn deregister_targets(&self, tg_arn: &str, targets: Vec<TargetDescription>) -> Result<(), Elbv2Error> {
-        let mut tg = self.target_groups.get_mut(tg_arn).ok_or_else(|| Elbv2Error::TargetGroupNotFound(tg_arn.to_string()))?;
+    pub fn deregister_targets(
+        &self,
+        tg_arn: &str,
+        targets: Vec<TargetDescription>,
+    ) -> Result<(), Elbv2Error> {
+        let mut tg = self
+            .target_groups
+            .get_mut(tg_arn)
+            .ok_or_else(|| Elbv2Error::TargetGroupNotFound(tg_arn.to_string()))?;
         let remove_ids: Vec<String> = targets.into_iter().map(|t| t.id).collect();
         tg.targets.retain(|t| !remove_ids.contains(&t.id));
         Ok(())
     }
 
-    pub fn describe_target_health(&self, tg_arn: &str) -> Result<Vec<TargetHealthDescription>, Elbv2Error> {
-        let tg = self.target_groups.get(tg_arn).ok_or_else(|| Elbv2Error::TargetGroupNotFound(tg_arn.to_string()))?;
-        let descs = tg.targets.iter().map(|t| TargetHealthDescription {
-            target: t.clone(),
-            target_health: "healthy".to_string(),
-        }).collect();
+    pub fn describe_target_health(
+        &self,
+        tg_arn: &str,
+    ) -> Result<Vec<TargetHealthDescription>, Elbv2Error> {
+        let tg = self
+            .target_groups
+            .get(tg_arn)
+            .ok_or_else(|| Elbv2Error::TargetGroupNotFound(tg_arn.to_string()))?;
+        let descs = tg
+            .targets
+            .iter()
+            .map(|t| TargetHealthDescription {
+                target: t.clone(),
+                target_health: "healthy".to_string(),
+            })
+            .collect();
         Ok(descs)
     }
 
@@ -253,10 +294,17 @@ impl Elbv2State {
         protocol: String,
         default_actions: Vec<ListenerAction>,
     ) -> Result<Listener, Elbv2Error> {
-        let lb = self.load_balancers.get(&lb_arn).ok_or_else(|| Elbv2Error::LoadBalancerNotFound(lb_arn.clone()))?;
-        
+        let lb = self
+            .load_balancers
+            .get(&lb_arn)
+            .ok_or_else(|| Elbv2Error::LoadBalancerNotFound(lb_arn.clone()))?;
+
         let hex_id = &Uuid::new_v4().to_string().replace('-', "")[..16];
-        let listener_arn = format!("{}/{}", lb_arn.replace(":loadbalancer/", ":listener/"), hex_id);
+        let listener_arn = format!(
+            "{}/{}",
+            lb_arn.replace(":loadbalancer/", ":listener/"),
+            hex_id
+        );
 
         for action in &default_actions {
             if let Some(ref tg_arn) = action.target_group_arn {
@@ -282,7 +330,11 @@ impl Elbv2State {
         Ok(listener)
     }
 
-    pub fn describe_listeners(&self, lb_arn: Option<String>, listener_arns: Option<Vec<String>>) -> Vec<Listener> {
+    pub fn describe_listeners(
+        &self,
+        lb_arn: Option<String>,
+        listener_arns: Option<Vec<String>>,
+    ) -> Vec<Listener> {
         let mut results = Vec::new();
         for item in self.listeners.iter() {
             let l = item.value();

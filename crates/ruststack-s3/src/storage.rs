@@ -150,13 +150,27 @@ pub trait S3Storage: Send + Sync {
     ) -> Result<Option<String>, RustStackError>;
 
     // Lifecycle
-    fn get_bucket_lifecycle(&self, bucket: &str) -> Result<Option<crate::types::BucketLifecycleConfig>, RustStackError>;
-    fn put_bucket_lifecycle(&self, bucket: &str, config: crate::types::BucketLifecycleConfig) -> Result<(), RustStackError>;
+    fn get_bucket_lifecycle(
+        &self,
+        bucket: &str,
+    ) -> Result<Option<crate::types::BucketLifecycleConfig>, RustStackError>;
+    fn put_bucket_lifecycle(
+        &self,
+        bucket: &str,
+        config: crate::types::BucketLifecycleConfig,
+    ) -> Result<(), RustStackError>;
     fn delete_bucket_lifecycle(&self, bucket: &str) -> Result<(), RustStackError>;
 
     // CORS
-    fn get_bucket_cors(&self, bucket: &str) -> Result<Option<crate::types::BucketCorsConfig>, RustStackError>;
-    fn put_bucket_cors(&self, bucket: &str, config: crate::types::BucketCorsConfig) -> Result<(), RustStackError>;
+    fn get_bucket_cors(
+        &self,
+        bucket: &str,
+    ) -> Result<Option<crate::types::BucketCorsConfig>, RustStackError>;
+    fn put_bucket_cors(
+        &self,
+        bucket: &str,
+        config: crate::types::BucketCorsConfig,
+    ) -> Result<(), RustStackError>;
     fn delete_bucket_cors(&self, bucket: &str) -> Result<(), RustStackError>;
 
     // Policy
@@ -166,7 +180,11 @@ pub trait S3Storage: Send + Sync {
 
     // Tagging
     fn get_bucket_tagging(&self, bucket: &str) -> Result<HashMap<String, String>, RustStackError>;
-    fn put_bucket_tagging(&self, bucket: &str, tags: HashMap<String, String>) -> Result<(), RustStackError>;
+    fn put_bucket_tagging(
+        &self,
+        bucket: &str,
+        tags: HashMap<String, String>,
+    ) -> Result<(), RustStackError>;
     fn delete_bucket_tagging(&self, bucket: &str) -> Result<(), RustStackError>;
 
     fn set_notification_target(&self, target: Arc<dyn S3NotificationTarget>);
@@ -1031,7 +1049,10 @@ impl S3Storage for InMemoryStorage {
             .iter()
             .find(|v| v.version_id == version_id)
             .ok_or_else(|| {
-                RustStackError::s3_not_found("NoSuchVersion", "The specified version does not exist.")
+                RustStackError::s3_not_found(
+                    "NoSuchVersion",
+                    "The specified version does not exist.",
+                )
             })?;
 
         if found.is_delete_marker {
@@ -1113,7 +1134,10 @@ impl S3Storage for InMemoryStorage {
         }
     }
 
-    fn get_bucket_lifecycle(&self, bucket: &str) -> Result<Option<crate::types::BucketLifecycleConfig>, RustStackError> {
+    fn get_bucket_lifecycle(
+        &self,
+        bucket: &str,
+    ) -> Result<Option<crate::types::BucketLifecycleConfig>, RustStackError> {
         let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
             code: "NoSuchBucket".to_string(),
             message: "The specified bucket does not exist".to_string(),
@@ -1124,7 +1148,11 @@ impl S3Storage for InMemoryStorage {
         Ok(res)
     }
 
-    fn put_bucket_lifecycle(&self, bucket: &str, config: crate::types::BucketLifecycleConfig) -> Result<(), RustStackError> {
+    fn put_bucket_lifecycle(
+        &self,
+        bucket: &str,
+        config: crate::types::BucketLifecycleConfig,
+    ) -> Result<(), RustStackError> {
         let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
             code: "NoSuchBucket".to_string(),
             message: "The specified bucket does not exist".to_string(),
@@ -1146,7 +1174,10 @@ impl S3Storage for InMemoryStorage {
         Ok(())
     }
 
-    fn get_bucket_cors(&self, bucket: &str) -> Result<Option<crate::types::BucketCorsConfig>, RustStackError> {
+    fn get_bucket_cors(
+        &self,
+        bucket: &str,
+    ) -> Result<Option<crate::types::BucketCorsConfig>, RustStackError> {
         let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
             code: "NoSuchBucket".to_string(),
             message: "The specified bucket does not exist".to_string(),
@@ -1157,7 +1188,11 @@ impl S3Storage for InMemoryStorage {
         Ok(res)
     }
 
-    fn put_bucket_cors(&self, bucket: &str, config: crate::types::BucketCorsConfig) -> Result<(), RustStackError> {
+    fn put_bucket_cors(
+        &self,
+        bucket: &str,
+        config: crate::types::BucketCorsConfig,
+    ) -> Result<(), RustStackError> {
         let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
             code: "NoSuchBucket".to_string(),
             message: "The specified bucket does not exist".to_string(),
@@ -1223,7 +1258,11 @@ impl S3Storage for InMemoryStorage {
         Ok(res)
     }
 
-    fn put_bucket_tagging(&self, bucket: &str, tags: HashMap<String, String>) -> Result<(), RustStackError> {
+    fn put_bucket_tagging(
+        &self,
+        bucket: &str,
+        tags: HashMap<String, String>,
+    ) -> Result<(), RustStackError> {
         let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
             code: "NoSuchBucket".to_string(),
             message: "The specified bucket does not exist".to_string(),

@@ -34,11 +34,16 @@ pub async fn handle_elasticache_request(
 
     match action.as_str() {
         "CreateCacheCluster" => {
-            let identifier = params.get("CacheClusterIdentifier").cloned().unwrap_or_default();
+            let identifier = params
+                .get("CacheClusterIdentifier")
+                .cloned()
+                .unwrap_or_default();
             let cache_node_type = params.get("CacheNodeType").cloned();
             let engine = params.get("Engine").cloned();
             let engine_version = params.get("EngineVersion").cloned();
-            let num_cache_nodes = params.get("NumCacheNodes").and_then(|s| s.parse::<i32>().ok());
+            let num_cache_nodes = params
+                .get("NumCacheNodes")
+                .and_then(|s| s.parse::<i32>().ok());
             let replication_group_id = params.get("ReplicationGroupId").cloned();
 
             match state.create_cache_cluster(
@@ -69,7 +74,9 @@ pub async fn handle_elasticache_request(
                         .body(Body::from(xml))
                         .unwrap()
                 }
-                Err(e) => render_elasticache_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id),
+                Err(e) => {
+                    render_elasticache_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id)
+                }
             }
         }
         "DescribeCacheClusters" => {
@@ -96,11 +103,16 @@ pub async fn handle_elasticache_request(
                         .body(Body::from(xml))
                         .unwrap()
                 }
-                Err(e) => render_elasticache_error(&e.to_string(), StatusCode::NOT_FOUND, &request_id),
+                Err(e) => {
+                    render_elasticache_error(&e.to_string(), StatusCode::NOT_FOUND, &request_id)
+                }
             }
         }
         "DeleteCacheCluster" => {
-            let identifier = params.get("CacheClusterIdentifier").cloned().unwrap_or_default();
+            let identifier = params
+                .get("CacheClusterIdentifier")
+                .cloned()
+                .unwrap_or_default();
             match state.delete_cache_cluster(&identifier) {
                 Ok(cl) => {
                     let xml = format!(
@@ -122,13 +134,23 @@ pub async fn handle_elasticache_request(
                         .body(Body::from(xml))
                         .unwrap()
                 }
-                Err(e) => render_elasticache_error(&e.to_string(), StatusCode::NOT_FOUND, &request_id),
+                Err(e) => {
+                    render_elasticache_error(&e.to_string(), StatusCode::NOT_FOUND, &request_id)
+                }
             }
         }
         "CreateReplicationGroup" => {
-            let identifier = params.get("ReplicationGroupId").cloned().unwrap_or_default();
-            let description = params.get("ReplicationGroupDescription").cloned().unwrap_or_else(|| "Redis replication group".to_string());
-            let num_clusters = params.get("NumCacheClusters").and_then(|s| s.parse::<i32>().ok());
+            let identifier = params
+                .get("ReplicationGroupId")
+                .cloned()
+                .unwrap_or_default();
+            let description = params
+                .get("ReplicationGroupDescription")
+                .cloned()
+                .unwrap_or_else(|| "Redis replication group".to_string());
+            let num_clusters = params
+                .get("NumCacheClusters")
+                .and_then(|s| s.parse::<i32>().ok());
 
             match state.create_replication_group(identifier, description, num_clusters) {
                 Ok(rg) => {
@@ -151,7 +173,9 @@ pub async fn handle_elasticache_request(
                         .body(Body::from(xml))
                         .unwrap()
                 }
-                Err(e) => render_elasticache_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id),
+                Err(e) => {
+                    render_elasticache_error(&e.to_string(), StatusCode::BAD_REQUEST, &request_id)
+                }
             }
         }
         "DescribeReplicationGroups" => {
@@ -178,10 +202,16 @@ pub async fn handle_elasticache_request(
                         .body(Body::from(xml))
                         .unwrap()
                 }
-                Err(e) => render_elasticache_error(&e.to_string(), StatusCode::NOT_FOUND, &request_id),
+                Err(e) => {
+                    render_elasticache_error(&e.to_string(), StatusCode::NOT_FOUND, &request_id)
+                }
             }
         }
-        _ => render_elasticache_error(&format!("Unknown Action: {}", action), StatusCode::BAD_REQUEST, &request_id),
+        _ => render_elasticache_error(
+            &format!("Unknown Action: {}", action),
+            StatusCode::BAD_REQUEST,
+            &request_id,
+        ),
     }
 }
 
@@ -228,12 +258,19 @@ fn render_cache_cluster(cl: &CacheCluster) -> String {
 
 fn render_replication_group(rg: &ReplicationGroup) -> String {
     let ep_xml = if let Some(ref ep) = rg.primary_endpoint {
-        format!("<PrimaryEndpoint><Address>{}</Address><Port>{}</Port></PrimaryEndpoint>", ep.address, ep.port)
+        format!(
+            "<PrimaryEndpoint><Address>{}</Address><Port>{}</Port></PrimaryEndpoint>",
+            ep.address, ep.port
+        )
     } else {
         "".to_string()
     };
 
-    let member_xml: String = rg.member_clusters.iter().map(|m| format!("<member>{}</member>", m)).collect();
+    let member_xml: String = rg
+        .member_clusters
+        .iter()
+        .map(|m| format!("<member>{}</member>", m))
+        .collect();
 
     format!(
         r#"<ReplicationGroup>

@@ -35,7 +35,10 @@ pub async fn handle_elbv2_request(
 
     match action {
         "CreateLoadBalancer" => {
-            let name = params.get("Name").cloned().unwrap_or_else(|| "my-lb".to_string());
+            let name = params
+                .get("Name")
+                .cloned()
+                .unwrap_or_else(|| "my-lb".to_string());
             let subnets = parse_indexed_list(&params, "Subnets.member");
             let sgs = parse_indexed_list(&params, "SecurityGroups.member");
             let scheme = params.get("Scheme").cloned();
@@ -61,11 +64,23 @@ pub async fn handle_elbv2_request(
     </CreateLoadBalancerResult>
     <ResponseMetadata><RequestId>{}</RequestId></ResponseMetadata>
 </CreateLoadBalancerResponse>"#,
-                        lb.load_balancer_arn, lb.dns_name, lb.load_balancer_name, lb.scheme, lb.vpc_id.unwrap_or_default(), lb.state, lb.lb_type, request_id
+                        lb.load_balancer_arn,
+                        lb.dns_name,
+                        lb.load_balancer_name,
+                        lb.scheme,
+                        lb.vpc_id.unwrap_or_default(),
+                        lb.state,
+                        lb.lb_type,
+                        request_id
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "DuplicateLoadBalancerName", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "DuplicateLoadBalancerName",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "DescribeLoadBalancers" => {
@@ -87,7 +102,13 @@ pub async fn handle_elbv2_request(
         <State><Code>{}</Code></State>
         <Type>{}</Type>
     </member>"#,
-                    lb.load_balancer_arn, lb.dns_name, lb.load_balancer_name, lb.scheme, lb.vpc_id.unwrap_or_default(), lb.state, lb.lb_type
+                    lb.load_balancer_arn,
+                    lb.dns_name,
+                    lb.load_balancer_name,
+                    lb.scheme,
+                    lb.vpc_id.unwrap_or_default(),
+                    lb.state,
+                    lb.lb_type
                 ));
             }
             let xml = format!(
@@ -102,7 +123,10 @@ pub async fn handle_elbv2_request(
             xml_response(StatusCode::OK, xml)
         }
         "DeleteLoadBalancer" => {
-            let arn = params.get("LoadBalancerArn").map(|s| s.as_str()).unwrap_or("");
+            let arn = params
+                .get("LoadBalancerArn")
+                .map(|s| s.as_str())
+                .unwrap_or("");
             match state.delete_load_balancer(arn) {
                 Ok(()) => {
                     let xml = format!(
@@ -114,11 +138,19 @@ pub async fn handle_elbv2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "LoadBalancerNotFound", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "LoadBalancerNotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "CreateTargetGroup" => {
-            let name = params.get("Name").cloned().unwrap_or_else(|| "my-tg".to_string());
+            let name = params
+                .get("Name")
+                .cloned()
+                .unwrap_or_else(|| "my-tg".to_string());
             let protocol = params.get("Protocol").cloned();
             let port = params.get("Port").and_then(|p| p.parse().ok());
             let vpc_id = params.get("VpcId").cloned();
@@ -143,11 +175,22 @@ pub async fn handle_elbv2_request(
     </CreateTargetGroupResult>
     <ResponseMetadata><RequestId>{}</RequestId></ResponseMetadata>
 </CreateTargetGroupResponse>"#,
-                        tg.target_group_arn, tg.target_group_name, tg.protocol.unwrap_or_default(), tg.port.unwrap_or_default(), tg.vpc_id.unwrap_or_default(), tg.target_type, request_id
+                        tg.target_group_arn,
+                        tg.target_group_name,
+                        tg.protocol.unwrap_or_default(),
+                        tg.port.unwrap_or_default(),
+                        tg.vpc_id.unwrap_or_default(),
+                        tg.target_type,
+                        request_id
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "DuplicateTargetGroupName", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "DuplicateTargetGroupName",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "DescribeTargetGroups" => {
@@ -170,7 +213,12 @@ pub async fn handle_elbv2_request(
         <VpcId>{}</VpcId>
         <TargetType>{}</TargetType>
     </member>"#,
-                    tg.target_group_arn, tg.target_group_name, tg.protocol.unwrap_or_default(), tg.port.unwrap_or_default(), tg.vpc_id.unwrap_or_default(), tg.target_type
+                    tg.target_group_arn,
+                    tg.target_group_name,
+                    tg.protocol.unwrap_or_default(),
+                    tg.port.unwrap_or_default(),
+                    tg.vpc_id.unwrap_or_default(),
+                    tg.target_type
                 ));
             }
             let xml = format!(
@@ -185,7 +233,10 @@ pub async fn handle_elbv2_request(
             xml_response(StatusCode::OK, xml)
         }
         "DeleteTargetGroup" => {
-            let tg_arn = params.get("TargetGroupArn").map(|s| s.as_str()).unwrap_or("");
+            let tg_arn = params
+                .get("TargetGroupArn")
+                .map(|s| s.as_str())
+                .unwrap_or("");
             match state.delete_target_group(tg_arn) {
                 Ok(()) => {
                     let xml = format!(
@@ -197,11 +248,19 @@ pub async fn handle_elbv2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "TargetGroupNotFound", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "TargetGroupNotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "RegisterTargets" => {
-            let tg_arn = params.get("TargetGroupArn").map(|s| s.as_str()).unwrap_or("");
+            let tg_arn = params
+                .get("TargetGroupArn")
+                .map(|s| s.as_str())
+                .unwrap_or("");
             let targets = parse_targets(&params);
             match state.register_targets(tg_arn, targets) {
                 Ok(()) => {
@@ -214,11 +273,19 @@ pub async fn handle_elbv2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "TargetGroupNotFound", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "TargetGroupNotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "DeregisterTargets" => {
-            let tg_arn = params.get("TargetGroupArn").map(|s| s.as_str()).unwrap_or("");
+            let tg_arn = params
+                .get("TargetGroupArn")
+                .map(|s| s.as_str())
+                .unwrap_or("");
             let targets = parse_targets(&params);
             match state.deregister_targets(tg_arn, targets) {
                 Ok(()) => {
@@ -231,11 +298,19 @@ pub async fn handle_elbv2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "TargetGroupNotFound", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "TargetGroupNotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "DescribeTargetHealth" => {
-            let tg_arn = params.get("TargetGroupArn").map(|s| s.as_str()).unwrap_or("");
+            let tg_arn = params
+                .get("TargetGroupArn")
+                .map(|s| s.as_str())
+                .unwrap_or("");
             match state.describe_target_health(tg_arn) {
                 Ok(healths) => {
                     let mut health_xml = String::new();
@@ -250,7 +325,9 @@ pub async fn handle_elbv2_request(
             <State>{}</State>
         </TargetHealth>
     </member>"#,
-                            h.target.id, h.target.port.unwrap_or(80), h.target_health
+                            h.target.id,
+                            h.target.port.unwrap_or(80),
+                            h.target_health
                         ));
                     }
                     let xml = format!(
@@ -264,15 +341,31 @@ pub async fn handle_elbv2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "TargetGroupNotFound", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "TargetGroupNotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "CreateListener" => {
             let lb_arn = params.get("LoadBalancerArn").cloned().unwrap_or_default();
-            let port = params.get("Port").and_then(|p| p.parse().ok()).unwrap_or(80);
-            let protocol = params.get("Protocol").cloned().unwrap_or_else(|| "HTTP".to_string());
-            let tg_arn = params.get("DefaultActions.member.1.TargetGroupArn").cloned();
-            let action_type = params.get("DefaultActions.member.1.Type").cloned().unwrap_or_else(|| "forward".to_string());
+            let port = params
+                .get("Port")
+                .and_then(|p| p.parse().ok())
+                .unwrap_or(80);
+            let protocol = params
+                .get("Protocol")
+                .cloned()
+                .unwrap_or_else(|| "HTTP".to_string());
+            let tg_arn = params
+                .get("DefaultActions.member.1.TargetGroupArn")
+                .cloned();
+            let action_type = params
+                .get("DefaultActions.member.1.Type")
+                .cloned()
+                .unwrap_or_else(|| "forward".to_string());
 
             let actions = vec![ListenerAction {
                 action_type,
@@ -299,13 +392,25 @@ pub async fn handle_elbv2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "LoadBalancerNotFound", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "LoadBalancerNotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         "DescribeListeners" => {
             let lb_arn = params.get("LoadBalancerArn").cloned();
             let listener_arns = parse_indexed_list(&params, "ListenerArns.member");
-            let listeners = state.describe_listeners(lb_arn, if listener_arns.is_empty() { None } else { Some(listener_arns) });
+            let listeners = state.describe_listeners(
+                lb_arn,
+                if listener_arns.is_empty() {
+                    None
+                } else {
+                    Some(listener_arns)
+                },
+            );
 
             let mut members_xml = String::new();
             for l in listeners {
@@ -343,13 +448,21 @@ pub async fn handle_elbv2_request(
                     );
                     xml_response(StatusCode::OK, xml)
                 }
-                Err(e) => elbv2_error_response(StatusCode::BAD_REQUEST, "ListenerNotFound", &e.to_string(), &request_id),
+                Err(e) => elbv2_error_response(
+                    StatusCode::BAD_REQUEST,
+                    "ListenerNotFound",
+                    &e.to_string(),
+                    &request_id,
+                ),
             }
         }
         _ => elbv2_error_response(
             StatusCode::BAD_REQUEST,
             "InvalidAction",
-            &format!("The action {} is not valid for Elastic Load Balancing v2.", action),
+            &format!(
+                "The action {} is not valid for Elastic Load Balancing v2.",
+                action
+            ),
             &request_id,
         ),
     }
@@ -372,8 +485,12 @@ fn parse_targets(params: &HashMap<String, String>) -> Vec<TargetDescription> {
     let mut targets = Vec::new();
     let mut i = 1;
     while let Some(id) = params.get(&format!("Targets.member.{}.Id", i)) {
-        let port = params.get(&format!("Targets.member.{}.Port", i)).and_then(|p| p.parse().ok());
-        let az = params.get(&format!("Targets.member.{}.AvailabilityZone", i)).cloned();
+        let port = params
+            .get(&format!("Targets.member.{}.Port", i))
+            .and_then(|p| p.parse().ok());
+        let az = params
+            .get(&format!("Targets.member.{}.AvailabilityZone", i))
+            .cloned();
         targets.push(TargetDescription {
             id: id.clone(),
             port,
@@ -388,8 +505,14 @@ fn parse_tags(params: &HashMap<String, String>) -> Vec<Tag> {
     let mut tags = Vec::new();
     let mut i = 1;
     while let Some(key) = params.get(&format!("Tags.member.{}.Key", i)) {
-        let value = params.get(&format!("Tags.member.{}.Value", i)).cloned().unwrap_or_default();
-        tags.push(Tag { key: key.clone(), value });
+        let value = params
+            .get(&format!("Tags.member.{}.Value", i))
+            .cloned()
+            .unwrap_or_default();
+        tags.push(Tag {
+            key: key.clone(),
+            value,
+        });
         i += 1;
     }
     tags
@@ -403,7 +526,12 @@ fn xml_response(status: StatusCode, body: String) -> Response<Body> {
         .unwrap()
 }
 
-fn elbv2_error_response(status: StatusCode, code: &str, message: &str, request_id: &str) -> Response<Body> {
+fn elbv2_error_response(
+    status: StatusCode,
+    code: &str,
+    message: &str,
+    request_id: &str,
+) -> Response<Body> {
     let xml = format!(
         r#"<ErrorResponse xmlns="http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/"><Error><Code>{}</Code><Message>{}</Message></Error><RequestId>{}</RequestId></ErrorResponse>"#,
         code, message, request_id

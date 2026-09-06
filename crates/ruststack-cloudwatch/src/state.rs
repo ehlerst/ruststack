@@ -663,7 +663,8 @@ impl CloudWatchState {
     }
 
     pub fn set_alarm_state(&self, req: SetAlarmStateRequest) -> Result<(), CloudWatchError> {
-        let (alarm_clone, old_state) = if let Some(mut entry) = self.alarms.get_mut(&req.alarm_name) {
+        let (alarm_clone, old_state) = if let Some(mut entry) = self.alarms.get_mut(&req.alarm_name)
+        {
             let old_state = entry.state_value.clone();
             entry.state_value = req.state_value.clone();
             entry.state_reason = Some(req.state_reason.clone());
@@ -682,9 +683,10 @@ impl CloudWatchState {
             let actions = match req.state_value.to_uppercase().as_str() {
                 "ALARM" => alarm_clone.alarm_actions.clone().unwrap_or_default(),
                 "OK" => alarm_clone.ok_actions.clone().unwrap_or_default(),
-                "INSUFFICIENT_DATA" => {
-                    alarm_clone.insufficient_data_actions.clone().unwrap_or_default()
-                }
+                "INSUFFICIENT_DATA" => alarm_clone
+                    .insufficient_data_actions
+                    .clone()
+                    .unwrap_or_default(),
                 _ => Vec::new(),
             };
 

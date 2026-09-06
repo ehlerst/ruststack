@@ -62,7 +62,7 @@ pub async fn handle_ses_request(
         headers
             .get("x-amz-target")
             .and_then(|v| v.to_str().ok())
-            .map(|t| t.split('.').last().unwrap_or(t).to_string())
+            .map(|t| t.split('.').next_back().unwrap_or(t).to_string())
             .unwrap_or_default()
     });
 
@@ -523,7 +523,10 @@ pub async fn handle_ses_request(
         }
 
         "CreateTemplate" => {
-            let template_name = params.get("Template.TemplateName").cloned().unwrap_or_default();
+            let template_name = params
+                .get("Template.TemplateName")
+                .cloned()
+                .unwrap_or_default();
             let subject_part = params.get("Template.SubjectPart").cloned();
             let text_part = params.get("Template.TextPart").cloned();
             let html_part = params.get("Template.HtmlPart").cloned();
@@ -559,7 +562,10 @@ pub async fn handle_ses_request(
         }
 
         "GetTemplate" => {
-            let name = params.get("TemplateName").map(|s| s.as_str()).unwrap_or_default();
+            let name = params
+                .get("TemplateName")
+                .map(|s| s.as_str())
+                .unwrap_or_default();
             match state.get_template(name) {
                 Ok(template) => {
                     if is_json {
@@ -592,22 +598,21 @@ pub async fn handle_ses_request(
             }
         }
 
-        "ListTemplates" => {
-            match state.list_templates() {
-                Ok(templates) => {
-                    if is_json {
-                        json_response(StatusCode::OK, json!({ "TemplatesMetadata": templates }))
-                    } else {
-                        let mut members = String::new();
-                        for t in templates {
-                            members.push_str(&format!(
+        "ListTemplates" => match state.list_templates() {
+            Ok(templates) => {
+                if is_json {
+                    json_response(StatusCode::OK, json!({ "TemplatesMetadata": templates }))
+                } else {
+                    let mut members = String::new();
+                    for t in templates {
+                        members.push_str(&format!(
                                 r#"<member><Name>{}</Name><CreatedTimestamp>{}</CreatedTimestamp></member>"#,
                                 escape(&t.name),
                                 escape(t.created_timestamp.as_deref().unwrap_or(""))
                             ));
-                        }
-                        let xml = format!(
-                            r#"<ListTemplatesResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
+                    }
+                    let xml = format!(
+                        r#"<ListTemplatesResponse xmlns="http://ses.amazonaws.com/doc/2010-12-01/">
   <ListTemplatesResult>
     <TemplatesMetadata>{}</TemplatesMetadata>
   </ListTemplatesResult>
@@ -615,17 +620,19 @@ pub async fn handle_ses_request(
     <RequestId>{}</RequestId>
   </ResponseMetadata>
 </ListTemplatesResponse>"#,
-                            members, request_id
-                        );
-                        xml_response(StatusCode::OK, &xml)
-                    }
+                        members, request_id
+                    );
+                    xml_response(StatusCode::OK, &xml)
                 }
-                Err(e) => map_ses_error(is_json, e, &request_id),
             }
-        }
+            Err(e) => map_ses_error(is_json, e, &request_id),
+        },
 
         "UpdateTemplate" => {
-            let template_name = params.get("Template.TemplateName").cloned().unwrap_or_default();
+            let template_name = params
+                .get("Template.TemplateName")
+                .cloned()
+                .unwrap_or_default();
             let subject_part = params.get("Template.SubjectPart").cloned();
             let text_part = params.get("Template.TextPart").cloned();
             let html_part = params.get("Template.HtmlPart").cloned();
@@ -661,7 +668,10 @@ pub async fn handle_ses_request(
         }
 
         "DeleteTemplate" => {
-            let name = params.get("TemplateName").map(|s| s.as_str()).unwrap_or_default();
+            let name = params
+                .get("TemplateName")
+                .map(|s| s.as_str())
+                .unwrap_or_default();
             match state.delete_template(name) {
                 Ok(_) => {
                     if is_json {
@@ -694,7 +704,10 @@ pub async fn handle_ses_request(
                 bcc_addresses,
             };
             let template = params.get("Template").cloned().unwrap_or_default();
-            let template_data = params.get("TemplateData").cloned().unwrap_or_else(|| "{}".to_string());
+            let template_data = params
+                .get("TemplateData")
+                .cloned()
+                .unwrap_or_else(|| "{}".to_string());
 
             let req = SendTemplatedEmailRequest {
                 source,

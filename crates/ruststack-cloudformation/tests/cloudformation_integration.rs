@@ -43,7 +43,9 @@ Outputs:
     );
     let body = Bytes::from(body_str);
 
-    let resp = handle_cloudformation_request(State(state.clone()), uri.clone(), headers.clone(), body).await;
+    let resp =
+        handle_cloudformation_request(State(state.clone()), uri.clone(), headers.clone(), body)
+            .await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let resp_str = std::str::from_utf8(&body_bytes).unwrap();
@@ -55,7 +57,9 @@ Outputs:
 
     // 2. DescribeStacks
     let body = Bytes::from("Action=DescribeStacks&StackName=infra-stack");
-    let resp = handle_cloudformation_request(State(state.clone()), uri.clone(), headers.clone(), body).await;
+    let resp =
+        handle_cloudformation_request(State(state.clone()), uri.clone(), headers.clone(), body)
+            .await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let resp_str = std::str::from_utf8(&body_bytes).unwrap();
@@ -64,7 +68,9 @@ Outputs:
 
     // 3. DescribeStackResources
     let body = Bytes::from("Action=DescribeStackResources&StackName=infra-stack");
-    let resp = handle_cloudformation_request(State(state.clone()), uri.clone(), headers.clone(), body).await;
+    let resp =
+        handle_cloudformation_request(State(state.clone()), uri.clone(), headers.clone(), body)
+            .await;
     assert_eq!(resp.status(), StatusCode::OK);
     let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let resp_str = std::str::from_utf8(&body_bytes).unwrap();
@@ -72,6 +78,8 @@ Outputs:
 
     // 4. DeleteStack
     let body = Bytes::from("Action=DeleteStack&StackName=infra-stack");
-    let resp = handle_cloudformation_request(State(state.clone()), uri.clone(), headers.clone(), body).await;
+    let resp =
+        handle_cloudformation_request(State(state.clone()), uri.clone(), headers.clone(), body)
+            .await;
     assert_eq!(resp.status(), StatusCode::OK);
 }

@@ -256,7 +256,8 @@ async fn test_sns_http_webhook_dispatch() {
     let webhook_url = format!("http://{}/webhook", addr);
 
     // Subscribe HTTP endpoint
-    sns.subscribe(&topic_arn, "http", &webhook_url, None).unwrap();
+    sns.subscribe(&topic_arn, "http", &webhook_url, None)
+        .unwrap();
 
     // Publish to topic
     sns.publish(
@@ -276,5 +277,8 @@ async fn test_sns_http_webhook_dispatch() {
     assert_eq!(msg_type, "Notification");
     let env: serde_json::Value = serde_json::from_str(&body).unwrap();
     assert_eq!(env["Subject"].as_str().unwrap(), "Health Alert");
-    assert_eq!(env["Message"].as_str().unwrap(), "Alert! Service health check failed");
+    assert_eq!(
+        env["Message"].as_str().unwrap(),
+        "Alert! Service health check failed"
+    );
 }

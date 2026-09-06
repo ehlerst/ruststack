@@ -15,7 +15,9 @@ pub async fn handle_bedrock_request(
 ) -> Response<Body> {
     let path = uri.path();
 
-    if method == Method::GET && (path == "/foundation-models" || path.ends_with("/foundation-models")) {
+    if method == Method::GET
+        && (path == "/foundation-models" || path.ends_with("/foundation-models"))
+    {
         let models = state.list_foundation_models();
         let resp = ListFoundationModelsResponse {
             model_summaries: models,
@@ -27,8 +29,14 @@ pub async fn handle_bedrock_request(
             .unwrap();
     }
 
-    if method == Method::GET && (path.starts_with("/foundation-models/") || path.contains("/foundation-models/")) {
-        let model_id = path.split("/foundation-models/").nth(1).unwrap_or("").trim();
+    if method == Method::GET
+        && (path.starts_with("/foundation-models/") || path.contains("/foundation-models/"))
+    {
+        let model_id = path
+            .split("/foundation-models/")
+            .nth(1)
+            .unwrap_or("")
+            .trim();
         match state.get_foundation_model(model_id) {
             Ok(model) => {
                 let resp = GetFoundationModelResponse {
@@ -50,7 +58,12 @@ pub async fn handle_bedrock_request(
         }
     }
 
-    if method == Method::POST && path.contains("/model/") && (path.ends_with("/invoke") || path.ends_with("/invoke-with-response-stream") || path.ends_with("/converse")) {
+    if method == Method::POST
+        && path.contains("/model/")
+        && (path.ends_with("/invoke")
+            || path.ends_with("/invoke-with-response-stream")
+            || path.ends_with("/converse"))
+    {
         let after_model = path.split("/model/").nth(1).unwrap_or("");
         let model_id = if let Some(idx) = after_model.find('/') {
             &after_model[..idx]
@@ -67,7 +80,9 @@ pub async fn handle_bedrock_request(
                     return Response::builder()
                         .status(StatusCode::BAD_REQUEST)
                         .header("content-type", "application/json")
-                        .body(Body::from(json!({ "message": format!("Invalid JSON: {}", e) }).to_string()))
+                        .body(Body::from(
+                            json!({ "message": format!("Invalid JSON: {}", e) }).to_string(),
+                        ))
                         .unwrap();
                 }
             }
@@ -94,6 +109,8 @@ pub async fn handle_bedrock_request(
     Response::builder()
         .status(StatusCode::NOT_FOUND)
         .header("content-type", "application/json")
-        .body(Body::from(json!({ "message": "Unknown Bedrock operation or path" }).to_string()))
+        .body(Body::from(
+            json!({ "message": "Unknown Bedrock operation or path" }).to_string(),
+        ))
         .unwrap()
 }

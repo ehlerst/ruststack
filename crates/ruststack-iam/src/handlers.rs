@@ -41,7 +41,7 @@ pub async fn handle_iam_request(
         headers
             .get("x-amz-target")
             .and_then(|v| v.to_str().ok())
-            .map(|t| t.split('.').last().unwrap_or(t).to_string())
+            .map(|t| t.split('.').next_back().unwrap_or(t).to_string())
             .unwrap_or_default()
     });
 

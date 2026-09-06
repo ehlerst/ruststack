@@ -11,8 +11,15 @@ async fn test_organizations_lifecycle() {
     let mut headers = HeaderMap::new();
 
     // 1. Create Organization
-    headers.insert("x-amz-target", "AWSOrganizationsV20161128.CreateOrganization".parse().unwrap());
-    let resp = handle_organizations_request(State(state.clone()), headers.clone(), Bytes::from("{}")).await;
+    headers.insert(
+        "x-amz-target",
+        "AWSOrganizationsV20161128.CreateOrganization"
+            .parse()
+            .unwrap(),
+    );
+    let resp =
+        handle_organizations_request(State(state.clone()), headers.clone(), Bytes::from("{}"))
+            .await;
     assert_eq!(resp.status(), StatusCode::OK);
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
@@ -20,12 +27,22 @@ async fn test_organizations_lifecycle() {
     assert!(org_id.starts_with("o-"));
 
     // 2. Describe Organization
-    headers.insert("x-amz-target", "AWSOrganizationsV20161128.DescribeOrganization".parse().unwrap());
-    let resp = handle_organizations_request(State(state.clone()), headers.clone(), Bytes::from("{}")).await;
+    headers.insert(
+        "x-amz-target",
+        "AWSOrganizationsV20161128.DescribeOrganization"
+            .parse()
+            .unwrap(),
+    );
+    let resp =
+        handle_organizations_request(State(state.clone()), headers.clone(), Bytes::from("{}"))
+            .await;
     assert_eq!(resp.status(), StatusCode::OK);
 
     // 3. Create Account
-    headers.insert("x-amz-target", "AWSOrganizationsV20161128.CreateAccount".parse().unwrap());
+    headers.insert(
+        "x-amz-target",
+        "AWSOrganizationsV20161128.CreateAccount".parse().unwrap(),
+    );
     let body = Bytes::from(
         json!({
             "AccountName": "Production",
@@ -40,8 +57,13 @@ async fn test_organizations_lifecycle() {
     assert_eq!(json["CreateAccountStatus"]["State"], "SUCCEEDED");
 
     // 4. List Accounts
-    headers.insert("x-amz-target", "AWSOrganizationsV20161128.ListAccounts".parse().unwrap());
-    let resp = handle_organizations_request(State(state.clone()), headers.clone(), Bytes::from("{}")).await;
+    headers.insert(
+        "x-amz-target",
+        "AWSOrganizationsV20161128.ListAccounts".parse().unwrap(),
+    );
+    let resp =
+        handle_organizations_request(State(state.clone()), headers.clone(), Bytes::from("{}"))
+            .await;
     assert_eq!(resp.status(), StatusCode::OK);
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let json: serde_json::Value = serde_json::from_slice(&bytes).unwrap();

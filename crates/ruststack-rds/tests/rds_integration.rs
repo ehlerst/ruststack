@@ -17,7 +17,9 @@ async fn test_rds_instance_and_cluster_lifecycle() {
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let xml = String::from_utf8(bytes.to_vec()).unwrap();
     assert!(xml.contains("<DBInstanceIdentifier>test-postgres</DBInstanceIdentifier>"));
-    assert!(xml.contains("<Address>test-postgres.us-east-1.rds.localhost.localstack.cloud</Address>"));
+    assert!(
+        xml.contains("<Address>test-postgres.us-east-1.rds.localhost.localstack.cloud</Address>")
+    );
 
     // 2. Describe DB Instances
     let body = Bytes::from("Action=DescribeDBInstances&DBInstanceIdentifier=test-postgres");

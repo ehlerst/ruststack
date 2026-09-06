@@ -1,4 +1,3 @@
-use axum::body::Body;
 use axum::extract::State;
 use axum::http::{HeaderMap, StatusCode, Uri};
 use bytes::Bytes;
@@ -25,7 +24,10 @@ async fn test_ec2_vpc_and_instance_lifecycle() {
     let vpc_id = &xml[start..end];
 
     // 2. Create Subnet
-    let body = Bytes::from(format!("Action=CreateSubnet&VpcId={}&CidrBlock=10.0.1.0/24", vpc_id));
+    let body = Bytes::from(format!(
+        "Action=CreateSubnet&VpcId={}&CidrBlock=10.0.1.0/24",
+        vpc_id
+    ));
     let resp = handle_ec2_request(State(state.clone()), uri.clone(), headers.clone(), body).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
@@ -37,7 +39,10 @@ async fn test_ec2_vpc_and_instance_lifecycle() {
     let subnet_id = &xml[start..end];
 
     // 3. Create Security Group & Authorize Ingress
-    let body = Bytes::from(format!("Action=CreateSecurityGroup&GroupName=web-sg&GroupDescription=WebSG&VpcId={}", vpc_id));
+    let body = Bytes::from(format!(
+        "Action=CreateSecurityGroup&GroupName=web-sg&GroupDescription=WebSG&VpcId={}",
+        vpc_id
+    ));
     let resp = handle_ec2_request(State(state.clone()), uri.clone(), headers.clone(), body).await;
     assert_eq!(resp.status(), StatusCode::OK);
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();

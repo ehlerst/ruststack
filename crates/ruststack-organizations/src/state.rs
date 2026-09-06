@@ -58,7 +58,10 @@ impl OrganizationsState {
         &self.region
     }
 
-    pub fn create_organization(&self, feature_set: Option<String>) -> Result<Organization, OrganizationsError> {
+    pub fn create_organization(
+        &self,
+        feature_set: Option<String>,
+    ) -> Result<Organization, OrganizationsError> {
         let mut org_lock = self.organization.write();
         if org_lock.is_some() {
             return Err(OrganizationsError::AlreadyInOrganization);
@@ -70,9 +73,15 @@ impl OrganizationsState {
 
         let org = Organization {
             id: org_id.clone(),
-            arn: format!("arn:aws:organizations::{}:organization/{}", self.account_id, org_id),
+            arn: format!(
+                "arn:aws:organizations::{}:organization/{}",
+                self.account_id, org_id
+            ),
             feature_set: feature_set.unwrap_or_else(|| "ALL".to_string()),
-            master_account_arn: format!("arn:aws:organizations::{}:account/{}/{}", self.account_id, org_id, self.account_id),
+            master_account_arn: format!(
+                "arn:aws:organizations::{}:account/{}/{}",
+                self.account_id, org_id, self.account_id
+            ),
             master_account_id: self.account_id.clone(),
             master_account_email: master_email.clone(),
             available_policy_types: vec![],
@@ -80,7 +89,10 @@ impl OrganizationsState {
 
         let root = Root {
             id: root_id.clone(),
-            arn: format!("arn:aws:organizations::{}:root/{}/{}", self.account_id, org_id, root_id),
+            arn: format!(
+                "arn:aws:organizations::{}:root/{}/{}",
+                self.account_id, org_id, root_id
+            ),
             name: "Root".to_string(),
             policy_types: vec![],
         };
@@ -97,7 +109,8 @@ impl OrganizationsState {
 
         *org_lock = Some(org.clone());
         self.roots.insert(root_id, root);
-        self.accounts.insert(self.account_id.clone(), master_account);
+        self.accounts
+            .insert(self.account_id.clone(), master_account);
 
         Ok(org)
     }
@@ -109,7 +122,11 @@ impl OrganizationsState {
             .ok_or(OrganizationsError::NotInUse)
     }
 
-    pub fn create_account(&self, account_name: String, email: String) -> Result<Account, OrganizationsError> {
+    pub fn create_account(
+        &self,
+        account_name: String,
+        email: String,
+    ) -> Result<Account, OrganizationsError> {
         let org = self.describe_organization()?;
 
         for kv in self.accounts.iter() {
@@ -121,7 +138,10 @@ impl OrganizationsState {
         let new_id = format!("{:012}", rand_account_id());
         let account = Account {
             id: new_id.clone(),
-            arn: format!("arn:aws:organizations::{}:account/{}/{}", self.account_id, org.id, new_id),
+            arn: format!(
+                "arn:aws:organizations::{}:account/{}/{}",
+                self.account_id, org.id, new_id
+            ),
             email,
             name: account_name,
             status: "ACTIVE".to_string(),
@@ -147,10 +167,17 @@ impl OrganizationsState {
         name: String,
     ) -> Result<OrganizationalUnit, OrganizationsError> {
         let org = self.describe_organization()?;
-        let ou_id = format!("ou-{}-{}", &parent_id[2..parent_id.len().min(6)], &Uuid::new_v4().simple().to_string()[0..8]);
+        let ou_id = format!(
+            "ou-{}-{}",
+            &parent_id[2..parent_id.len().min(6)],
+            &Uuid::new_v4().simple().to_string()[0..8]
+        );
         let ou = OrganizationalUnit {
             id: ou_id.clone(),
-            arn: format!("arn:aws:organizations::{}:ou/{}/{}", self.account_id, org.id, ou_id),
+            arn: format!(
+                "arn:aws:organizations::{}:ou/{}/{}",
+                self.account_id, org.id, ou_id
+            ),
             name,
         };
 
@@ -159,7 +186,10 @@ impl OrganizationsState {
     }
 
     pub fn list_organizational_units_for_parent(&self, parent_id: &str) -> Vec<OrganizationalUnit> {
-        self.ous.get(parent_id).map(|v| v.clone()).unwrap_or_default()
+        self.ous
+            .get(parent_id)
+            .map(|v| v.clone())
+            .unwrap_or_default()
     }
 
     pub fn reset(&self) {

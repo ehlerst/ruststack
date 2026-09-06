@@ -15,7 +15,11 @@ pub async fn handle_apigateway_request(
     body: Bytes,
 ) -> Response {
     let path = uri.path();
-    let segments: Vec<&str> = path.trim_matches('/').split('/').filter(|s| !s.is_empty()).collect();
+    let segments: Vec<&str> = path
+        .trim_matches('/')
+        .split('/')
+        .filter(|s| !s.is_empty())
+        .collect();
 
     // 1. Control plane REST API: /restapis
     if segments.first() == Some(&"restapis") {
@@ -65,7 +69,11 @@ pub async fn handle_apigateway_request(
         }
     }
 
-    error_response(StatusCode::NOT_FOUND, "NotFoundException", "Endpoint not found")
+    error_response(
+        StatusCode::NOT_FOUND,
+        "NotFoundException",
+        "Endpoint not found",
+    )
 }
 
 fn handle_restapis_control_plane(
@@ -84,7 +92,13 @@ fn handle_restapis_control_plane(
         (&Method::POST, ["restapis"]) => {
             let req: CreateRestApiRequest = match serde_json::from_slice(body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "BadRequestException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "BadRequestException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.create_rest_api(req) {
                 Ok(res) => json_response(StatusCode::CREATED, serde_json::to_value(res).unwrap()),
@@ -110,7 +124,13 @@ fn handle_restapis_control_plane(
         (&Method::POST, ["restapis", api_id, "resources", parent_id]) => {
             let req: CreateResourceRequest = match serde_json::from_slice(body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "BadRequestException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "BadRequestException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.create_resource(api_id, parent_id, &req.path_part) {
                 Ok(res) => json_response(StatusCode::CREATED, serde_json::to_value(res).unwrap()),
@@ -141,19 +161,17 @@ fn handle_restapis_control_plane(
         // PUT /restapis/{api_id}/resources/{resource_id}/methods/{http_method}/integration
         (
             &Method::PUT,
-            [
-                "restapis",
-                api_id,
-                "resources",
-                resource_id,
-                "methods",
-                http_method,
-                "integration",
-            ],
+            ["restapis", api_id, "resources", resource_id, "methods", http_method, "integration"],
         ) => {
             let req: PutIntegrationRequest = match serde_json::from_slice(body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "BadRequestException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "BadRequestException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.put_integration(api_id, resource_id, http_method, req) {
                 Ok(res) => json_response(StatusCode::CREATED, serde_json::to_value(res).unwrap()),
@@ -164,7 +182,13 @@ fn handle_restapis_control_plane(
         (&Method::POST, ["restapis", api_id, "deployments"]) => {
             let req: CreateDeploymentRequest = match serde_json::from_slice(body) {
                 Ok(r) => r,
-                Err(e) => return error_response(StatusCode::BAD_REQUEST, "BadRequestException", &e.to_string()),
+                Err(e) => {
+                    return error_response(
+                        StatusCode::BAD_REQUEST,
+                        "BadRequestException",
+                        &e.to_string(),
+                    )
+                }
             };
             match state.create_deployment(api_id, req) {
                 Ok(res) => json_response(StatusCode::CREATED, serde_json::to_value(res).unwrap()),

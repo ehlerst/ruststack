@@ -13,7 +13,7 @@ pub struct LoadBalancer {
     pub load_balancer_name: String,
     pub scheme: String, // "internet-facing" or "internal"
     pub vpc_id: Option<String>,
-    pub state: String,  // "active", "provisioning", "failed"
+    pub state: String,   // "active", "provisioning", "failed"
     pub lb_type: String, // "application" or "network"
     pub availability_zones: Vec<String>,
     pub security_groups: Vec<String>,

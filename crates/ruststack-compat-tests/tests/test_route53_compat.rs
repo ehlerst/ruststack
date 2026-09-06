@@ -75,5 +75,7 @@ async fn test_route53_hosted_zone_and_dns_records_compat() {
     let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let rr_json: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
     let sets = rr_json["ResourceRecordSets"].as_array().unwrap();
-    assert!(sets.iter().any(|s| s["Name"].as_str() == Some("web.app.internal.")));
+    assert!(sets
+        .iter()
+        .any(|s| s["Name"].as_str() == Some("web.app.internal.")));
 }

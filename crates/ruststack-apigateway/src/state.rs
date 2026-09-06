@@ -152,7 +152,11 @@ impl ApiGatewayState {
         Ok(GetResourcesResponse { items })
     }
 
-    pub fn get_resource(&self, api_id: &str, resource_id: &str) -> Result<Resource, ApiGatewayError> {
+    pub fn get_resource(
+        &self,
+        api_id: &str,
+        resource_id: &str,
+    ) -> Result<Resource, ApiGatewayError> {
         let api_entry = self
             .rest_apis
             .get(api_id)
@@ -316,6 +320,7 @@ impl ApiGatewayState {
         Ok(GetStagesResponse { item: items })
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn invoke_api(
         &self,
         api_id: &str,
@@ -449,14 +454,19 @@ impl ApiGatewayState {
                         Some(ruststack_lambda::types::InvocationType::RequestResponse),
                     ) {
                         Ok(inv) => {
-                            if let Ok(proxy_res) = serde_json::from_slice::<serde_json::Value>(&inv.payload) {
+                            if let Ok(proxy_res) =
+                                serde_json::from_slice::<serde_json::Value>(&inv.payload)
+                            {
                                 let status = proxy_res
                                     .get("statusCode")
                                     .and_then(|s| s.as_u64())
-                                    .unwrap_or(200) as u16;
+                                    .unwrap_or(200)
+                                    as u16;
 
                                 let mut out_headers = HashMap::new();
-                                if let Some(h) = proxy_res.get("headers").and_then(|v| v.as_object()) {
+                                if let Some(h) =
+                                    proxy_res.get("headers").and_then(|v| v.as_object())
+                                {
                                     for (k, v) in h {
                                         if let Some(s) = v.as_str() {
                                             out_headers.insert(k.clone(), s.to_string());
@@ -464,7 +474,9 @@ impl ApiGatewayState {
                                     }
                                 }
 
-                                let out_body = if let Some(b) = proxy_res.get("body").and_then(|v| v.as_str()) {
+                                let out_body = if let Some(b) =
+                                    proxy_res.get("body").and_then(|v| v.as_str())
+                                {
                                     b.as_bytes().to_vec()
                                 } else {
                                     inv.payload
@@ -473,14 +485,19 @@ impl ApiGatewayState {
                                 Ok((status, out_headers, out_body))
                             } else {
                                 let mut out_headers = HashMap::new();
-                                out_headers.insert("content-type".to_string(), "application/json".to_string());
+                                out_headers.insert(
+                                    "content-type".to_string(),
+                                    "application/json".to_string(),
+                                );
                                 Ok((200, out_headers, inv.payload))
                             }
                         }
                         Err(e) => {
                             let mut out_headers = HashMap::new();
-                            out_headers.insert("content-type".to_string(), "application/json".to_string());
-                            let err_str = format!("{{\"message\": \"Lambda invocation error: {}\"}}", e);
+                            out_headers
+                                .insert("content-type".to_string(), "application/json".to_string());
+                            let err_str =
+                                format!("{{\"message\": \"Lambda invocation error: {}\"}}", e);
                             Ok((502, out_headers, err_str.into_bytes()))
                         }
                     }

@@ -11,7 +11,10 @@ async fn test_wafv2_web_acl_and_ipset_lifecycle() {
     let mut headers = HeaderMap::new();
 
     // 1. Create WebACL
-    headers.insert("x-amz-target", "AWSWAF_20190729.CreateWebACL".parse().unwrap());
+    headers.insert(
+        "x-amz-target",
+        "AWSWAF_20190729.CreateWebACL".parse().unwrap(),
+    );
     let body = Bytes::from(
         json!({
             "Name": "test-web-acl",
@@ -34,12 +37,16 @@ async fn test_wafv2_web_acl_and_ipset_lifecycle() {
 
     // 2. Get WebACL
     headers.insert("x-amz-target", "AWSWAF_20190729.GetWebACL".parse().unwrap());
-    let body = Bytes::from(json!({ "Name": "test-web-acl", "Id": id, "Scope": "REGIONAL" }).to_string());
+    let body =
+        Bytes::from(json!({ "Name": "test-web-acl", "Id": id, "Scope": "REGIONAL" }).to_string());
     let resp = handle_wafv2_request(State(state.clone()), headers.clone(), body).await;
     assert_eq!(resp.status(), StatusCode::OK);
 
     // 3. Create IPSet
-    headers.insert("x-amz-target", "AWSWAF_20190729.CreateIPSet".parse().unwrap());
+    headers.insert(
+        "x-amz-target",
+        "AWSWAF_20190729.CreateIPSet".parse().unwrap(),
+    );
     let body = Bytes::from(
         json!({
             "Name": "blocked-ips",

@@ -125,7 +125,11 @@ impl Ec2State {
         Ec2StateSnapshot {
             vpcs: self.vpcs.iter().map(|kv| kv.value().clone()).collect(),
             subnets: self.subnets.iter().map(|kv| kv.value().clone()).collect(),
-            security_groups: self.security_groups.iter().map(|kv| kv.value().clone()).collect(),
+            security_groups: self
+                .security_groups
+                .iter()
+                .map(|kv| kv.value().clone())
+                .collect(),
             key_pairs: self.key_pairs.iter().map(|kv| kv.value().clone()).collect(),
             instances: self.instances.iter().map(|kv| kv.value().clone()).collect(),
         }
@@ -186,12 +190,21 @@ impl Ec2State {
     }
 
     // Subnet APIs
-    pub fn create_subnet(&self, vpc_id: String, cidr_block: String, az: Option<String>, tags: Vec<Tag>) -> Result<Subnet, Ec2Error> {
+    pub fn create_subnet(
+        &self,
+        vpc_id: String,
+        cidr_block: String,
+        az: Option<String>,
+        tags: Vec<Tag>,
+    ) -> Result<Subnet, Ec2Error> {
         if !self.vpcs.contains_key(&vpc_id) {
             return Err(Ec2Error::VpcNotFound(vpc_id));
         }
 
-        let subnet_id = format!("subnet-{}", &Uuid::new_v4().to_string().replace('-', "")[..17]);
+        let subnet_id = format!(
+            "subnet-{}",
+            &Uuid::new_v4().to_string().replace('-', "")[..17]
+        );
         let subnet = Subnet {
             subnet_id: subnet_id.clone(),
             vpc_id,
@@ -224,7 +237,13 @@ impl Ec2State {
     }
 
     // Security Group APIs
-    pub fn create_security_group(&self, name: String, description: String, vpc_id: Option<String>, tags: Vec<Tag>) -> SecurityGroup {
+    pub fn create_security_group(
+        &self,
+        name: String,
+        description: String,
+        vpc_id: Option<String>,
+        tags: Vec<Tag>,
+    ) -> SecurityGroup {
         let actual_vpc_id = vpc_id.unwrap_or_else(|| {
             self.vpcs
                 .iter()
@@ -256,22 +275,44 @@ impl Ec2State {
         sg
     }
 
-    pub fn describe_security_groups(&self, group_ids: Option<Vec<String>>, group_names: Option<Vec<String>>) -> Vec<SecurityGroup> {
+    pub fn describe_security_groups(
+        &self,
+        group_ids: Option<Vec<String>>,
+        group_names: Option<Vec<String>>,
+    ) -> Vec<SecurityGroup> {
         if let Some(ids) = group_ids {
             if !ids.is_empty() {
-                return ids.iter().filter_map(|id| self.security_groups.get(id).map(|g| g.clone())).collect();
+                return ids
+                    .iter()
+                    .filter_map(|id| self.security_groups.get(id).map(|g| g.clone()))
+                    .collect();
             }
         }
         if let Some(names) = group_names {
             if !names.is_empty() {
-                return self.security_groups.iter().filter(|kv| names.contains(&kv.value().group_name)).map(|kv| kv.value().clone()).collect();
+                return self
+                    .security_groups
+                    .iter()
+                    .filter(|kv| names.contains(&kv.value().group_name))
+                    .map(|kv| kv.value().clone())
+                    .collect();
             }
         }
-        self.security_groups.iter().map(|kv| kv.value().clone()).collect()
+        self.security_groups
+            .iter()
+            .map(|kv| kv.value().clone())
+            .collect()
     }
 
-    pub fn authorize_security_group_ingress(&self, group_id: &str, permissions: Vec<IpPermission>) -> Result<(), Ec2Error> {
-        let mut sg = self.security_groups.get_mut(group_id).ok_or_else(|| Ec2Error::SecurityGroupNotFound(group_id.to_string()))?;
+    pub fn authorize_security_group_ingress(
+        &self,
+        group_id: &str,
+        permissions: Vec<IpPermission>,
+    ) -> Result<(), Ec2Error> {
+        let mut sg = self
+            .security_groups
+            .get_mut(group_id)
+            .ok_or_else(|| Ec2Error::SecurityGroupNotFound(group_id.to_string()))?;
         sg.ip_permissions.extend(permissions);
         Ok(())
     }
@@ -314,6 +355,7 @@ impl Ec2State {
     }
 
     // Instance Lifecycle APIs
+    #[allow(clippy::too_many_arguments)]
     pub fn run_instances(
         &self,
         image_id: String,
@@ -339,7 +381,9 @@ impl Ec2State {
             let inst = Instance {
                 instance_id: instance_id.clone(),
                 image_id: image_id.clone(),
-                instance_type: instance_type.clone().unwrap_or_else(|| "t3.micro".to_string()),
+                instance_type: instance_type
+                    .clone()
+                    .unwrap_or_else(|| "t3.micro".to_string()),
                 key_name: key_name.clone(),
                 subnet_id: subnet_id.clone(),
                 vpc_id: vpc_id.clone(),

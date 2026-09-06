@@ -2,8 +2,8 @@ use axum::extract::State;
 use axum::http::{HeaderMap, Method, StatusCode, Uri};
 use bytes::Bytes;
 use ruststack_apigateway::handle_apigateway_request;
-use ruststack_apigateway::ApiGatewayState;
 use ruststack_apigateway::types::*;
+use ruststack_apigateway::ApiGatewayState;
 
 #[tokio::test]
 async fn test_apigateway_lifecycle_and_mock_invocation() {
@@ -20,9 +20,7 @@ async fn test_apigateway_lifecycle_and_mock_invocation() {
     let root_id = api.root_resource_id;
 
     // 2. Create Resource /pets
-    let pet_resource = state
-        .create_resource(&api_id, &root_id, "pets")
-        .unwrap();
+    let pet_resource = state.create_resource(&api_id, &root_id, "pets").unwrap();
     let pet_res_id = pet_resource.id;
     assert_eq!(pet_resource.path, "/pets");
 
@@ -85,7 +83,10 @@ async fn test_apigateway_lifecycle_and_mock_invocation() {
     .await;
 
     assert_eq!(resp.status(), StatusCode::OK);
-    let body = http_body_util::BodyExt::collect(resp.into_body()).await.unwrap().to_bytes();
+    let body = http_body_util::BodyExt::collect(resp.into_body())
+        .await
+        .unwrap()
+        .to_bytes();
     let json_resp: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(json_resp["pets"][0]["name"].as_str().unwrap(), "Dog");
 }

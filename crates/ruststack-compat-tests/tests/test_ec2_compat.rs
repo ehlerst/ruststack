@@ -9,10 +9,7 @@ async fn test_ec2_vpc_subnet_security_group_compat() {
     let (status, body) = client
         .call_query(
             "/",
-            &[
-                ("Action", "CreateVpc"),
-                ("CidrBlock", "10.10.0.0/16"),
-            ],
+            &[("Action", "CreateVpc"), ("CidrBlock", "10.10.0.0/16")],
         )
         .await;
     assert_eq!(status, StatusCode::OK);
@@ -41,10 +38,7 @@ async fn test_ec2_vpc_subnet_security_group_compat() {
     let (status, body) = client
         .call_query(
             "/",
-            &[
-                ("Action", "CreateKeyPair"),
-                ("KeyName", "compat-keypair"),
-            ],
+            &[("Action", "CreateKeyPair"), ("KeyName", "compat-keypair")],
         )
         .await;
     assert_eq!(status, StatusCode::OK);

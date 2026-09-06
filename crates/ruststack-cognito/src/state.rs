@@ -125,7 +125,11 @@ impl CognitoState {
         &self,
         req: CreateUserPoolRequest,
     ) -> Result<CreateUserPoolResponse, CognitoError> {
-        let pool_id = format!("{}_{}", self.region, fastrand::alphanumeric().to_lowercase());
+        let pool_id = format!(
+            "{}_{}",
+            self.region,
+            fastrand::alphanumeric().to_lowercase()
+        );
         let arn = self.format_user_pool_arn(&pool_id);
         let now = Utc::now().timestamp_millis() as f64 / 1000.0;
 
@@ -205,8 +209,7 @@ impl CognitoState {
         self.user_pools
             .remove(&req.user_pool_id)
             .ok_or_else(|| CognitoError::ResourceNotFound("User pool not found".to_string()))?;
-        self.client_to_pool
-            .retain(|_, v| v != &req.user_pool_id);
+        self.client_to_pool.retain(|_, v| v != &req.user_pool_id);
         Ok(())
     }
 
@@ -235,10 +238,7 @@ impl CognitoState {
             modified_at: now,
         };
 
-        pool_entry
-            .write()
-            .clients
-            .insert(client_id.clone(), client);
+        pool_entry.write().clients.insert(client_id.clone(), client);
         self.client_to_pool
             .insert(client_id.clone(), req.user_pool_id.clone());
 
@@ -264,10 +264,9 @@ impl CognitoState {
             .ok_or_else(|| CognitoError::ResourceNotFound("User pool not found".to_string()))?;
 
         let pool = pool_entry.read();
-        let client = pool
-            .clients
-            .get(&req.client_id)
-            .ok_or_else(|| CognitoError::ResourceNotFound("User pool client not found".to_string()))?;
+        let client = pool.clients.get(&req.client_id).ok_or_else(|| {
+            CognitoError::ResourceNotFound("User pool client not found".to_string())
+        })?;
 
         Ok(DescribeUserPoolClientResponse {
             user_pool_client: UserPoolClientType {
@@ -544,7 +543,10 @@ impl CognitoState {
         })
     }
 
-    pub fn initiate_auth(&self, req: InitiateAuthRequest) -> Result<InitiateAuthResponse, CognitoError> {
+    pub fn initiate_auth(
+        &self,
+        req: InitiateAuthRequest,
+    ) -> Result<InitiateAuthResponse, CognitoError> {
         let pool_id = self
             .client_to_pool
             .get(&req.client_id)
@@ -552,14 +554,12 @@ impl CognitoState {
             .clone();
 
         let params = req.auth_parameters.unwrap_or_default();
-        let username = params
-            .get("USERNAME")
-            .cloned()
-            .ok_or_else(|| CognitoError::InvalidParameter("Missing USERNAME in auth parameters".to_string()))?;
-        let password = params
-            .get("PASSWORD")
-            .cloned()
-            .ok_or_else(|| CognitoError::InvalidParameter("Missing PASSWORD in auth parameters".to_string()))?;
+        let username = params.get("USERNAME").cloned().ok_or_else(|| {
+            CognitoError::InvalidParameter("Missing USERNAME in auth parameters".to_string())
+        })?;
+        let password = params.get("PASSWORD").cloned().ok_or_else(|| {
+            CognitoError::InvalidParameter("Missing PASSWORD in auth parameters".to_string())
+        })?;
 
         let pool_entry = self.user_pools.get(&pool_id).unwrap();
         let pool = pool_entry.read();
@@ -570,12 +570,22 @@ impl CognitoState {
             .ok_or_else(|| CognitoError::UserNotFound("User not found".to_string()))?;
 
         if user.password_hash != Self::hash_password(&password) {
-            return Err(CognitoError::NotAuthorized("Incorrect username or password".to_string()));
+            return Err(CognitoError::NotAuthorized(
+                "Incorrect username or password".to_string(),
+            ));
         }
 
         let email = user.attributes.get("email").map(|s| s.as_str());
-        let access_token = self.generate_jwt(&pool_id, &req.client_id, &username, &user.sub, email, "access");
-        let id_token = self.generate_jwt(&pool_id, &req.client_id, &username, &user.sub, email, "id");
+        let access_token = self.generate_jwt(
+            &pool_id,
+            &req.client_id,
+            &username,
+            &user.sub,
+            email,
+            "access",
+        );
+        let id_token =
+            self.generate_jwt(&pool_id, &req.client_id, &username, &user.sub, email, "id");
         let refresh_token = Uuid::new_v4().to_string();
 
         Ok(InitiateAuthResponse {

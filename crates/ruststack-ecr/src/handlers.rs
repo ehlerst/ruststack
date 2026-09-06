@@ -34,7 +34,8 @@ pub async fn handle_ecr_request(
             }
         }
         "DescribeRepositories" => {
-            let req: DescribeRepositoriesRequest = serde_json::from_slice(&body).unwrap_or_default();
+            let req: DescribeRepositoriesRequest =
+                serde_json::from_slice(&body).unwrap_or_default();
             match state.describe_repositories(req) {
                 Ok(resp) => ok_json(&resp),
                 Err(e) => error_response(e),
@@ -132,8 +133,16 @@ fn bad_request(msg: &str) -> Response<Body> {
 
 fn error_response(err: EcrError) -> Response<Body> {
     let (status, type_name, msg) = match err {
-        EcrError::RepositoryAlreadyExists(m) => (StatusCode::BAD_REQUEST, "RepositoryAlreadyExistsException", format!("The repository with name '{}' already exists", m)),
-        EcrError::RepositoryNotFound(m) => (StatusCode::BAD_REQUEST, "RepositoryNotFoundException", format!("The repository with name '{}' does not exist", m)),
+        EcrError::RepositoryAlreadyExists(m) => (
+            StatusCode::BAD_REQUEST,
+            "RepositoryAlreadyExistsException",
+            format!("The repository with name '{}' already exists", m),
+        ),
+        EcrError::RepositoryNotFound(m) => (
+            StatusCode::BAD_REQUEST,
+            "RepositoryNotFoundException",
+            format!("The repository with name '{}' does not exist", m),
+        ),
         EcrError::ImageNotFound(m) => (StatusCode::BAD_REQUEST, "ImageNotFoundException", m),
         EcrError::InvalidParameter(m) => (StatusCode::BAD_REQUEST, "InvalidParameterException", m),
     };

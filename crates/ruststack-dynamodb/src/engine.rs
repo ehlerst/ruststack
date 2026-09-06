@@ -32,6 +32,7 @@ impl DynamoDbEngine {
         )
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub fn create_table(
         &self,
         table_name: String,
@@ -366,8 +367,8 @@ impl DynamoDbEngine {
         let mut streams = Vec::new();
         for entry in self.tables.iter() {
             let table = entry.value().read();
-            if let Some(ref name) = table_name {
-                if table.description.table_name != *name {
+            if let Some(name) = table_name {
+                if table.description.table_name != name {
                     continue;
                 }
             }
@@ -770,15 +771,14 @@ impl DynamoDbEngine {
             )
         })?;
         let mut table = table_arc.write();
-        table.description.time_to_live_description =
-            Some(crate::types::TimeToLiveDescription {
-                attribute_name: Some(spec.attribute_name.clone()),
-                time_to_live_status: if spec.enabled {
-                    "ENABLED".to_string()
-                } else {
-                    "DISABLED".to_string()
-                },
-            });
+        table.description.time_to_live_description = Some(crate::types::TimeToLiveDescription {
+            attribute_name: Some(spec.attribute_name.clone()),
+            time_to_live_status: if spec.enabled {
+                "ENABLED".to_string()
+            } else {
+                "DISABLED".to_string()
+            },
+        });
         Ok(spec)
     }
 
@@ -835,7 +835,10 @@ fn apply_update_expression(
 ) -> Result<(), RustStackError> {
     let mut rest = expr.trim();
     while !rest.is_empty() {
-        if let Some(after_set) = rest.strip_prefix("SET ").or_else(|| rest.strip_prefix("set ")) {
+        if let Some(after_set) = rest
+            .strip_prefix("SET ")
+            .or_else(|| rest.strip_prefix("set "))
+        {
             let next_clause_idx = find_next_clause(after_set);
             let set_part = after_set[..next_clause_idx].trim();
             rest = after_set[next_clause_idx..].trim();
@@ -859,7 +862,10 @@ fn apply_update_expression(
                     }
                 }
             }
-        } else if let Some(after_rem) = rest.strip_prefix("REMOVE ").or_else(|| rest.strip_prefix("remove ")) {
+        } else if let Some(after_rem) = rest
+            .strip_prefix("REMOVE ")
+            .or_else(|| rest.strip_prefix("remove "))
+        {
             let next_clause_idx = find_next_clause(after_rem);
             let rem_part = after_rem[..next_clause_idx].trim();
             rest = after_rem[next_clause_idx..].trim();
@@ -875,7 +881,10 @@ fn apply_update_expression(
                 };
                 item.remove(real_name);
             }
-        } else if let Some(after_add) = rest.strip_prefix("ADD ").or_else(|| rest.strip_prefix("add ")) {
+        } else if let Some(after_add) = rest
+            .strip_prefix("ADD ")
+            .or_else(|| rest.strip_prefix("add "))
+        {
             let next_clause_idx = find_next_clause(after_add);
             let add_part = after_add[..next_clause_idx].trim();
             rest = after_add[next_clause_idx..].trim();
@@ -896,11 +905,16 @@ fn apply_update_expression(
                                 AttributeValue::N(n_str) => {
                                     let inc_val = n_str.parse::<f64>().unwrap_or(0.0);
                                     let current_val = match item.get(real_name) {
-                                        Some(AttributeValue::N(curr)) => curr.parse::<f64>().unwrap_or(0.0),
+                                        Some(AttributeValue::N(curr)) => {
+                                            curr.parse::<f64>().unwrap_or(0.0)
+                                        }
                                         _ => 0.0,
                                     };
                                     let new_val = current_val + inc_val;
-                                    item.insert(real_name.to_string(), AttributeValue::N(new_val.to_string()));
+                                    item.insert(
+                                        real_name.to_string(),
+                                        AttributeValue::N(new_val.to_string()),
+                                    );
                                 }
                                 AttributeValue::SS(new_set) => {
                                     let mut set = match item.get(real_name) {
@@ -934,7 +948,10 @@ fn apply_update_expression(
                     }
                 }
             }
-        } else if let Some(after_del) = rest.strip_prefix("DELETE ").or_else(|| rest.strip_prefix("delete ")) {
+        } else if let Some(after_del) = rest
+            .strip_prefix("DELETE ")
+            .or_else(|| rest.strip_prefix("delete "))
+        {
             let next_clause_idx = find_next_clause(after_del);
             let del_part = after_del[..next_clause_idx].trim();
             rest = after_del[next_clause_idx..].trim();
@@ -953,12 +970,16 @@ fn apply_update_expression(
                         if let Some(val) = map.get(right) {
                             match val {
                                 AttributeValue::SS(rem_set) => {
-                                    if let Some(AttributeValue::SS(existing)) = item.get_mut(real_name) {
+                                    if let Some(AttributeValue::SS(existing)) =
+                                        item.get_mut(real_name)
+                                    {
                                         existing.retain(|x| !rem_set.contains(x));
                                     }
                                 }
                                 AttributeValue::NS(rem_set) => {
-                                    if let Some(AttributeValue::NS(existing)) = item.get_mut(real_name) {
+                                    if let Some(AttributeValue::NS(existing)) =
+                                        item.get_mut(real_name)
+                                    {
                                         existing.retain(|x| !rem_set.contains(x));
                                     }
                                 }

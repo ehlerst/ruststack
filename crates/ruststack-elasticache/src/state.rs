@@ -70,7 +70,10 @@ impl ElastiCacheState {
         let now = Utc::now();
 
         let endpoint = CacheEndpoint {
-            address: format!("{}.{}.cache.localhost.localstack.cloud", identifier, self.region),
+            address: format!(
+                "{}.{}.cache.localhost.localstack.cloud",
+                identifier, self.region
+            ),
             port,
         };
 
@@ -88,7 +91,11 @@ impl ElastiCacheState {
 
         let cluster = CacheCluster {
             cache_cluster_identifier: identifier.clone(),
-            configuration_endpoint: if engine == "memcached" { Some(endpoint.clone()) } else { None },
+            configuration_endpoint: if engine == "memcached" {
+                Some(endpoint.clone())
+            } else {
+                None
+            },
             client_download_landing_page: None,
             cache_node_type: cache_node_type.unwrap_or_else(|| "cache.t3.micro".to_string()),
             engine: engine.clone(),
@@ -106,7 +113,10 @@ impl ElastiCacheState {
         Ok(cluster)
     }
 
-    pub fn describe_cache_clusters(&self, identifier: Option<&str>) -> Result<Vec<CacheCluster>, ElastiCacheError> {
+    pub fn describe_cache_clusters(
+        &self,
+        identifier: Option<&str>,
+    ) -> Result<Vec<CacheCluster>, ElastiCacheError> {
         if let Some(id) = identifier {
             let cl = self
                 .clusters
@@ -142,7 +152,10 @@ impl ElastiCacheState {
         }
 
         let endpoint = CacheEndpoint {
-            address: format!("{}.{}.cache.localhost.localstack.cloud", identifier, self.region),
+            address: format!(
+                "{}.{}.cache.localhost.localstack.cloud",
+                identifier, self.region
+            ),
             port: 6379,
         };
 
@@ -158,7 +171,11 @@ impl ElastiCacheState {
                 cache_node_id: "0001".to_string(),
                 read_endpoint: Some(endpoint.clone()),
                 preferred_availability_zone: format!("{}a", self.region),
-                current_role: if i == 1 { "primary".to_string() } else { "replica".to_string() },
+                current_role: if i == 1 {
+                    "primary".to_string()
+                } else {
+                    "replica".to_string()
+                },
             });
         }
 
@@ -186,7 +203,10 @@ impl ElastiCacheState {
         Ok(rg)
     }
 
-    pub fn describe_replication_groups(&self, identifier: Option<&str>) -> Result<Vec<ReplicationGroup>, ElastiCacheError> {
+    pub fn describe_replication_groups(
+        &self,
+        identifier: Option<&str>,
+    ) -> Result<Vec<ReplicationGroup>, ElastiCacheError> {
         if let Some(id) = identifier {
             let rg = self
                 .replication_groups
@@ -195,7 +215,11 @@ impl ElastiCacheState {
                 .ok_or_else(|| ElastiCacheError::ReplicationGroupNotFound(id.to_string()))?;
             Ok(vec![rg])
         } else {
-            Ok(self.replication_groups.iter().map(|kv| kv.value().clone()).collect())
+            Ok(self
+                .replication_groups
+                .iter()
+                .map(|kv| kv.value().clone())
+                .collect())
         }
     }
 
@@ -207,7 +231,11 @@ impl ElastiCacheState {
     pub fn export_snapshot(&self) -> ElastiCacheStateSnapshot {
         ElastiCacheStateSnapshot {
             clusters: self.clusters.iter().map(|kv| kv.value().clone()).collect(),
-            replication_groups: self.replication_groups.iter().map(|kv| kv.value().clone()).collect(),
+            replication_groups: self
+                .replication_groups
+                .iter()
+                .map(|kv| kv.value().clone())
+                .collect(),
         }
     }
 
@@ -215,10 +243,12 @@ impl ElastiCacheState {
         self.clusters.clear();
         self.replication_groups.clear();
         for cl in snapshot.clusters {
-            self.clusters.insert(cl.cache_cluster_identifier.clone(), cl);
+            self.clusters
+                .insert(cl.cache_cluster_identifier.clone(), cl);
         }
         for rg in snapshot.replication_groups {
-            self.replication_groups.insert(rg.replication_group_id.clone(), rg);
+            self.replication_groups
+                .insert(rg.replication_group_id.clone(), rg);
         }
     }
 }
