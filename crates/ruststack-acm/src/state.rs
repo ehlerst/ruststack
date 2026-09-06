@@ -70,7 +70,7 @@ impl AcmState {
         for san in &sans {
             let record_hash = format!("{:.16}", Uuid::new_v4().simple());
             let cname_name = format!("_{}.{}", record_hash, san);
-            let cname_val = format!("_{}.acm-validations.aws.", &record_hash);
+            let cname_val = format!("_{}.acm-validations.aws.", record_hash);
 
             domain_validations.push(DomainValidation {
                 domain_name: san.clone(),

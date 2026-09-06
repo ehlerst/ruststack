@@ -160,7 +160,7 @@ impl Ec2State {
 
     // VPC APIs
     pub fn create_vpc(&self, cidr_block: String, tags: Vec<Tag>) -> Vpc {
-        let vpc_id = format!("vpc-{}", &Uuid::new_v4().to_string().replace('-', "")[..17]);
+        let vpc_id = format!("vpc-{:.17}", Uuid::new_v4().simple());
         let vpc = Vpc {
             vpc_id: vpc_id.clone(),
             cidr_block,
@@ -252,7 +252,7 @@ impl Ec2State {
                 .unwrap_or_else(|| "vpc-default00000001".to_string())
         });
 
-        let sg_id = format!("sg-{}", &Uuid::new_v4().to_string().replace('-', "")[..17]);
+        let sg_id = format!("sg-{:.17}", Uuid::new_v4().simple());
         let sg = SecurityGroup {
             group_id: sg_id.clone(),
             group_name: name,
@@ -326,7 +326,7 @@ impl Ec2State {
 
     // Key Pair APIs
     pub fn create_key_pair(&self, key_name: String) -> KeyPair {
-        let key_pair_id = format!("key-{}", &Uuid::new_v4().to_string().replace('-', "")[..17]);
+        let key_pair_id = format!("key-{:.17}", Uuid::new_v4().simple());
         let kp = KeyPair {
             key_name: key_name.clone(),
             key_pair_id,
@@ -377,7 +377,7 @@ impl Ec2State {
         };
 
         for i in 0..num {
-            let instance_id = format!("i-{}", &Uuid::new_v4().to_string().replace('-', "")[..17]);
+            let instance_id = format!("i-{:.17}", Uuid::new_v4().simple());
             let inst = Instance {
                 instance_id: instance_id.clone(),
                 image_id: image_id.clone(),

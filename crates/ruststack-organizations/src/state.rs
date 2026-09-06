@@ -67,8 +67,8 @@ impl OrganizationsState {
             return Err(OrganizationsError::AlreadyInOrganization);
         }
 
-        let org_id = format!("o-{}", &Uuid::new_v4().simple().to_string()[0..10]);
-        let root_id = format!("r-{}", &Uuid::new_v4().simple().to_string()[0..4]);
+        let org_id = format!("o-{:.10}", Uuid::new_v4().simple());
+        let root_id = format!("r-{:.4}", Uuid::new_v4().simple());
         let master_email = "admin@example.com".to_string();
 
         let org = Organization {
