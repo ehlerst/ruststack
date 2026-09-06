@@ -375,9 +375,9 @@ impl CloudWatchState {
                     }
 
                     if scan_desc {
-                        bucket_vec.sort_by(|a, b| b.0.cmp(&a.0));
+                        bucket_vec.sort_by_key(|a| std::cmp::Reverse(a.0));
                     } else {
-                        bucket_vec.sort_by(|a, b| a.0.cmp(&b.0));
+                        bucket_vec.sort_by_key(|a| a.0);
                     }
 
                     for (ts, val) in bucket_vec {

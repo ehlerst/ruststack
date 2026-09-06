@@ -336,7 +336,7 @@ impl CloudFormationState {
                 list.push(stack);
             }
         }
-        list.sort_by(|a, b| b.creation_time.cmp(&a.creation_time));
+        list.sort_by_key(|a| std::cmp::Reverse(a.creation_time));
         Ok(list)
     }
 
