@@ -3,20 +3,15 @@ use std::collections::HashMap;
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum InvocationType {
     #[serde(rename = "RequestResponse")]
+    #[default]
     RequestResponse,
     #[serde(rename = "Event")]
     Event,
     #[serde(rename = "DryRun")]
     DryRun,
-}
-
-impl Default for InvocationType {
-    fn default() -> Self {
-        Self::RequestResponse
-    }
 }
 
 impl fmt::Display for InvocationType {
