@@ -140,6 +140,18 @@ fn setup_test_app() -> axum::Router {
         account_id.clone(),
         region.clone(),
     ));
+    let pipes_state = Arc::new(ruststack_pipes::PipesState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let msk_state = Arc::new(ruststack_msk::MskState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
+    let appsync_state = Arc::new(ruststack_appsync::AppSyncState::new(
+        account_id.clone(),
+        region.clone(),
+    ));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let app_state = AppState {
@@ -176,6 +188,9 @@ fn setup_test_app() -> axum::Router {
         acm_state,
         wafv2_state,
         organizations_state,
+        pipes_state,
+        msk_state,
+        appsync_state,
         chaos_engine,
         region,
         account_id,

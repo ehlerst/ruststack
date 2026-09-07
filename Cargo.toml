@@ -34,6 +34,9 @@ members = [
     "crates/ruststack-acm",
     "crates/ruststack-wafv2",
     "crates/ruststack-organizations",
+    "crates/ruststack-pipes",
+    "crates/ruststack-msk",
+    "crates/ruststack-appsync",
     "crates/ruststack-server",
     "crates/ruststack-benchmarks",
     "crates/ruststack-compat-tests",
@@ -83,6 +86,9 @@ ruststack-redshift = { path = "crates/ruststack-redshift" }
 ruststack-acm = { path = "crates/ruststack-acm" }
 ruststack-wafv2 = { path = "crates/ruststack-wafv2" }
 ruststack-organizations = { path = "crates/ruststack-organizations" }
+ruststack-pipes = { path = "crates/ruststack-pipes" }
+ruststack-msk = { path = "crates/ruststack-msk" }
+ruststack-appsync = { path = "crates/ruststack-appsync" }
 ruststack-server = { path = "crates/ruststack-server" }
 
 # Async & HTTP runtime

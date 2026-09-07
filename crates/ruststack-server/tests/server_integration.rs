@@ -145,6 +145,18 @@ async fn test_server_unified_routing() {
         "000000000000".to_string(),
         "us-east-1".to_string(),
     ));
+    let pipes_state = Arc::new(ruststack_pipes::PipesState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let msk_state = Arc::new(ruststack_msk::MskState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
+    let appsync_state = Arc::new(ruststack_appsync::AppSyncState::new(
+        "000000000000".to_string(),
+        "us-east-1".to_string(),
+    ));
 
     let state = AppState {
         s3_storage,
@@ -180,6 +192,9 @@ async fn test_server_unified_routing() {
         acm_state,
         wafv2_state,
         organizations_state,
+        pipes_state,
+        msk_state,
+        appsync_state,
         chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
         region: "us-east-1".to_string(),
         account_id: "000000000000".to_string(),
@@ -850,6 +865,69 @@ async fn test_server_unified_routing() {
                 )
                 .header("content-type", "application/x-amz-json-1.1")
                 .body(Body::from("{}"))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 35. Pipes CreatePipe via unified router (REST /v1/pipes/{name})
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/v1/pipes/unified-pipe")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "Source": "arn:aws:sqs:us-east-1:000000000000:my-queue",
+                        "Target": "arn:aws:sns:us-east-1:000000000000:my-topic"
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 36. MSK CreateCluster via unified router (REST /v1/clusters)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/v1/clusters")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "ClusterName": "unified-kafka",
+                        "NumberOfBrokerNodes": 3
+                    })
+                    .to_string(),
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // 37. AppSync CreateGraphqlApi via unified router (REST /v1/apis)
+    let resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/v1/apis")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "name": "unified-appsync",
+                        "authenticationType": "API_KEY"
+                    })
+                    .to_string(),
+                ))
                 .unwrap(),
         )
         .await

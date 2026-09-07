@@ -145,6 +145,18 @@ impl RustStackTestClient {
             account_id.clone(),
             region.clone(),
         ));
+        let pipes_state = Arc::new(ruststack_pipes::PipesState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
+        let msk_state = Arc::new(ruststack_msk::MskState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
+        let appsync_state = Arc::new(ruststack_appsync::AppSyncState::new(
+            account_id.clone(),
+            region.clone(),
+        ));
 
         let state = AppState {
             s3_storage,
@@ -180,6 +192,9 @@ impl RustStackTestClient {
             acm_state,
             wafv2_state,
             organizations_state,
+            pipes_state,
+            msk_state,
+            appsync_state,
             chaos_engine: Arc::new(ruststack_core::ChaosEngine::new()),
             region: region.clone(),
             account_id: account_id.clone(),
@@ -210,6 +225,29 @@ impl RustStackTestClient {
         let status = resp.status();
         let body = resp.into_body().collect().await.unwrap().to_bytes();
         let val: Value = serde_json::from_slice(&body).unwrap_or(Value::Null);
+        (status, val)
+    }
+
+    pub async fn call_rest_json(
+        &self,
+        method: Method,
+        uri: &str,
+        payload: Option<Value>,
+    ) -> (StatusCode, Value) {
+        let builder = Request::builder()
+            .method(method)
+            .uri(uri)
+            .header("content-type", "application/json");
+        let body = if let Some(p) = payload {
+            Body::from(p.to_string())
+        } else {
+            Body::empty()
+        };
+        let req = builder.body(body).unwrap();
+        let resp = self.send_request(req).await;
+        let status = resp.status();
+        let body_bytes = resp.into_body().collect().await.unwrap().to_bytes();
+        let val: Value = serde_json::from_slice(&body_bytes).unwrap_or(Value::Null);
         (status, val)
     }
 

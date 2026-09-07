@@ -455,6 +455,18 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         opts.account_id.clone(),
         opts.region.clone(),
     ));
+    let pipes_state = Arc::new(ruststack_pipes::PipesState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let msk_state = Arc::new(ruststack_msk::MskState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
+    let appsync_state = Arc::new(ruststack_appsync::AppSyncState::new(
+        opts.account_id.clone(),
+        opts.region.clone(),
+    ));
     let chaos_engine = Arc::new(ruststack_core::ChaosEngine::new());
 
     let state = AppState {
@@ -491,6 +503,9 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
         acm_state: acm_state.clone(),
         wafv2_state: wafv2_state.clone(),
         organizations_state: organizations_state.clone(),
+        pipes_state: pipes_state.clone(),
+        msk_state: msk_state.clone(),
+        appsync_state: appsync_state.clone(),
         chaos_engine,
         region: opts.region.clone(),
         account_id: opts.account_id.clone(),
@@ -543,6 +558,9 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
                         acm_state.import_snapshot(snapshot.acm);
                         wafv2_state.import_snapshot(snapshot.wafv2);
                         organizations_state.import_snapshot(snapshot.organizations);
+                        pipes_state.import_snapshot(snapshot.pipes);
+                        msk_state.import_snapshot(snapshot.msk);
+                        appsync_state.import_snapshot(snapshot.appsync);
                         info!("💾 Auto-loaded persistent cluster state from {}", path);
                     }
                     Err(e) => {
@@ -605,6 +623,9 @@ async fn run_server(opts: Opts) -> anyhow::Result<()> {
             acm: acm_state.export_snapshot(),
             wafv2: wafv2_state.export_snapshot(),
             organizations: organizations_state.export_snapshot(),
+            pipes: pipes_state.export_snapshot(),
+            msk: msk_state.export_snapshot(),
+            appsync: appsync_state.export_snapshot(),
         };
         if let Ok(json_str) = serde_json::to_string_pretty(&snapshot) {
             if let Ok(()) = std::fs::write(path, json_str) {

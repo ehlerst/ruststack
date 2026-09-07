@@ -41,6 +41,9 @@ ruststack-redshift = { path = "../ruststack-redshift" }
 ruststack-acm = { path = "../ruststack-acm" }
 ruststack-wafv2 = { path = "../ruststack-wafv2" }
 ruststack-organizations = { path = "../ruststack-organizations" }
+ruststack-pipes = { path = "../ruststack-pipes" }
+ruststack-msk = { path = "../ruststack-msk" }
+ruststack-appsync = { path = "../ruststack-appsync" }
 ruststack-server = { path = "../ruststack-server" }
 tokio = { workspace = true }
 axum = { workspace = true }

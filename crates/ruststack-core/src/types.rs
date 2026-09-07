@@ -36,6 +36,9 @@ pub enum AwsService {
     Acm,
     WafV2,
     Organizations,
+    Pipes,
+    Msk,
+    AppSync,
     Internal,
     Unknown,
 }
@@ -77,6 +80,9 @@ impl fmt::Display for AwsService {
             AwsService::Acm => write!(f, "acm"),
             AwsService::WafV2 => write!(f, "wafv2"),
             AwsService::Organizations => write!(f, "organizations"),
+            AwsService::Pipes => write!(f, "pipes"),
+            AwsService::Msk => write!(f, "kafka"),
+            AwsService::AppSync => write!(f, "appsync"),
             AwsService::Internal => write!(f, "internal"),
             AwsService::Unknown => write!(f, "unknown"),
         }

@@ -8,6 +8,7 @@ use clap::Parser;
 use http_body_util::BodyExt;
 use ruststack_acm::{handle_acm_request, AcmState};
 use ruststack_apigateway::{handle_apigateway_request, ApiGatewayState};
+use ruststack_appsync::{handle_appsync_request, AppSyncState};
 use ruststack_athena::{handle_athena_request, AthenaState};
 use ruststack_bedrock::{handle_bedrock_request, BedrockState};
 use ruststack_cloudformation::{handle_cloudformation_request, CloudFormationState};
@@ -26,8 +27,10 @@ use ruststack_kinesis::{handle_kinesis_request, KinesisState};
 use ruststack_kms::{handle_kms_request, KmsState};
 use ruststack_lambda::{handle_lambda_request, LambdaState};
 use ruststack_logs::{handle_logs_request, LogsState};
+use ruststack_msk::{handle_msk_request, MskState};
 use ruststack_opensearch::{handle_opensearch_request, OpenSearchState};
 use ruststack_organizations::{handle_organizations_request, OrganizationsState};
+use ruststack_pipes::{handle_pipes_request, PipesState};
 use ruststack_rds::{handle_rds_request, RdsState};
 use ruststack_redshift::{handle_redshift_request, RedshiftState};
 use ruststack_route53::{handle_route53_request, Route53State};
@@ -66,7 +69,7 @@ pub struct Opts {
     #[arg(
         short,
         long,
-        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda,cognito,apigateway,route53,stepfunctions,cloudformation,ecr,ecs,ec2,elbv2,bedrock,opensearch,athena,rds,elasticache,redshift",
+        default_value = "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda,cognito,apigateway,route53,stepfunctions,cloudformation,ecr,ecs,ec2,elbv2,bedrock,opensearch,athena,rds,elasticache,redshift,acm,wafv2,organizations,pipes,msk,appsync",
         env = "SERVICES"
     )]
     pub services: String,
@@ -89,7 +92,7 @@ impl Default for Opts {
         Self {
             port: 4566,
             host: "0.0.0.0".to_string(),
-            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda,cognito,apigateway,route53,stepfunctions,cloudformation,ecr,ecs,ec2,elbv2,bedrock,opensearch,athena,rds,elasticache,redshift,acm,wafv2,organizations".to_string(),
+            services: "s3,sqs,sns,events,ssm,secretsmanager,sts,dynamodb,kms,logs,iam,cloudwatch,ses,kinesis,lambda,cognito,apigateway,route53,stepfunctions,cloudformation,ecr,ecs,ec2,elbv2,bedrock,opensearch,athena,rds,elasticache,redshift,acm,wafv2,organizations,pipes,msk,appsync".to_string(),
             region: "us-east-1".to_string(),
             account_id: "000000000000".to_string(),
             data_dir: None,
@@ -181,6 +184,9 @@ pub struct AppState {
     pub acm_state: Arc<AcmState>,
     pub wafv2_state: Arc<Wafv2State>,
     pub organizations_state: Arc<OrganizationsState>,
+    pub pipes_state: Arc<PipesState>,
+    pub msk_state: Arc<MskState>,
+    pub appsync_state: Arc<AppSyncState>,
     pub chaos_engine: Arc<ChaosEngine>,
     pub region: String,
     pub account_id: String,
@@ -262,7 +268,7 @@ async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
             "dynamodb", "kms", "logs", "iam", "cloudwatch", "ses", "kinesis", "lambda", "dynamodbstreams",
             "cognito", "apigateway", "route53", "stepfunctions", "cloudformation", "ecr",
             "ecs", "ec2", "elbv2", "bedrock", "opensearch", "athena", "rds", "elasticache", "redshift",
-            "acm", "wafv2", "organizations"
+            "acm", "wafv2", "organizations", "pipes", "msk", "appsync"
         ],
         "region": state.region,
         "account_id": state.account_id,
@@ -301,6 +307,9 @@ async fn info_handler(State(state): State<AppState>) -> impl IntoResponse {
             "acm": ["request-certificate", "describe-certificate", "list-certificates", "x509-mocking", "dns-validation", "json-protocol"],
             "wafv2": ["web-acls", "rules", "ip-sets", "alb-and-apigateway-associations", "json-protocol"],
             "organizations": ["organizations", "roots", "accounts", "organizational-units", "json-protocol"],
+            "pipes": ["pipes", "enrichment", "target-routing", "start-stop", "json-protocol"],
+            "msk": ["clusters", "broker-nodes", "bootstrap-brokers", "kafka-configurations", "json-protocol"],
+            "appsync": ["graphql-apis", "api-keys", "schemas", "data-sources", "graphql-execution", "json-protocol"],
             "chaos": ["latency-injection", "jitter", "error-rate-simulation", "rule-limits", "service-filtering"]
         }
     });
@@ -580,6 +589,36 @@ async fn gateway_handler(State(state): State<AppState>, req: Request<Body>) -> R
         AwsService::Organizations => {
             handle_organizations_request(
                 State((*state.organizations_state).clone()),
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Pipes => {
+            handle_pipes_request(
+                State((*state.pipes_state).clone()),
+                method,
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::Msk => {
+            handle_msk_request(
+                State((*state.msk_state).clone()),
+                method,
+                uri,
+                headers,
+                body_bytes,
+            )
+            .await
+        }
+        AwsService::AppSync => {
+            handle_appsync_request(
+                State((*state.appsync_state).clone()),
+                method,
+                uri,
                 headers,
                 body_bytes,
             )

@@ -218,6 +218,9 @@
       <button class="tab-btn" onclick="switchTab('kinesis')">🌊 Kinesis</button>
       <button class="tab-btn" onclick="switchTab('lambda')">λ Lambda</button>
       <button class="tab-btn" onclick="switchTab('cloudwatch')">📈 CloudWatch</button>
+      <button class="tab-btn" onclick="switchTab('databases')">🗄️ Relational & Cache</button>
+      <button class="tab-btn" onclick="switchTab('security')">🛡️ Security & Org</button>
+      <button class="tab-btn" onclick="switchTab('streaming-apis')">⚡ Streaming & APIs</button>
       <button class="tab-btn" onclick="switchTab('chaos')">🌪️ Chaos Studio</button>
       <button class="tab-btn" onclick="switchTab('snapshots')">💾 Snapshots</button>
     </div>
@@ -268,6 +271,42 @@
         <div class="card">
           <div class="card-title">CloudWatch Metrics & Alarms</div>
           <div class="card-value" id="card-cw-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">RDS Instances & Clusters</div>
+          <div class="card-value" id="card-rds-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">ElastiCache Clusters</div>
+          <div class="card-value" id="card-elasticache-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Redshift Warehouses</div>
+          <div class="card-value" id="card-redshift-count">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">ACM Certificates</div>
+          <div class="card-value" id="card-acm-count">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">WAFv2 Web ACLs</div>
+          <div class="card-value" id="card-wafv2-count">0 / 0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">AWS Organizations</div>
+          <div class="card-value" id="card-org-count">0 accts</div>
+        </div>
+        <div class="card">
+          <div class="card-title">EventBridge Pipes</div>
+          <div class="card-value" id="card-pipes-count">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">Apache Kafka (MSK)</div>
+          <div class="card-value" id="card-msk-count">0</div>
+        </div>
+        <div class="card">
+          <div class="card-title">AppSync GraphQL APIs</div>
+          <div class="card-value" id="card-appsync-count">0</div>
         </div>
       </div>
 
@@ -718,6 +757,201 @@
       </div>
     </div>
 
+    <!-- DATABASES TAB -->
+    <div id="tab-databases" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title">
+          <span>🗄️ Amazon RDS & Aurora</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>DB Identifier</th>
+              <th>Engine</th>
+              <th>Status</th>
+              <th>Allocated Storage</th>
+              <th>Endpoint</th>
+            </tr>
+          </thead>
+          <tbody id="table-rds-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No RDS instances created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title">
+          <span>⚡ Amazon ElastiCache</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Cluster ID</th>
+              <th>Engine</th>
+              <th>Cache Nodes</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="table-elasticache-rows">
+            <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No ElastiCache clusters created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <span>📊 Amazon Redshift Data Warehousing</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Cluster Identifier</th>
+              <th>Node Type</th>
+              <th>Nodes</th>
+              <th>Status</th>
+              <th>Database Name</th>
+            </tr>
+          </thead>
+          <tbody id="table-redshift-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No Redshift clusters created yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SECURITY TAB -->
+    <div id="tab-security" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title">
+          <span>🔒 AWS Certificate Manager (ACM)</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Domain Name</th>
+              <th>Status</th>
+              <th>Validation Method</th>
+              <th>Certificate ARN</th>
+            </tr>
+          </thead>
+          <tbody id="table-acm-rows">
+            <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No certificates requested yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title">
+          <span>🛡️ AWS WAFv2 Web ACLs</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Web ACL Name</th>
+              <th>Scope</th>
+              <th>Default Action</th>
+              <th>Capacity Units</th>
+              <th>ARN</th>
+            </tr>
+          </thead>
+          <tbody id="table-wafv2-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No Web ACLs configured yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <span>🏢 AWS Organizations</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Account ID</th>
+              <th>Account Name</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Joined Method</th>
+            </tr>
+          </thead>
+          <tbody id="table-organizations-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No organization or member accounts</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- STREAMING & APIS TAB -->
+    <div id="tab-streaming-apis" class="tab-content">
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title">
+          <span>⚡ Amazon EventBridge Pipes</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Pipe Name</th>
+              <th>Source</th>
+              <th>Target</th>
+              <th>Desired State</th>
+              <th>Current State</th>
+            </tr>
+          </thead>
+          <tbody id="table-pipes-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No EventBridge Pipes configured yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="section-title">
+          <span>☕ Amazon Managed Streaming for Apache Kafka (MSK)</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>Cluster Name</th>
+              <th>Kafka Version</th>
+              <th>Broker Nodes</th>
+              <th>State</th>
+              <th>Cluster ARN</th>
+            </tr>
+          </thead>
+          <tbody id="table-msk-rows">
+            <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No MSK clusters deployed yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <span>🌐 AWS AppSync (GraphQL APIs)</span>
+          <button class="btn" onclick="fetchStateOverview()">Refresh</button>
+        </div>
+        <table>
+          <thead>
+            <tr>
+              <th>API Name</th>
+              <th>API ID</th>
+              <th>Authentication Type</th>
+              <th>GraphQL URI</th>
+            </tr>
+          </thead>
+          <tbody id="table-appsync-rows">
+            <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No GraphQL APIs deployed yet</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- SNAPSHOTS TAB -->
     <div id="tab-snapshots" class="tab-content">
       <div class="card" style="margin-bottom: 1.5rem;">
@@ -729,7 +963,7 @@
           </div>
         </div>
         <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1rem;">
-          RustStack supports instant atomic snapshotting and state recovery across all 8 services.
+          RustStack supports instant atomic snapshotting and state recovery across all 37 services.
         </p>
         <div class="form-group">
           <label>Raw Snapshot JSON (Paste here to restore)</label>
@@ -778,6 +1012,15 @@
         document.getElementById('card-kinesis-count').innerText = `${(dump.kinesis?.streams || []).length}`;
         document.getElementById('card-lambda-count').innerText = `${(dump.lambda?.functions || []).length}`;
         document.getElementById('card-cw-count').innerText = `${(dump.cloudwatch?.metrics || []).length} / ${(dump.cloudwatch?.alarms || []).length}`;
+        document.getElementById('card-rds-count').innerText = `${(dump.rds?.instances || []).length} / ${(dump.rds?.clusters || []).length}`;
+        document.getElementById('card-elasticache-count').innerText = `${(dump.elasticache?.clusters || []).length} / ${(dump.elasticache?.replication_groups || []).length}`;
+        document.getElementById('card-redshift-count').innerText = `${(dump.redshift?.clusters || []).length}`;
+        document.getElementById('card-acm-count').innerText = `${(dump.acm?.certificates || []).length}`;
+        document.getElementById('card-wafv2-count').innerText = `${(dump.wafv2?.web_acls || []).length} / ${(dump.wafv2?.ip_sets || []).length}`;
+        document.getElementById('card-org-count').innerText = `${(dump.organizations?.accounts || []).length} accts`;
+        document.getElementById('card-pipes-count').innerText = `${(dump.pipes?.pipes || []).length}`;
+        document.getElementById('card-msk-count').innerText = `${(dump.msk?.clusters || []).length}`;
+        document.getElementById('card-appsync-count').innerText = `${(dump.appsync?.apis || []).length}`;
 
         // Populate Tables
         renderDynamoTables(dump.dynamodb.tables || []);
@@ -793,6 +1036,9 @@
         renderKinesis(dump.kinesis?.streams || []);
         renderLambda(dump.lambda?.functions || []);
         renderCloudWatch(dump.cloudwatch?.metrics || [], dump.cloudwatch?.alarms || []);
+        renderDatabases(dump.rds?.instances || [], dump.elasticache?.clusters || [], dump.redshift?.clusters || []);
+        renderSecurity(dump.acm?.certificates || [], dump.wafv2?.web_acls || [], dump.organizations || {});
+        renderStreamingApis(dump.pipes?.pipes || [], dump.msk?.clusters || [], dump.appsync?.apis || []);
       } catch (err) {
         console.error("Failed to load state", err);
       }
@@ -1050,6 +1296,127 @@
       </tr>`).join('');
     }
 
+    function renderDatabases(rdsInstances, elcClusters, rsClusters) {
+      const tbodyRds = document.getElementById('table-rds-rows');
+      if (!rdsInstances.length) {
+        tbodyRds.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No RDS instances created yet</td></tr>';
+      } else {
+        tbodyRds.innerHTML = rdsInstances.map(i => `<tr>
+          <td><strong>${i.db_instance_identifier}</strong></td>
+          <td><span class="badge badge-primary">${i.engine}</span></td>
+          <td><span class="badge badge-success">${i.db_instance_status}</span></td>
+          <td>${i.allocated_storage} GB (${i.db_instance_class})</td>
+          <td><code>${i.endpoint?.address || '-'}:${i.endpoint?.port || '-'}</code></td>
+        </tr>`).join('');
+      }
+
+      const tbodyElc = document.getElementById('table-elasticache-rows');
+      if (!elcClusters.length) {
+        tbodyElc.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No ElastiCache clusters created yet</td></tr>';
+      } else {
+        tbodyElc.innerHTML = elcClusters.map(c => `<tr>
+          <td><strong>${c.cache_cluster_id}</strong></td>
+          <td><span class="badge badge-primary">${c.engine}</span></td>
+          <td>${c.num_cache_nodes} nodes (${c.cache_node_type})</td>
+          <td><span class="badge badge-success">${c.cache_cluster_status}</span></td>
+        </tr>`).join('');
+      }
+
+      const tbodyRs = document.getElementById('table-redshift-rows');
+      if (!rsClusters.length) {
+        tbodyRs.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No Redshift clusters created yet</td></tr>';
+      } else {
+        tbodyRs.innerHTML = rsClusters.map(r => `<tr>
+          <td><strong>${r.cluster_identifier}</strong></td>
+          <td><code>${r.node_type}</code></td>
+          <td>${r.number_of_nodes} nodes</td>
+          <td><span class="badge badge-success">${r.cluster_status}</span></td>
+          <td>${r.db_name || 'dev'}</td>
+        </tr>`).join('');
+      }
+    }
+
+    function renderSecurity(certificates, webAcls, org) {
+      const tbodyAcm = document.getElementById('table-acm-rows');
+      if (!certificates.length) {
+        tbodyAcm.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No certificates requested yet</td></tr>';
+      } else {
+        tbodyAcm.innerHTML = certificates.map(c => `<tr>
+          <td><strong>${c.domain_name}</strong></td>
+          <td><span class="badge badge-success">${c.status}</span></td>
+          <td><span class="badge badge-primary">${c.validation_method || 'DNS'}</span></td>
+          <td><small style="color: var(--text-muted);">${c.certificate_arn}</small></td>
+        </tr>`).join('');
+      }
+
+      const tbodyWaf = document.getElementById('table-wafv2-rows');
+      if (!webAcls.length) {
+        tbodyWaf.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No Web ACLs configured yet</td></tr>';
+      } else {
+        tbodyWaf.innerHTML = webAcls.map(w => `<tr>
+          <td><strong>${w.name}</strong></td>
+          <td><span class="badge badge-primary">${w.scope || 'REGIONAL'}</span></td>
+          <td><span class="badge badge-success">${Object.keys(w.default_action || {})[0] || 'Allow'}</span></td>
+          <td>${w.capacity || 0} WCU</td>
+          <td><small style="color: var(--text-muted);">${w.arn}</small></td>
+        </tr>`).join('');
+      }
+
+      const tbodyOrg = document.getElementById('table-organizations-rows');
+      const accounts = org.accounts || [];
+      if (!accounts.length) {
+        tbodyOrg.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No organization or member accounts</td></tr>';
+      } else {
+        tbodyOrg.innerHTML = accounts.map(a => `<tr>
+          <td><code>${a.id}</code></td>
+          <td><strong>${a.name}</strong></td>
+          <td>${a.email}</td>
+          <td><span class="badge badge-success">${a.status}</span></td>
+          <td>${a.joined_method || 'INVITED'}</td>
+        </tr>`).join('');
+      }
+    }
+
+    function renderStreamingApis(pipes, mskClusters, appsyncApis) {
+      const tbodyPipes = document.getElementById('table-pipes-rows');
+      if (!pipes.length) {
+        tbodyPipes.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No EventBridge Pipes configured yet</td></tr>';
+      } else {
+        tbodyPipes.innerHTML = pipes.map(p => `<tr>
+          <td><strong>${p.Name || p.name}</strong></td>
+          <td><code>${p.Source || p.source}</code></td>
+          <td><code>${p.Target || p.target}</code></td>
+          <td>${p.DesiredState || p.desired_state || 'RUNNING'}</td>
+          <td><span class="badge badge-success">${p.CurrentState || p.current_state || 'RUNNING'}</span></td>
+        </tr>`).join('');
+      }
+
+      const tbodyMsk = document.getElementById('table-msk-rows');
+      if (!mskClusters.length) {
+        tbodyMsk.innerHTML = '<tr><td colspan="5" style="text-align:center; color: var(--text-muted);">No MSK clusters deployed yet</td></tr>';
+      } else {
+        tbodyMsk.innerHTML = mskClusters.map(k => `<tr>
+          <td><strong>${k.ClusterName || k.cluster_name}</strong></td>
+          <td><span class="badge badge-primary">${k.KafkaVersion || k.kafka_version || '3.5.1'}</span></td>
+          <td>${k.NumberOfBrokerNodes || k.number_of_broker_nodes || 3} brokers</td>
+          <td><span class="badge badge-success">${k.State || k.state || 'ACTIVE'}</span></td>
+          <td><small style="color: var(--text-muted);">${k.ClusterArn || k.cluster_arn}</small></td>
+        </tr>`).join('');
+      }
+
+      const tbodyAppSync = document.getElementById('table-appsync-rows');
+      if (!appsyncApis.length) {
+        tbodyAppSync.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">No GraphQL APIs deployed yet</td></tr>';
+      } else {
+        tbodyAppSync.innerHTML = appsyncApis.map(a => `<tr>
+          <td><strong>${a.name || a.Name}</strong></td>
+          <td><code>${a.apiId || a.api_id}</code></td>
+          <td><span class="badge badge-primary">${a.authenticationType || a.authentication_type || 'API_KEY'}</span></td>
+          <td><code>${(a.uris && (a.uris.GRAPHQL || a.uris.graphql)) || '-'}</code></td>
+        </tr>`).join('');
+      }
+    }
+
     async function fetchChaosRules() {
       try {
         const res = await fetch('/_ruststack/chaos/rules');
@@ -1127,7 +1494,7 @@
     }
 
     async function resetState() {
-      if (!confirm("Are you sure you want to reset all 8 services completely?")) return;
+      if (!confirm("Are you sure you want to reset all 37 services completely?")) return;
       await fetch('/_ruststack/state/reset', { method: 'POST' });
       alert("All state wiped!");
       fetchStateOverview();

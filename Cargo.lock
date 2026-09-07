@@ -1502,6 +1502,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruststack-appsync"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "http-body-util",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ruststack-athena"
 version = "0.1.0"
 dependencies = [
@@ -1664,6 +1682,7 @@ dependencies = [
  "quick-xml",
  "ruststack-acm",
  "ruststack-apigateway",
+ "ruststack-appsync",
  "ruststack-athena",
  "ruststack-bedrock",
  "ruststack-cloudformation",
@@ -1682,8 +1701,10 @@ dependencies = [
  "ruststack-kms",
  "ruststack-lambda",
  "ruststack-logs",
+ "ruststack-msk",
  "ruststack-opensearch",
  "ruststack-organizations",
+ "ruststack-pipes",
  "ruststack-rds",
  "ruststack-redshift",
  "ruststack-route53",
@@ -1988,6 +2009,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "ruststack-msk"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "http-body-util",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "ruststack-opensearch"
 version = "0.1.0"
 dependencies = [
@@ -2015,6 +2054,24 @@ dependencies = [
  "dashmap",
  "http-body-util",
  "parking_lot",
+ "ruststack-core",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
+name = "ruststack-pipes"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "bytes",
+ "chrono",
+ "dashmap",
+ "http-body-util",
  "ruststack-core",
  "serde",
  "serde_json",
@@ -2149,6 +2206,7 @@ dependencies = [
  "reqwest",
  "ruststack-acm",
  "ruststack-apigateway",
+ "ruststack-appsync",
  "ruststack-athena",
  "ruststack-bedrock",
  "ruststack-cloudformation",
@@ -2167,8 +2225,10 @@ dependencies = [
  "ruststack-kms",
  "ruststack-lambda",
  "ruststack-logs",
+ "ruststack-msk",
  "ruststack-opensearch",
  "ruststack-organizations",
+ "ruststack-pipes",
  "ruststack-rds",
  "ruststack-redshift",
  "ruststack-route53",

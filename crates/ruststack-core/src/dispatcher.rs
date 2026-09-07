@@ -154,6 +154,15 @@ impl Dispatcher {
             {
                 return AwsService::Organizations;
             }
+            if target.starts_with("Pipes") || target.starts_with("pipes") {
+                return AwsService::Pipes;
+            }
+            if target.starts_with("Kafka") || target.starts_with("kafka") {
+                return AwsService::Msk;
+            }
+            if target.starts_with("AppSync") || target.starts_with("appsync") {
+                return AwsService::AppSync;
+            }
         }
 
         // 3. Check Authorization header (AWS SigV4 credential scope: .../us-east-1/<service>/aws4_request)
@@ -194,6 +203,9 @@ impl Dispatcher {
                     "acm" => return AwsService::Acm,
                     "wafv2" | "waf-regional" | "waf" => return AwsService::WafV2,
                     "organizations" => return AwsService::Organizations,
+                    "pipes" => return AwsService::Pipes,
+                    "kafka" => return AwsService::Msk,
+                    "appsync" => return AwsService::AppSync,
                     _ => {}
                 }
             }
@@ -402,6 +414,15 @@ impl Dispatcher {
             }
             if first == "organizations" {
                 return AwsService::Organizations;
+            }
+            if (first == "v1" && path.starts_with("/v1/pipes")) || first == "pipes" {
+                return AwsService::Pipes;
+            }
+            if (first == "v1" && path.starts_with("/v1/clusters")) || first == "kafka" {
+                return AwsService::Msk;
+            }
+            if (first == "v1" && path.starts_with("/v1/apis")) || first == "appsync" {
+                return AwsService::AppSync;
             }
         }
 

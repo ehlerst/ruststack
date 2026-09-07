@@ -46,6 +46,9 @@ pub struct RustStackStateSnapshot {
     pub acm: ruststack_acm::AcmStateSnapshot,
     pub wafv2: ruststack_wafv2::Wafv2StateSnapshot,
     pub organizations: ruststack_organizations::OrganizationsStateSnapshot,
+    pub pipes: ruststack_pipes::PipesSnapshot,
+    pub msk: ruststack_msk::MskSnapshot,
+    pub appsync: ruststack_appsync::AppSyncSnapshot,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -118,6 +121,9 @@ pub async fn state_reset_handler(
         "acm",
         "wafv2",
         "organizations",
+        "pipes",
+        "msk",
+        "appsync",
     ];
 
     let target_services = match reset_req.services {
@@ -160,6 +166,9 @@ pub async fn state_reset_handler(
             "acm" => state.acm_state.reset(),
             "wafv2" | "waf" => state.wafv2_state.reset(),
             "organizations" => state.organizations_state.reset(),
+            "pipes" => state.pipes_state.reset(),
+            "msk" | "kafka" => state.msk_state.reset(),
+            "appsync" => state.appsync_state.reset(),
             _ => {}
         }
     }
@@ -230,6 +239,9 @@ pub async fn state_dump_handler(
         acm: state.acm_state.export_snapshot(),
         wafv2: state.wafv2_state.export_snapshot(),
         organizations: state.organizations_state.export_snapshot(),
+        pipes: state.pipes_state.export_snapshot(),
+        msk: state.msk_state.export_snapshot(),
+        appsync: state.appsync_state.export_snapshot(),
     };
 
     if let Some(file_path) = dump_req.file_path {
@@ -373,6 +385,9 @@ pub async fn state_load_handler(
     state
         .organizations_state
         .import_snapshot(snapshot.organizations);
+    state.pipes_state.import_snapshot(snapshot.pipes);
+    state.msk_state.import_snapshot(snapshot.msk);
+    state.appsync_state.import_snapshot(snapshot.appsync);
 
     let resp_json = json!({
         "status": "ok",
