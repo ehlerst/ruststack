@@ -116,6 +116,8 @@ pub fn compute_crc32c(data: &[u8]) -> u32 {
 // -----------------------------------------------------------------------------
 // SHA-1 (RFC 3174)
 // -----------------------------------------------------------------------------
+#[allow(unknown_lints)]
+#[allow(clippy::chunks_exact_to_as_chunks)]
 pub fn compute_sha1(data: &[u8]) -> [u8; 20] {
     let mut h0 = 0x6745_2301u32;
     let mut h1 = 0xEFCD_AB89u32;
@@ -134,9 +136,11 @@ pub fn compute_sha1(data: &[u8]) -> [u8; 20] {
     }
     msg.extend_from_slice(&bit_len.to_be_bytes());
 
-    for chunk in msg.chunks_exact(64) {
+    let chunk_size = 64;
+    for chunk in msg.chunks_exact(chunk_size) {
         let mut w = [0u32; 80];
-        for (slot, block) in w[..16].iter_mut().zip(chunk.chunks_exact(4)) {
+        let word_size = 4;
+        for (slot, block) in w[..16].iter_mut().zip(chunk.chunks_exact(word_size)) {
             *slot = u32::from_be_bytes([block[0], block[1], block[2], block[3]]);
         }
         for i in 16..80 {
