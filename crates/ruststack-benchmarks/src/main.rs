@@ -247,18 +247,9 @@ pub fn run_s3_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
                 &format!("mp_{}", i),
                 &upload_id,
                 vec![
-                    CompletedPart {
-                        part_number: 1,
-                        etag: etag1,
-                    },
-                    CompletedPart {
-                        part_number: 2,
-                        etag: etag2,
-                    },
-                    CompletedPart {
-                        part_number: 3,
-                        etag: etag3,
-                    },
+                    CompletedPart::new(1, etag1),
+                    CompletedPart::new(2, etag2),
+                    CompletedPart::new(3, etag3),
                 ],
             )
             .unwrap();

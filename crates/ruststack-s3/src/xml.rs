@@ -82,6 +82,11 @@ pub fn serialize_list_objects_v2(res: &ListObjectsV2Result) -> String {
     }
 
     for obj in &res.contents {
+        let storage_class = if obj.storage_class.is_empty() {
+            "STANDARD"
+        } else {
+            &obj.storage_class
+        };
         xml.push_str(&format!(
             r#"
     <Contents>
@@ -89,12 +94,13 @@ pub fn serialize_list_objects_v2(res: &ListObjectsV2Result) -> String {
         <LastModified>{}</LastModified>
         <ETag>{}</ETag>
         <Size>{}</Size>
-        <StorageClass>STANDARD</StorageClass>
+        <StorageClass>{}</StorageClass>
     </Contents>"#,
             quick_xml::escape::escape(&obj.key),
             obj.last_modified.to_rfc3339(),
             quick_xml::escape::escape(&obj.etag),
-            obj.size
+            obj.size,
+            storage_class
         ));
     }
 
@@ -154,7 +160,7 @@ pub fn serialize_initiate_multipart(bucket: &str, key: &str, upload_id: &str) ->
 }
 
 pub fn serialize_complete_multipart(bucket: &str, key: &str, etag: &str, location: &str) -> String {
-    serialize_complete_multipart_upload(bucket, key, etag, location)
+    serialize_complete_multipart_upload(bucket, key, etag, location, None, None, None, None)
 }
 
 pub fn serialize_copy_object_result(
@@ -186,25 +192,57 @@ pub fn serialize_initiate_multipart_upload(bucket: &str, key: &str, upload_id: &
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn serialize_complete_multipart_upload(
     bucket: &str,
     key: &str,
     etag: &str,
     location: &str,
+    checksum_crc32: Option<&str>,
+    checksum_crc32c: Option<&str>,
+    checksum_sha1: Option<&str>,
+    checksum_sha256: Option<&str>,
 ) -> String {
-    format!(
+    let mut xml = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?>
 <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
     <Location>{}</Location>
     <Bucket>{}</Bucket>
     <Key>{}</Key>
-    <ETag>{}</ETag>
-</CompleteMultipartUploadResult>"#,
+    <ETag>{}</ETag>"#,
         quick_xml::escape::escape(location),
         quick_xml::escape::escape(bucket),
         quick_xml::escape::escape(key),
         quick_xml::escape::escape(etag)
-    )
+    );
+
+    if let Some(cs) = checksum_crc32 {
+        xml.push_str(&format!(
+            "\n    <ChecksumCRC32>{}</ChecksumCRC32>",
+            quick_xml::escape::escape(cs)
+        ));
+    }
+    if let Some(cs) = checksum_crc32c {
+        xml.push_str(&format!(
+            "\n    <ChecksumCRC32C>{}</ChecksumCRC32C>",
+            quick_xml::escape::escape(cs)
+        ));
+    }
+    if let Some(cs) = checksum_sha1 {
+        xml.push_str(&format!(
+            "\n    <ChecksumSHA1>{}</ChecksumSHA1>",
+            quick_xml::escape::escape(cs)
+        ));
+    }
+    if let Some(cs) = checksum_sha256 {
+        xml.push_str(&format!(
+            "\n    <ChecksumSHA256>{}</ChecksumSHA256>",
+            quick_xml::escape::escape(cs)
+        ));
+    }
+
+    xml.push_str("\n</CompleteMultipartUploadResult>");
+    xml
 }
 
 pub fn serialize_list_parts(
@@ -236,13 +274,37 @@ pub fn serialize_list_parts(
         <PartNumber>{}</PartNumber>
         <LastModified>{}</LastModified>
         <ETag>{}</ETag>
-        <Size>{}</Size>
-    </Part>"#,
+        <Size>{}</Size>"#,
             p.part_number,
             p.last_modified.to_rfc3339(),
             quick_xml::escape::escape(&p.etag),
             p.size
         ));
+        if let Some(ref cs) = p.checksum_crc32 {
+            xml.push_str(&format!(
+                "\n        <ChecksumCRC32>{}</ChecksumCRC32>",
+                quick_xml::escape::escape(cs)
+            ));
+        }
+        if let Some(ref cs) = p.checksum_crc32c {
+            xml.push_str(&format!(
+                "\n        <ChecksumCRC32C>{}</ChecksumCRC32C>",
+                quick_xml::escape::escape(cs)
+            ));
+        }
+        if let Some(ref cs) = p.checksum_sha1 {
+            xml.push_str(&format!(
+                "\n        <ChecksumSHA1>{}</ChecksumSHA1>",
+                quick_xml::escape::escape(cs)
+            ));
+        }
+        if let Some(ref cs) = p.checksum_sha256 {
+            xml.push_str(&format!(
+                "\n        <ChecksumSHA256>{}</ChecksumSHA256>",
+                quick_xml::escape::escape(cs)
+            ));
+        }
+        xml.push_str("\n    </Part>");
     }
 
     xml.push_str("\n</ListPartsResult>");
@@ -521,6 +583,10 @@ pub fn parse_complete_multipart_request(body: &[u8]) -> Result<Vec<CompletedPart
     let mut parts = Vec::new();
     let mut current_part_num: Option<i32> = None;
     let mut current_etag: Option<String> = None;
+    let mut current_checksum_crc32: Option<String> = None;
+    let mut current_checksum_crc32c: Option<String> = None;
+    let mut current_checksum_sha1: Option<String> = None;
+    let mut current_checksum_sha256: Option<String> = None;
     let mut current_tag = String::new();
     let mut buf = Vec::new();
 
@@ -537,6 +603,14 @@ pub fn parse_complete_multipart_request(body: &[u8]) -> Result<Vec<CompletedPart
                     current_part_num = text.parse().ok();
                 } else if current_tag == "ETag" {
                     current_etag = Some(text.trim_matches('"').to_string());
+                } else if current_tag == "ChecksumCRC32" {
+                    current_checksum_crc32 = Some(text.trim().to_string());
+                } else if current_tag == "ChecksumCRC32C" {
+                    current_checksum_crc32c = Some(text.trim().to_string());
+                } else if current_tag == "ChecksumSHA1" {
+                    current_checksum_sha1 = Some(text.trim().to_string());
+                } else if current_tag == "ChecksumSHA256" {
+                    current_checksum_sha256 = Some(text.trim().to_string());
                 }
             }
             Ok(Event::End(e)) => {
@@ -547,6 +621,10 @@ pub fn parse_complete_multipart_request(body: &[u8]) -> Result<Vec<CompletedPart
                         parts.push(CompletedPart {
                             part_number: num,
                             etag: format!("\"{}\"", etag),
+                            checksum_crc32: current_checksum_crc32.take(),
+                            checksum_crc32c: current_checksum_crc32c.take(),
+                            checksum_sha1: current_checksum_sha1.take(),
+                            checksum_sha256: current_checksum_sha256.take(),
                         });
                     }
                 }
@@ -942,4 +1020,97 @@ pub fn parse_put_bucket_tagging(
     }
 
     Ok(tags)
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct CreateBucketConfig {
+    pub location_constraint: Option<String>,
+    pub bucket_type: Option<String>,
+    pub data_redundancy: Option<String>,
+    pub location_name: Option<String>,
+}
+
+pub fn parse_create_bucket_configuration(
+    body: &[u8],
+) -> Result<CreateBucketConfig, RustStackError> {
+    if body.is_empty() {
+        return Ok(CreateBucketConfig::default());
+    }
+
+    use quick_xml::events::Event;
+    use quick_xml::Reader;
+
+    let mut reader = Reader::from_reader(body);
+    reader.config_mut().trim_text(true);
+
+    let mut config = CreateBucketConfig::default();
+    let mut current_tag = String::new();
+    let mut tag_stack: Vec<String> = Vec::new();
+    let mut buf = Vec::new();
+
+    loop {
+        match reader.read_event_into(&mut buf) {
+            Ok(Event::Start(e)) => {
+                current_tag = String::from_utf8_lossy(e.name().as_ref()).to_string();
+                tag_stack.push(current_tag.clone());
+            }
+            Ok(Event::Text(e)) => {
+                let text = e
+                    .unescape()
+                    .map_err(|err| RustStackError::BadRequest(err.to_string()))?
+                    .trim()
+                    .to_string();
+                if current_tag == "LocationConstraint" {
+                    config.location_constraint = Some(text);
+                } else if current_tag == "Type" {
+                    if let Some(parent) = tag_stack.iter().rev().nth(1) {
+                        if parent == "Bucket" {
+                            config.bucket_type = Some(text);
+                        }
+                    }
+                } else if current_tag == "DataRedundancy" {
+                    config.data_redundancy = Some(text);
+                } else if current_tag == "Name" {
+                    if let Some(parent) = tag_stack.iter().rev().nth(1) {
+                        if parent == "Location" {
+                            config.location_name = Some(text);
+                        }
+                    }
+                }
+            }
+            Ok(Event::End(_)) => {
+                tag_stack.pop();
+                current_tag = tag_stack.last().cloned().unwrap_or_default();
+            }
+            Ok(Event::Eof) => break,
+            Err(e) => {
+                return Err(RustStackError::BadRequest(format!(
+                    "XML parse error in CreateBucketConfiguration: {}",
+                    e
+                )))
+            }
+            _ => {}
+        }
+        buf.clear();
+    }
+
+    Ok(config)
+}
+
+pub fn serialize_create_session(creds: &crate::types::SessionCredentials) -> String {
+    format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<CreateSessionResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+    <Credentials>
+        <AccessKeyId>{}</AccessKeyId>
+        <SecretAccessKey>{}</SecretAccessKey>
+        <SessionToken>{}</SessionToken>
+        <Expiration>{}</Expiration>
+    </Credentials>
+</CreateSessionResult>"#,
+        quick_xml::escape::escape(&creds.access_key_id),
+        quick_xml::escape::escape(&creds.secret_access_key),
+        quick_xml::escape::escape(&creds.session_token),
+        creds.expiration.to_rfc3339()
+    )
 }

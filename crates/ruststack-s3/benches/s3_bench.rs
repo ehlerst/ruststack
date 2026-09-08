@@ -128,10 +128,90 @@ fn s3_multipart_bench(c: &mut Criterion) {
     group.finish();
 }
 
+fn s3_express_one_zone_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("s3_express_one_zone");
+    let storage = InMemoryStorage::new();
+    let bucket = "express-bench--usw2-az1--x-s3";
+    storage.create_bucket(bucket, "us-west-2").unwrap();
+
+    let data = Bytes::from(vec![b'w'; 4096]); // 4KB WAL log record
+    group.throughput(Throughput::Bytes(4096));
+
+    let mut i = 0u64;
+    group.bench_function("express_put_wal_record_4kb", |b| {
+        b.iter(|| {
+            i += 1;
+            let key = format!("wal/log_{:08}.segment", i);
+            let meta = storage
+                .put_object(
+                    bucket,
+                    &key,
+                    black_box(data.clone()),
+                    Some("application/octet-stream".to_string()),
+                    HashMap::new(),
+                )
+                .unwrap();
+            black_box(meta);
+        });
+    });
+
+    storage
+        .put_object(
+            bucket,
+            "wal/read_target.segment",
+            data.clone(),
+            Some("application/octet-stream".to_string()),
+            HashMap::new(),
+        )
+        .unwrap();
+
+    group.bench_function("express_get_wal_record_4kb", |b| {
+        b.iter(|| {
+            let (meta, bytes, _) = storage
+                .get_object(bucket, "wal/read_target.segment", None)
+                .unwrap();
+            black_box((meta, bytes));
+        });
+    });
+
+    group.finish();
+}
+
+fn s3_checksum_bench(c: &mut Criterion) {
+    let mut group = c.benchmark_group("s3_checksums");
+    let payload = vec![b'c'; 64 * 1024]; // 64KB
+    group.throughput(Throughput::Bytes(64 * 1024));
+
+    group.bench_function("crc32_64kb", |b| {
+        b.iter(|| {
+            let res = ruststack_s3::compute_crc32(black_box(&payload));
+            black_box(res);
+        });
+    });
+
+    group.bench_function("crc32c_64kb", |b| {
+        b.iter(|| {
+            let res = ruststack_s3::compute_crc32c(black_box(&payload));
+            black_box(res);
+        });
+    });
+
+    group.bench_function("sha256_64kb", |b| {
+        b.iter(|| {
+            let res = ruststack_s3::compute_sha256(black_box(&payload));
+            black_box(res);
+        });
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     benches,
     s3_put_get_bench,
     s3_list_objects_bench,
-    s3_multipart_bench
+    s3_multipart_bench,
+    s3_express_one_zone_bench,
+    s3_checksum_bench
 );
 criterion_main!(benches);

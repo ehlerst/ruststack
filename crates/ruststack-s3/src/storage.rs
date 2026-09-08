@@ -24,7 +24,25 @@ pub trait S3Storage: Send + Sync {
     fn dump_state(&self) -> S3Snapshot;
     fn load_state(&self, snapshot: S3Snapshot);
 
-    fn create_bucket(&self, bucket: &str, region: &str) -> Result<(), RustStackError>;
+    fn create_bucket(&self, bucket: &str, region: &str) -> Result<(), RustStackError> {
+        let is_dir = bucket.ends_with("--x-s3");
+        self.create_bucket_with_config(bucket, region, is_dir, None)
+    }
+
+    fn create_bucket_with_config(
+        &self,
+        bucket: &str,
+        region: &str,
+        is_directory: bool,
+        az: Option<&str>,
+    ) -> Result<(), RustStackError>;
+
+    fn create_session(
+        &self,
+        bucket: &str,
+        mode: &str,
+    ) -> Result<crate::types::SessionCredentials, RustStackError>;
+
     fn delete_bucket(&self, bucket: &str) -> Result<(), RustStackError>;
     fn head_bucket(&self, bucket: &str) -> Result<BucketInfo, RustStackError>;
     fn list_buckets(&self) -> Result<Vec<BucketInfo>, RustStackError>;
@@ -36,6 +54,32 @@ pub trait S3Storage: Send + Sync {
         data: Bytes,
         content_type: Option<String>,
         user_metadata: HashMap<String, String>,
+    ) -> Result<ObjectMetadata, RustStackError> {
+        self.put_object_with_checksums(
+            bucket,
+            key,
+            data,
+            content_type,
+            user_metadata,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn put_object_with_checksums(
+        &self,
+        bucket: &str,
+        key: &str,
+        data: Bytes,
+        content_type: Option<String>,
+        user_metadata: HashMap<String, String>,
+        checksum_crc32: Option<String>,
+        checksum_crc32c: Option<String>,
+        checksum_sha1: Option<String>,
+        checksum_sha256: Option<String>,
     ) -> Result<ObjectMetadata, RustStackError>;
 
     fn get_object(
@@ -79,6 +123,17 @@ pub trait S3Storage: Send + Sync {
         key: &str,
         content_type: Option<String>,
         metadata: HashMap<String, String>,
+    ) -> Result<String, RustStackError> {
+        self.create_multipart_upload_with_checksum(bucket, key, content_type, metadata, None)
+    }
+
+    fn create_multipart_upload_with_checksum(
+        &self,
+        bucket: &str,
+        key: &str,
+        content_type: Option<String>,
+        metadata: HashMap<String, String>,
+        checksum_algorithm: Option<crate::checksum::ChecksumAlgorithm>,
     ) -> Result<String, RustStackError>;
 
     fn upload_part(
@@ -88,6 +143,32 @@ pub trait S3Storage: Send + Sync {
         upload_id: &str,
         part_number: i32,
         data: Bytes,
+    ) -> Result<String, RustStackError> {
+        self.upload_part_with_checksum(
+            bucket,
+            key,
+            upload_id,
+            part_number,
+            data,
+            None,
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn upload_part_with_checksum(
+        &self,
+        bucket: &str,
+        key: &str,
+        upload_id: &str,
+        part_number: i32,
+        data: Bytes,
+        checksum_crc32: Option<String>,
+        checksum_crc32c: Option<String>,
+        checksum_sha1: Option<String>,
+        checksum_sha256: Option<String>,
     ) -> Result<String, RustStackError>;
 
     fn complete_multipart_upload(
@@ -201,6 +282,10 @@ struct StoredPart {
     size: u64,
     data: Bytes,
     last_modified: chrono::DateTime<Utc>,
+    checksum_crc32: Option<String>,
+    checksum_crc32c: Option<String>,
+    checksum_sha1: Option<String>,
+    checksum_sha256: Option<String>,
 }
 
 #[allow(dead_code)]
@@ -210,6 +295,7 @@ struct StoredMultipartUpload {
     content_type: Option<String>,
     user_metadata: HashMap<String, String>,
     parts: RwLock<BTreeMap<i32, StoredPart>>,
+    checksum_algorithm: Option<crate::checksum::ChecksumAlgorithm>,
 }
 
 #[derive(Clone)]
@@ -415,7 +501,13 @@ impl S3Storage for InMemoryStorage {
         Ok(())
     }
 
-    fn create_bucket(&self, bucket: &str, region: &str) -> Result<(), RustStackError> {
+    fn create_bucket_with_config(
+        &self,
+        bucket: &str,
+        region: &str,
+        mut is_directory: bool,
+        az: Option<&str>,
+    ) -> Result<(), RustStackError> {
         if self.buckets.contains_key(bucket) {
             return Err(RustStackError::S3 {
                 code: "BucketAlreadyOwnedByYou".to_string(),
@@ -425,6 +517,23 @@ impl S3Storage for InMemoryStorage {
             });
         }
 
+        let mut az_opt = az.map(|s| s.to_string());
+        if bucket.ends_with("--x-s3") {
+            is_directory = true;
+            if az_opt.is_none() {
+                let parts: Vec<&str> = bucket.split("--").collect();
+                if parts.len() >= 3 {
+                    az_opt = Some(parts[parts.len() - 2].to_string());
+                }
+            }
+        }
+
+        let storage_class = if is_directory {
+            "EXPRESS_ONEZONE".to_string()
+        } else {
+            "STANDARD".to_string()
+        };
+
         self.buckets.insert(
             bucket.to_string(),
             Bucket {
@@ -432,6 +541,9 @@ impl S3Storage for InMemoryStorage {
                     name: bucket.to_string(),
                     creation_date: Utc::now(),
                     region: region.to_string(),
+                    is_directory_bucket: is_directory,
+                    storage_class,
+                    availability_zone: az_opt,
                 },
                 objects: DashMap::new(),
                 versions: DashMap::new(),
@@ -446,6 +558,32 @@ impl S3Storage for InMemoryStorage {
         );
 
         Ok(())
+    }
+
+    fn create_session(
+        &self,
+        bucket: &str,
+        _mode: &str,
+    ) -> Result<crate::types::SessionCredentials, RustStackError> {
+        if !self.buckets.contains_key(bucket) {
+            return Err(RustStackError::S3 {
+                code: "NoSuchBucket".to_string(),
+                message: "The specified bucket does not exist".to_string(),
+                status: http::StatusCode::NOT_FOUND,
+                resource: Some(bucket.to_string()),
+            });
+        }
+
+        let session_id = uuid::Uuid::new_v4().to_string();
+        let short_id = &session_id[..8];
+        let creds = crate::types::SessionCredentials {
+            access_key_id: format!("ASIA_RUSTSTACK_EXPRESS_{}", short_id),
+            secret_access_key: uuid::Uuid::new_v4().to_string(),
+            session_token: base64::engine::general_purpose::STANDARD
+                .encode(format!("ruststack-session-{}-{}", bucket, session_id)),
+            expiration: Utc::now() + chrono::Duration::minutes(5),
+        };
+        Ok(creds)
     }
 
     fn delete_bucket(&self, bucket: &str) -> Result<(), RustStackError> {
@@ -486,13 +624,18 @@ impl S3Storage for InMemoryStorage {
         Ok(list)
     }
 
-    fn put_object(
+    #[allow(clippy::too_many_arguments)]
+    fn put_object_with_checksums(
         &self,
         bucket: &str,
         key: &str,
         data: Bytes,
         content_type: Option<String>,
         user_metadata: HashMap<String, String>,
+        checksum_crc32: Option<String>,
+        checksum_crc32c: Option<String>,
+        checksum_sha1: Option<String>,
+        checksum_sha256: Option<String>,
     ) -> Result<ObjectMetadata, RustStackError> {
         let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
             code: "NoSuchBucket".to_string(),
@@ -501,6 +644,70 @@ impl S3Storage for InMemoryStorage {
             resource: Some(bucket.to_string()),
         })?;
 
+        // Checksum verification if provided (unless it is a composite multipart checksum with '-' suffix)
+        if let Some(ref expected) = checksum_crc32 {
+            if !expected.contains('-') {
+                crate::checksum::verify_checksum(
+                    crate::checksum::ChecksumAlgorithm::Crc32,
+                    &data,
+                    expected,
+                )?;
+            }
+        }
+        if let Some(ref expected) = checksum_crc32c {
+            if !expected.contains('-') {
+                crate::checksum::verify_checksum(
+                    crate::checksum::ChecksumAlgorithm::Crc32c,
+                    &data,
+                    expected,
+                )?;
+            }
+        }
+        if let Some(ref expected) = checksum_sha1 {
+            if !expected.contains('-') {
+                crate::checksum::verify_checksum(
+                    crate::checksum::ChecksumAlgorithm::Sha1,
+                    &data,
+                    expected,
+                )?;
+            }
+        }
+        if let Some(ref expected) = checksum_sha256 {
+            if !expected.contains('-') {
+                crate::checksum::verify_checksum(
+                    crate::checksum::ChecksumAlgorithm::Sha256,
+                    &data,
+                    expected,
+                )?;
+            }
+        }
+
+        let crc32_val = checksum_crc32.or_else(|| {
+            Some(crate::checksum::calculate_checksum(
+                crate::checksum::ChecksumAlgorithm::Crc32,
+                &data,
+            ))
+        });
+        let crc32c_val = checksum_crc32c.or_else(|| {
+            Some(crate::checksum::calculate_checksum(
+                crate::checksum::ChecksumAlgorithm::Crc32c,
+                &data,
+            ))
+        });
+        let sha1_val = checksum_sha1.or_else(|| {
+            Some(crate::checksum::calculate_checksum(
+                crate::checksum::ChecksumAlgorithm::Sha1,
+                &data,
+            ))
+        });
+        let sha256_val = checksum_sha256.or_else(|| {
+            Some(crate::checksum::calculate_checksum(
+                crate::checksum::ChecksumAlgorithm::Sha256,
+                &data,
+            ))
+        });
+
+        let storage_class = entry.info.storage_class.clone();
         let etag = Self::calculate_etag(&data);
         let size = data.len() as u64;
         let metadata = ObjectMetadata {
@@ -510,6 +717,11 @@ impl S3Storage for InMemoryStorage {
             last_modified: Utc::now(),
             content_type: content_type.unwrap_or_else(|| "application/octet-stream".to_string()),
             user_metadata,
+            checksum_crc32: crc32_val,
+            checksum_crc32c: crc32c_val,
+            checksum_sha1: sha1_val,
+            checksum_sha256: sha256_val,
+            storage_class,
         };
 
         let is_versioned = entry.versioning.read().as_deref() == Some("Enabled");
@@ -756,12 +968,13 @@ impl S3Storage for InMemoryStorage {
         Ok(res)
     }
 
-    fn create_multipart_upload(
+    fn create_multipart_upload_with_checksum(
         &self,
         bucket: &str,
         key: &str,
         content_type: Option<String>,
         metadata: HashMap<String, String>,
+        checksum_algorithm: Option<crate::checksum::ChecksumAlgorithm>,
     ) -> Result<String, RustStackError> {
         let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
             code: "NoSuchBucket".to_string(),
@@ -779,19 +992,25 @@ impl S3Storage for InMemoryStorage {
                 content_type,
                 user_metadata: metadata,
                 parts: RwLock::new(BTreeMap::new()),
+                checksum_algorithm,
             },
         );
 
         Ok(upload_id)
     }
 
-    fn upload_part(
+    #[allow(clippy::too_many_arguments)]
+    fn upload_part_with_checksum(
         &self,
         bucket: &str,
         _key: &str,
         upload_id: &str,
         part_number: i32,
         data: Bytes,
+        checksum_crc32: Option<String>,
+        checksum_crc32c: Option<String>,
+        checksum_sha1: Option<String>,
+        checksum_sha256: Option<String>,
     ) -> Result<String, RustStackError> {
         let entry = self.buckets.get(bucket).ok_or_else(|| RustStackError::S3 {
             code: "NoSuchBucket".to_string(),
@@ -810,6 +1029,77 @@ impl S3Storage for InMemoryStorage {
                 resource: Some(upload_id.to_string()),
             })?;
 
+        // Checksum verification if provided
+        if let Some(ref expected) = checksum_crc32 {
+            crate::checksum::verify_checksum(
+                crate::checksum::ChecksumAlgorithm::Crc32,
+                &data,
+                expected,
+            )?;
+        }
+        if let Some(ref expected) = checksum_crc32c {
+            crate::checksum::verify_checksum(
+                crate::checksum::ChecksumAlgorithm::Crc32c,
+                &data,
+                expected,
+            )?;
+        }
+        if let Some(ref expected) = checksum_sha1 {
+            crate::checksum::verify_checksum(
+                crate::checksum::ChecksumAlgorithm::Sha1,
+                &data,
+                expected,
+            )?;
+        }
+        if let Some(ref expected) = checksum_sha256 {
+            crate::checksum::verify_checksum(
+                crate::checksum::ChecksumAlgorithm::Sha256,
+                &data,
+                expected,
+            )?;
+        }
+
+        let computed_crc32 = checksum_crc32.or_else(|| {
+            if mp.checksum_algorithm == Some(crate::checksum::ChecksumAlgorithm::Crc32) {
+                Some(crate::checksum::calculate_checksum(
+                    crate::checksum::ChecksumAlgorithm::Crc32,
+                    &data,
+                ))
+            } else {
+                None
+            }
+        });
+        let computed_crc32c = checksum_crc32c.or_else(|| {
+            if mp.checksum_algorithm == Some(crate::checksum::ChecksumAlgorithm::Crc32c) {
+                Some(crate::checksum::calculate_checksum(
+                    crate::checksum::ChecksumAlgorithm::Crc32c,
+                    &data,
+                ))
+            } else {
+                None
+            }
+        });
+        let computed_sha1 = checksum_sha1.or_else(|| {
+            if mp.checksum_algorithm == Some(crate::checksum::ChecksumAlgorithm::Sha1) {
+                Some(crate::checksum::calculate_checksum(
+                    crate::checksum::ChecksumAlgorithm::Sha1,
+                    &data,
+                ))
+            } else {
+                None
+            }
+        });
+        let computed_sha256 = checksum_sha256.or_else(|| {
+            if mp.checksum_algorithm == Some(crate::checksum::ChecksumAlgorithm::Sha256) {
+                Some(crate::checksum::calculate_checksum(
+                    crate::checksum::ChecksumAlgorithm::Sha256,
+                    &data,
+                ))
+            } else {
+                None
+            }
+        });
+
         let etag = Self::calculate_etag(&data);
         mp.parts.write().insert(
             part_number,
@@ -819,6 +1109,10 @@ impl S3Storage for InMemoryStorage {
                 size: data.len() as u64,
                 data,
                 last_modified: Utc::now(),
+                checksum_crc32: computed_crc32,
+                checksum_crc32c: computed_crc32c,
+                checksum_sha1: computed_sha1,
+                checksum_sha256: computed_sha256,
             },
         );
 
@@ -852,6 +1146,10 @@ impl S3Storage for InMemoryStorage {
 
         let stored_parts = mp.parts.read();
         let mut combined = Vec::new();
+        let mut part_crc32s = Vec::new();
+        let mut part_crc32cs = Vec::new();
+        let mut part_sha1s = Vec::new();
+        let mut part_sha256s = Vec::new();
 
         for p in parts {
             let part_data = stored_parts
@@ -862,16 +1160,139 @@ impl S3Storage for InMemoryStorage {
                     status: http::StatusCode::BAD_REQUEST,
                     resource: Some(upload_id.to_string()),
                 })?;
+
+            // Validate part checksum if passed in CompletedPart XML
+            if let Some(ref expected) = p.checksum_crc32 {
+                crate::checksum::verify_checksum(
+                    crate::checksum::ChecksumAlgorithm::Crc32,
+                    &part_data.data,
+                    expected,
+                )?;
+            }
+            if let Some(ref expected) = p.checksum_crc32c {
+                crate::checksum::verify_checksum(
+                    crate::checksum::ChecksumAlgorithm::Crc32c,
+                    &part_data.data,
+                    expected,
+                )?;
+            }
+            if let Some(ref expected) = p.checksum_sha1 {
+                crate::checksum::verify_checksum(
+                    crate::checksum::ChecksumAlgorithm::Sha1,
+                    &part_data.data,
+                    expected,
+                )?;
+            }
+            if let Some(ref expected) = p.checksum_sha256 {
+                crate::checksum::verify_checksum(
+                    crate::checksum::ChecksumAlgorithm::Sha256,
+                    &part_data.data,
+                    expected,
+                )?;
+            }
+
+            let c32 = p
+                .checksum_crc32
+                .or_else(|| part_data.checksum_crc32.clone());
+            if let Some(c) = c32 {
+                part_crc32s.push(c);
+            }
+
+            let c32c = p
+                .checksum_crc32c
+                .or_else(|| part_data.checksum_crc32c.clone());
+            if let Some(c) = c32c {
+                part_crc32cs.push(c);
+            }
+
+            let s1 = p.checksum_sha1.or_else(|| part_data.checksum_sha1.clone());
+            if let Some(c) = s1 {
+                part_sha1s.push(c);
+            }
+
+            let s256 = p
+                .checksum_sha256
+                .or_else(|| part_data.checksum_sha256.clone());
+            if let Some(c) = s256 {
+                part_sha256s.push(c);
+            }
+
             combined.extend_from_slice(&part_data.data);
         }
 
         let combined_bytes = Bytes::from(combined);
-        let res = self.put_object(
+
+        // Compute composite checksums if parts had checksums or multipart had algorithm
+        let composite_crc32 = if !part_crc32s.is_empty() {
+            crate::checksum::compute_composite_checksum(
+                crate::checksum::ChecksumAlgorithm::Crc32,
+                &part_crc32s,
+            )
+            .ok()
+        } else if mp.checksum_algorithm == Some(crate::checksum::ChecksumAlgorithm::Crc32) {
+            Some(crate::checksum::calculate_checksum(
+                crate::checksum::ChecksumAlgorithm::Crc32,
+                &combined_bytes,
+            ))
+        } else {
+            None
+        };
+
+        let composite_crc32c = if !part_crc32cs.is_empty() {
+            crate::checksum::compute_composite_checksum(
+                crate::checksum::ChecksumAlgorithm::Crc32c,
+                &part_crc32cs,
+            )
+            .ok()
+        } else if mp.checksum_algorithm == Some(crate::checksum::ChecksumAlgorithm::Crc32c) {
+            Some(crate::checksum::calculate_checksum(
+                crate::checksum::ChecksumAlgorithm::Crc32c,
+                &combined_bytes,
+            ))
+        } else {
+            None
+        };
+
+        let composite_sha1 = if !part_sha1s.is_empty() {
+            crate::checksum::compute_composite_checksum(
+                crate::checksum::ChecksumAlgorithm::Sha1,
+                &part_sha1s,
+            )
+            .ok()
+        } else if mp.checksum_algorithm == Some(crate::checksum::ChecksumAlgorithm::Sha1) {
+            Some(crate::checksum::calculate_checksum(
+                crate::checksum::ChecksumAlgorithm::Sha1,
+                &combined_bytes,
+            ))
+        } else {
+            None
+        };
+
+        let composite_sha256 = if !part_sha256s.is_empty() {
+            crate::checksum::compute_composite_checksum(
+                crate::checksum::ChecksumAlgorithm::Sha256,
+                &part_sha256s,
+            )
+            .ok()
+        } else if mp.checksum_algorithm == Some(crate::checksum::ChecksumAlgorithm::Sha256) {
+            Some(crate::checksum::calculate_checksum(
+                crate::checksum::ChecksumAlgorithm::Sha256,
+                &combined_bytes,
+            ))
+        } else {
+            None
+        };
+
+        let res = self.put_object_with_checksums(
             bucket,
             key,
             combined_bytes,
             mp.content_type,
             mp.user_metadata,
+            composite_crc32,
+            composite_crc32c,
+            composite_sha1,
+            composite_sha256,
         )?;
 
         self.dispatch_event(
@@ -942,6 +1363,10 @@ impl S3Storage for InMemoryStorage {
                 etag: p.etag.clone(),
                 size: p.size,
                 last_modified: p.last_modified,
+                checksum_crc32: p.checksum_crc32.clone(),
+                checksum_crc32c: p.checksum_crc32c.clone(),
+                checksum_sha1: p.checksum_sha1.clone(),
+                checksum_sha256: p.checksum_sha256.clone(),
             })
             .collect();
 
@@ -1117,6 +1542,11 @@ impl S3Storage for InMemoryStorage {
                 last_modified: Utc::now(),
                 content_type: "application/octet-stream".to_string(),
                 user_metadata: HashMap::new(),
+                checksum_crc32: None,
+                checksum_crc32c: None,
+                checksum_sha1: None,
+                checksum_sha256: None,
+                storage_class: entry.info.storage_class.clone(),
             };
             v_list.push(StoredObjectVersion {
                 version_id: delete_marker_id.clone(),

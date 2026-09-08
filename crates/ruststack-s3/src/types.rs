@@ -7,6 +7,12 @@ pub struct BucketInfo {
     pub name: String,
     pub creation_date: DateTime<Utc>,
     pub region: String,
+    #[serde(default)]
+    pub is_directory_bucket: bool,
+    #[serde(default)]
+    pub storage_class: String,
+    #[serde(default)]
+    pub availability_zone: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -17,6 +23,16 @@ pub struct ObjectMetadata {
     pub last_modified: DateTime<Utc>,
     pub content_type: String,
     pub user_metadata: HashMap<String, String>,
+    #[serde(default)]
+    pub checksum_crc32: Option<String>,
+    #[serde(default)]
+    pub checksum_crc32c: Option<String>,
+    #[serde(default)]
+    pub checksum_sha1: Option<String>,
+    #[serde(default)]
+    pub checksum_sha256: Option<String>,
+    #[serde(default)]
+    pub storage_class: String,
 }
 
 #[derive(Debug, Clone)]
@@ -61,10 +77,31 @@ impl ByteRange {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CompletedPart {
     pub part_number: i32,
     pub etag: String,
+    #[serde(default)]
+    pub checksum_crc32: Option<String>,
+    #[serde(default)]
+    pub checksum_crc32c: Option<String>,
+    #[serde(default)]
+    pub checksum_sha1: Option<String>,
+    #[serde(default)]
+    pub checksum_sha256: Option<String>,
+}
+
+impl CompletedPart {
+    pub fn new(part_number: i32, etag: impl Into<String>) -> Self {
+        Self {
+            part_number,
+            etag: etag.into(),
+            checksum_crc32: None,
+            checksum_crc32c: None,
+            checksum_sha1: None,
+            checksum_sha256: None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,6 +110,22 @@ pub struct PartInfo {
     pub etag: String,
     pub size: u64,
     pub last_modified: DateTime<Utc>,
+    #[serde(default)]
+    pub checksum_crc32: Option<String>,
+    #[serde(default)]
+    pub checksum_crc32c: Option<String>,
+    #[serde(default)]
+    pub checksum_sha1: Option<String>,
+    #[serde(default)]
+    pub checksum_sha256: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionCredentials {
+    pub access_key_id: String,
+    pub secret_access_key: String,
+    pub session_token: String,
+    pub expiration: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Default)]

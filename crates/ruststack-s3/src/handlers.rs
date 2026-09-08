@@ -190,8 +190,13 @@ fn dispatch_s3_op(
                 return Ok(res);
             }
 
-            let region = "us-east-1";
-            storage.create_bucket(bucket, region)?;
+            let config = xml::parse_create_bucket_configuration(&body).unwrap_or_default();
+            let region = config.location_constraint.as_deref().unwrap_or("us-east-1");
+            let is_directory =
+                bucket.ends_with("--x-s3") || config.bucket_type.as_deref() == Some("Directory");
+            let az = config.location_name.as_deref();
+
+            storage.create_bucket_with_config(bucket, region, is_directory, az)?;
             let mut res = Response::new(Body::empty());
             *res.status_mut() = StatusCode::OK;
             res.headers_mut().insert(
@@ -263,9 +268,16 @@ fn dispatch_s3_op(
 
         // HEAD /<bucket> -> HeadBucket
         (&Method::HEAD, Some(bucket), None) => {
-            let _ = storage.head_bucket(bucket)?;
+            let info = storage.head_bucket(bucket)?;
             let mut res = Response::new(Body::empty());
             *res.status_mut() = StatusCode::OK;
+            if info.is_directory_bucket {
+                res.headers_mut()
+                    .insert("x-amz-bucket-type", HeaderValue::from_static("Directory"));
+            }
+            if let Ok(reg) = HeaderValue::from_str(&info.region) {
+                res.headers_mut().insert("x-amz-bucket-region", reg);
+            }
             res.headers_mut().insert(
                 "x-amz-request-id",
                 HeaderValue::from_str(request_id).unwrap(),
@@ -273,8 +285,26 @@ fn dispatch_s3_op(
             Ok(res)
         }
 
-        // GET /<bucket> -> ListObjectsV2 / Versions / Location / Notification / Versioning / Lifecycle / CORS / Policy / Tagging
+        // GET /<bucket> -> ListObjectsV2 / Versions / Location / Notification / Versioning / Lifecycle / CORS / Policy / Tagging / CreateSession
         (&Method::GET, Some(bucket), None) => {
+            if query.contains_key("session") {
+                let mode = headers
+                    .get("x-amz-create-session-mode")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("ReadWrite");
+                let creds = storage.create_session(bucket, mode)?;
+                let xml_body = xml::serialize_create_session(&creds);
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
             if query.contains_key("notification") {
                 let config = storage.get_bucket_notification_configuration(bucket)?;
                 let xml_body = xml::serialize_notification_configuration(&config);
@@ -449,20 +479,44 @@ fn dispatch_s3_op(
             Ok(res)
         }
 
-        // POST /<bucket>?delete -> DeleteObjects
-        (&Method::POST, Some(bucket), None) if query.contains_key("delete") => {
-            let (keys, quiet) = xml::parse_delete_objects_request(&body)?;
-            let del_res = storage.delete_objects(bucket, keys, quiet)?;
-            let xml_body = xml::serialize_delete_result(&del_res);
-            let mut res = Response::new(Body::from(xml_body));
-            *res.status_mut() = StatusCode::OK;
-            res.headers_mut()
-                .insert("content-type", HeaderValue::from_static("application/xml"));
-            res.headers_mut().insert(
-                "x-amz-request-id",
-                HeaderValue::from_str(request_id).unwrap(),
-            );
-            Ok(res)
+        // POST /<bucket> -> DeleteObjects (?delete) / CreateSession (?session)
+        (&Method::POST, Some(bucket), None) => {
+            if query.contains_key("session") {
+                let mode = headers
+                    .get("x-amz-create-session-mode")
+                    .and_then(|v| v.to_str().ok())
+                    .unwrap_or("ReadWrite");
+                let creds = storage.create_session(bucket, mode)?;
+                let xml_body = xml::serialize_create_session(&creds);
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            if query.contains_key("delete") {
+                let (keys, quiet) = xml::parse_delete_objects_request(&body)?;
+                let del_res = storage.delete_objects(bucket, keys, quiet)?;
+                let xml_body = xml::serialize_delete_result(&del_res);
+                let mut res = Response::new(Body::from(xml_body));
+                *res.status_mut() = StatusCode::OK;
+                res.headers_mut()
+                    .insert("content-type", HeaderValue::from_static("application/xml"));
+                res.headers_mut().insert(
+                    "x-amz-request-id",
+                    HeaderValue::from_str(request_id).unwrap(),
+                );
+                return Ok(res);
+            }
+
+            Err(RustStackError::BadRequest(
+                "Unsupported POST operation on bucket".to_string(),
+            ))
         }
 
         // PUT /<bucket>/<key> -> PutObject / CopyObject / UploadPart
@@ -474,11 +528,59 @@ fn dispatch_s3_op(
                 let part_num: i32 = part_num_str.parse().map_err(|_| {
                     RustStackError::s3_bad_request("InvalidArgument", "Invalid partNumber")
                 })?;
-                let etag = storage.upload_part(bucket, key, upload_id, part_num, body)?;
+
+                let cs_crc32 = headers
+                    .get("x-amz-checksum-crc32")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string());
+                let cs_crc32c = headers
+                    .get("x-amz-checksum-crc32c")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string());
+                let cs_sha1 = headers
+                    .get("x-amz-checksum-sha1")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string());
+                let cs_sha256 = headers
+                    .get("x-amz-checksum-sha256")
+                    .and_then(|v| v.to_str().ok())
+                    .map(|s| s.to_string());
+
+                let etag = storage.upload_part_with_checksum(
+                    bucket,
+                    key,
+                    upload_id,
+                    part_num,
+                    body,
+                    cs_crc32.clone(),
+                    cs_crc32c.clone(),
+                    cs_sha1.clone(),
+                    cs_sha256.clone(),
+                )?;
                 let mut res = Response::new(Body::empty());
                 *res.status_mut() = StatusCode::OK;
                 res.headers_mut()
                     .insert("etag", HeaderValue::from_str(&etag).unwrap());
+                if let Some(ref cs) = cs_crc32 {
+                    if let Ok(val) = HeaderValue::from_str(cs) {
+                        res.headers_mut().insert("x-amz-checksum-crc32", val);
+                    }
+                }
+                if let Some(ref cs) = cs_crc32c {
+                    if let Ok(val) = HeaderValue::from_str(cs) {
+                        res.headers_mut().insert("x-amz-checksum-crc32c", val);
+                    }
+                }
+                if let Some(ref cs) = cs_sha1 {
+                    if let Ok(val) = HeaderValue::from_str(cs) {
+                        res.headers_mut().insert("x-amz-checksum-sha1", val);
+                    }
+                }
+                if let Some(ref cs) = cs_sha256 {
+                    if let Ok(val) = HeaderValue::from_str(cs) {
+                        res.headers_mut().insert("x-amz-checksum-sha256", val);
+                    }
+                }
                 res.headers_mut().insert(
                     "x-amz-request-id",
                     HeaderValue::from_str(request_id).unwrap(),
@@ -533,11 +635,97 @@ fn dispatch_s3_op(
                 }
             }
 
-            let meta = storage.put_object(bucket, key, body, content_type, user_metadata)?;
+            let mut cs_crc32 = headers
+                .get("x-amz-checksum-crc32")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let mut cs_crc32c = headers
+                .get("x-amz-checksum-crc32c")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let mut cs_sha1 = headers
+                .get("x-amz-checksum-sha1")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+            let mut cs_sha256 = headers
+                .get("x-amz-checksum-sha256")
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
+
+            if let Some(algo_str) = headers
+                .get("x-amz-checksum-algorithm")
+                .and_then(|v| v.to_str().ok())
+            {
+                match crate::checksum::ChecksumAlgorithm::from_str_opt(algo_str) {
+                    Some(crate::checksum::ChecksumAlgorithm::Crc32) if cs_crc32.is_none() => {
+                        cs_crc32 = Some(crate::checksum::calculate_checksum(
+                            crate::checksum::ChecksumAlgorithm::Crc32,
+                            &body,
+                        ));
+                    }
+                    Some(crate::checksum::ChecksumAlgorithm::Crc32c) if cs_crc32c.is_none() => {
+                        cs_crc32c = Some(crate::checksum::calculate_checksum(
+                            crate::checksum::ChecksumAlgorithm::Crc32c,
+                            &body,
+                        ));
+                    }
+                    Some(crate::checksum::ChecksumAlgorithm::Sha1) if cs_sha1.is_none() => {
+                        cs_sha1 = Some(crate::checksum::calculate_checksum(
+                            crate::checksum::ChecksumAlgorithm::Sha1,
+                            &body,
+                        ));
+                    }
+                    Some(crate::checksum::ChecksumAlgorithm::Sha256) if cs_sha256.is_none() => {
+                        cs_sha256 = Some(crate::checksum::calculate_checksum(
+                            crate::checksum::ChecksumAlgorithm::Sha256,
+                            &body,
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+
+            let meta = storage.put_object_with_checksums(
+                bucket,
+                key,
+                body,
+                content_type,
+                user_metadata,
+                cs_crc32,
+                cs_crc32c,
+                cs_sha1,
+                cs_sha256,
+            )?;
             let mut res = Response::new(Body::empty());
             *res.status_mut() = StatusCode::OK;
             res.headers_mut()
                 .insert("etag", HeaderValue::from_str(&meta.etag).unwrap());
+            if let Some(ref cs) = meta.checksum_crc32 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-crc32", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_crc32c {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-crc32c", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_sha1 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-sha1", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_sha256 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-sha256", val);
+                }
+            }
+            if meta.storage_class == "EXPRESS_ONEZONE" {
+                res.headers_mut().insert(
+                    "x-amz-storage-class",
+                    HeaderValue::from_static("EXPRESS_ONEZONE"),
+                );
+            }
             res.headers_mut().insert(
                 "x-amz-request-id",
                 HeaderValue::from_str(request_id).unwrap(),
@@ -640,6 +828,33 @@ fn dispatch_s3_op(
                 }
             }
 
+            if let Some(ref cs) = meta.checksum_crc32 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-crc32", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_crc32c {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-crc32c", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_sha1 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-sha1", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_sha256 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-sha256", val);
+                }
+            }
+            if meta.storage_class == "EXPRESS_ONEZONE" {
+                res.headers_mut().insert(
+                    "x-amz-storage-class",
+                    HeaderValue::from_static("EXPRESS_ONEZONE"),
+                );
+            }
+
             Ok(res)
         }
 
@@ -681,6 +896,33 @@ fn dispatch_s3_op(
                         res.headers_mut().insert(name, val);
                     }
                 }
+            }
+
+            if let Some(ref cs) = meta.checksum_crc32 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-crc32", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_crc32c {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-crc32c", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_sha1 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-sha1", val);
+                }
+            }
+            if let Some(ref cs) = meta.checksum_sha256 {
+                if let Ok(val) = HeaderValue::from_str(cs) {
+                    res.headers_mut().insert("x-amz-checksum-sha256", val);
+                }
+            }
+            if meta.storage_class == "EXPRESS_ONEZONE" {
+                res.headers_mut().insert(
+                    "x-amz-storage-class",
+                    HeaderValue::from_static("EXPRESS_ONEZONE"),
+                );
             }
 
             Ok(res)
@@ -739,13 +981,29 @@ fn dispatch_s3_op(
                     }
                 }
 
-                let upload_id =
-                    storage.create_multipart_upload(bucket, key, content_type, user_metadata)?;
+                let checksum_algorithm = headers
+                    .get("x-amz-checksum-algorithm")
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(crate::checksum::ChecksumAlgorithm::from_str_opt);
+
+                let upload_id = storage.create_multipart_upload_with_checksum(
+                    bucket,
+                    key,
+                    content_type,
+                    user_metadata,
+                    checksum_algorithm,
+                )?;
                 let xml_body = xml::serialize_initiate_multipart(bucket, key, &upload_id);
                 let mut res = Response::new(Body::from(xml_body));
                 *res.status_mut() = StatusCode::OK;
                 res.headers_mut()
                     .insert("content-type", HeaderValue::from_static("application/xml"));
+                if let Some(algo) = checksum_algorithm {
+                    res.headers_mut().insert(
+                        "x-amz-checksum-algorithm",
+                        HeaderValue::from_static(algo.as_str()),
+                    );
+                }
                 res.headers_mut().insert(
                     "x-amz-request-id",
                     HeaderValue::from_str(request_id).unwrap(),
@@ -757,12 +1015,46 @@ fn dispatch_s3_op(
                 let parts = xml::parse_complete_multipart_request(&body)?;
                 let meta = storage.complete_multipart_upload(bucket, key, upload_id, parts)?;
                 let location = format!("http://localhost:4566/{}/{}", bucket, key);
-                let xml_body =
-                    xml::serialize_complete_multipart(bucket, key, &location, &meta.etag);
+                let xml_body = xml::serialize_complete_multipart_upload(
+                    bucket,
+                    key,
+                    &meta.etag,
+                    &location,
+                    meta.checksum_crc32.as_deref(),
+                    meta.checksum_crc32c.as_deref(),
+                    meta.checksum_sha1.as_deref(),
+                    meta.checksum_sha256.as_deref(),
+                );
                 let mut res = Response::new(Body::from(xml_body));
                 *res.status_mut() = StatusCode::OK;
                 res.headers_mut()
                     .insert("content-type", HeaderValue::from_static("application/xml"));
+                if let Some(ref cs) = meta.checksum_crc32 {
+                    if let Ok(val) = HeaderValue::from_str(cs) {
+                        res.headers_mut().insert("x-amz-checksum-crc32", val);
+                    }
+                }
+                if let Some(ref cs) = meta.checksum_crc32c {
+                    if let Ok(val) = HeaderValue::from_str(cs) {
+                        res.headers_mut().insert("x-amz-checksum-crc32c", val);
+                    }
+                }
+                if let Some(ref cs) = meta.checksum_sha1 {
+                    if let Ok(val) = HeaderValue::from_str(cs) {
+                        res.headers_mut().insert("x-amz-checksum-sha1", val);
+                    }
+                }
+                if let Some(ref cs) = meta.checksum_sha256 {
+                    if let Ok(val) = HeaderValue::from_str(cs) {
+                        res.headers_mut().insert("x-amz-checksum-sha256", val);
+                    }
+                }
+                if meta.storage_class == "EXPRESS_ONEZONE" {
+                    res.headers_mut().insert(
+                        "x-amz-storage-class",
+                        HeaderValue::from_static("EXPRESS_ONEZONE"),
+                    );
+                }
                 res.headers_mut().insert(
                     "x-amz-request-id",
                     HeaderValue::from_str(request_id).unwrap(),
