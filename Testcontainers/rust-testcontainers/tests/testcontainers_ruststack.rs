@@ -68,6 +68,27 @@ impl ContainerContext {
         let text = resp.text().await.unwrap_or_default();
         (status, text)
     }
+
+    async fn call_s3(
+        &self,
+        method: reqwest::Method,
+        path: &str,
+        headers: reqwest::header::HeaderMap,
+        body: bytes::Bytes,
+    ) -> (reqwest::StatusCode, reqwest::header::HeaderMap, String) {
+        let resp = self
+            .http
+            .request(method, format!("{}{}", self.base_url, path))
+            .headers(headers)
+            .body(body)
+            .send()
+            .await
+            .unwrap();
+        let status = resp.status();
+        let resp_headers = resp.headers().clone();
+        let text = resp.text().await.unwrap_or_default();
+        (status, resp_headers, text)
+    }
 }
 
 #[tokio::test]
@@ -694,4 +715,492 @@ async fn test_ruststack_container_chaos_and_state_lifecycle() {
         .await;
     assert_eq!(status, 200);
     assert_eq!(reset_val["status"].as_str().unwrap(), "ok");
+}
+
+#[tokio::test]
+#[ignore = "requires running docker daemon and pulled ehlers320/ruststack:latest"]
+async fn test_ruststack_container_s3_bucket_notifications_to_sqs() {
+    let image = ruststack_image();
+    let container = image
+        .start()
+        .await
+        .expect("failed to start ruststack container");
+    let host_port = container
+        .get_host_port_ipv4(4566)
+        .await
+        .expect("failed to get host port");
+    let ctx = ContainerContext::new(host_port);
+
+    // 1. Create SQS target queue
+    let (status, q_val) = ctx
+        .call_json(
+            "AmazonSQS.CreateQueue",
+            json!({ "QueueName": "s3-event-target-q" }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    let q_url = q_val["QueueUrl"].as_str().unwrap().to_string();
+    let q_arn = "arn:aws:sqs:us-east-1:000000000000:s3-event-target-q";
+
+    // 2. Create S3 Bucket
+    let (status, _, _) = ctx
+        .call_s3(
+            reqwest::Method::PUT,
+            "/event-test-bucket",
+            reqwest::header::HeaderMap::new(),
+            bytes::Bytes::new(),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    // 3. Configure Bucket Notification for prefix "uploads/"
+    let notif_xml = format!(
+        r#"<NotificationConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+    <QueueConfiguration>
+        <Id>sqs-uploads-rule</Id>
+        <Queue>{}</Queue>
+        <Event>s3:ObjectCreated:*</Event>
+        <Filter>
+            <S3Key>
+                <FilterRule>
+                    <Name>prefix</Name>
+                    <Value>uploads/</Value>
+                </FilterRule>
+            </S3Key>
+        </Filter>
+    </QueueConfiguration>
+</NotificationConfiguration>"#,
+        q_arn
+    );
+    let (status, _, _) = ctx
+        .call_s3(
+            reqwest::Method::PUT,
+            "/event-test-bucket?notification",
+            reqwest::header::HeaderMap::new(),
+            bytes::Bytes::from(notif_xml),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    // 4. PutObject outside prefix -> Should NOT notify
+    let (status, _, _) = ctx
+        .call_s3(
+            reqwest::Method::PUT,
+            "/event-test-bucket/temp/draft.txt",
+            reqwest::header::HeaderMap::new(),
+            bytes::Bytes::from("draft data"),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    let (status, recv_none) = ctx
+        .call_json(
+            "AmazonSQS.ReceiveMessage",
+            json!({ "QueueUrl": q_url, "MaxNumberOfMessages": 10 }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert!(
+        recv_none.get("Messages").is_none() || recv_none["Messages"].as_array().unwrap().is_empty()
+    );
+
+    // 5. PutObject matching prefix -> MUST deliver event!
+    let (status, _, _) = ctx
+        .call_s3(
+            reqwest::Method::PUT,
+            "/event-test-bucket/uploads/order_999.json",
+            reqwest::header::HeaderMap::new(),
+            bytes::Bytes::from(r#"{"orderId": 999}"#),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    let (status, recv_event) = ctx
+        .call_json(
+            "AmazonSQS.ReceiveMessage",
+            json!({ "QueueUrl": q_url, "MaxNumberOfMessages": 10 }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    let msgs = recv_event["Messages"].as_array().unwrap();
+    assert_eq!(msgs.len(), 1);
+    let body_str = msgs[0]["Body"].as_str().unwrap();
+    assert!(body_str.contains("event-test-bucket"));
+    assert!(body_str.contains("uploads/order_999.json"));
+}
+
+#[tokio::test]
+#[ignore = "requires running docker daemon and pulled ehlers320/ruststack:latest"]
+async fn test_ruststack_container_dynamodb_batch_and_query_expressions() {
+    let image = ruststack_image();
+    let container = image
+        .start()
+        .await
+        .expect("failed to start ruststack container");
+    let host_port = container
+        .get_host_port_ipv4(4566)
+        .await
+        .expect("failed to get host port");
+    let ctx = ContainerContext::new(host_port);
+
+    // 1. CreateTable
+    let (status, _) = ctx
+        .call_json(
+            "DynamoDB_20120810.CreateTable",
+            json!({
+                "TableName": "StoreProducts",
+                "KeySchema": [
+                    { "AttributeName": "category", "KeyType": "HASH" },
+                    { "AttributeName": "sku", "KeyType": "RANGE" }
+                ],
+                "AttributeDefinitions": [
+                    { "AttributeName": "category", "AttributeType": "S" },
+                    { "AttributeName": "sku", "AttributeType": "S" }
+                ],
+                "BillingMode": "PAY_PER_REQUEST"
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    // 2. BatchWriteItem
+    let (status, bw_val) = ctx
+        .call_json(
+            "DynamoDB_20120810.BatchWriteItem",
+            json!({
+                "RequestItems": {
+                    "StoreProducts": [
+                        {
+                            "PutRequest": {
+                                "Item": {
+                                    "category": { "S": "hardware" },
+                                    "sku": { "S": "hw-001" },
+                                    "name": { "S": "SSD 1TB" },
+                                    "price": { "N": "100" }
+                                }
+                            }
+                        },
+                        {
+                            "PutRequest": {
+                                "Item": {
+                                    "category": { "S": "hardware" },
+                                    "sku": { "S": "hw-002" },
+                                    "name": { "S": "RAM 32GB" },
+                                    "price": { "N": "150" }
+                                }
+                            }
+                        }
+                    ]
+                }
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert!(bw_val["UnprocessedItems"].as_object().unwrap().is_empty());
+
+    // 3. BatchGetItem
+    let (status, bg_val) = ctx
+        .call_json(
+            "DynamoDB_20120810.BatchGetItem",
+            json!({
+                "RequestItems": {
+                    "StoreProducts": {
+                        "Keys": [
+                            { "category": { "S": "hardware" }, "sku": { "S": "hw-001" } },
+                            { "category": { "S": "hardware" }, "sku": { "S": "hw-002" } }
+                        ]
+                    }
+                }
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    let items = bg_val["Responses"]["StoreProducts"].as_array().unwrap();
+    assert_eq!(items.len(), 2);
+
+    // 4. Query with KeyConditionExpression and FilterExpression
+    let (status, q_res) = ctx
+        .call_json(
+            "DynamoDB_20120810.Query",
+            json!({
+                "TableName": "StoreProducts",
+                "KeyConditionExpression": "category = :c AND begins_with(sku, :pfx)",
+                "FilterExpression": "price > :min_p",
+                "ExpressionAttributeValues": {
+                    ":c": { "S": "hardware" },
+                    ":pfx": { "S": "hw-" },
+                    ":min_p": { "N": "120" }
+                }
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    let matches = q_res["Items"].as_array().unwrap();
+    assert_eq!(matches.len(), 1);
+    assert_eq!(matches[0]["name"]["S"].as_str().unwrap(), "RAM 32GB");
+}
+
+#[tokio::test]
+#[ignore = "requires running docker daemon and pulled ehlers320/ruststack:latest"]
+async fn test_ruststack_container_cloudwatch_metrics_and_logs() {
+    let image = ruststack_image();
+    let container = image
+        .start()
+        .await
+        .expect("failed to start ruststack container");
+    let host_port = container
+        .get_host_port_ipv4(4566)
+        .await
+        .expect("failed to get host port");
+    let ctx = ContainerContext::new(host_port);
+
+    // 1. CreateLogGroup & CreateLogStream
+    let (status, _) = ctx
+        .call_json(
+            "Logs_20140328.CreateLogGroup",
+            json!({ "logGroupName": "/aws/container/prod-app" }),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    let (status, _) = ctx
+        .call_json(
+            "Logs_20140328.CreateLogStream",
+            json!({
+                "logGroupName": "/aws/container/prod-app",
+                "logStreamName": "instance-001"
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    // 2. PutLogEvents
+    let (status, _) = ctx
+        .call_json(
+            "Logs_20140328.PutLogEvents",
+            json!({
+                "logGroupName": "/aws/container/prod-app",
+                "logStreamName": "instance-001",
+                "logEvents": [
+                    {
+                        "timestamp": 1700000000000_i64,
+                        "message": "Application booted successfully"
+                    }
+                ]
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    // 3. CloudWatch PutMetricData & ListMetrics
+    let (status, put_metric) = ctx
+        .call_query(
+            "/",
+            &[
+                ("Action", "PutMetricData"),
+                ("Namespace", "CustomApp"),
+                ("MetricData.member.1.MetricName", "OrderLatency"),
+                ("MetricData.member.1.Value", "45.5"),
+                ("MetricData.member.1.Unit", "Milliseconds"),
+            ],
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert!(put_metric.contains("PutMetricDataResponse"));
+
+    let (status, list_metric) = ctx
+        .call_query(
+            "/",
+            &[("Action", "ListMetrics"), ("Namespace", "CustomApp")],
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert!(list_metric.contains("OrderLatency"));
+}
+
+#[tokio::test]
+#[ignore = "requires running docker daemon and pulled ehlers320/ruststack:latest"]
+async fn test_ruststack_container_security_acm_wafv2_and_sts() {
+    let image = ruststack_image();
+    let container = image
+        .start()
+        .await
+        .expect("failed to start ruststack container");
+    let host_port = container
+        .get_host_port_ipv4(4566)
+        .await
+        .expect("failed to get host port");
+    let ctx = ContainerContext::new(host_port);
+
+    // 1. STS GetCallerIdentity
+    let (status, sts_val) = ctx
+        .call_json(
+            "AWSSecurityTokenServiceV20110615.GetCallerIdentity",
+            json!({}),
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(sts_val["Account"].as_str().unwrap(), "000000000000");
+    assert!(sts_val["Arn"]
+        .as_str()
+        .unwrap()
+        .contains("arn:aws:iam::000000000000:root"));
+
+    // 2. ACM RequestCertificate & DescribeCertificate
+    let (status, acm_val) = ctx
+        .call_json(
+            "CertificateManager.RequestCertificate",
+            json!({
+                "DomainName": "api.ruststack.local",
+                "ValidationMethod": "DNS"
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    let cert_arn = acm_val["CertificateArn"].as_str().unwrap();
+
+    let (status, desc_val) = ctx
+        .call_json(
+            "CertificateManager.DescribeCertificate",
+            json!({ "CertificateArn": cert_arn }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        desc_val["Certificate"]["DomainName"].as_str().unwrap(),
+        "api.ruststack.local"
+    );
+    assert_eq!(
+        desc_val["Certificate"]["Status"].as_str().unwrap(),
+        "ISSUED"
+    );
+
+    // 3. WAFv2 CreateWebACL & GetWebACL
+    let (status, waf_val) = ctx
+        .call_json(
+            "AWSWAF_20190729.CreateWebACL",
+            json!({
+                "Name": "container-waf",
+                "Scope": "REGIONAL",
+                "DefaultAction": { "Allow": {} },
+                "VisibilityConfig": {
+                    "SampledRequestsEnabled": true,
+                    "CloudWatchMetricsEnabled": true,
+                    "MetricName": "ContainerWafMetric"
+                }
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    let waf_id = waf_val["Summary"]["Id"].as_str().unwrap();
+
+    let (status, get_waf) = ctx
+        .call_json(
+            "AWSWAF_20190729.GetWebACL",
+            json!({
+                "Name": "container-waf",
+                "Id": waf_id,
+                "Scope": "REGIONAL"
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(get_waf["WebACL"]["Name"].as_str().unwrap(), "container-waf");
+}
+
+#[tokio::test]
+#[ignore = "requires running docker daemon and pulled ehlers320/ruststack:latest"]
+async fn test_ruststack_container_full_state_snapshot_roundtrip() {
+    let image = ruststack_image();
+    let container = image
+        .start()
+        .await
+        .expect("failed to start ruststack container");
+    let host_port = container
+        .get_host_port_ipv4(4566)
+        .await
+        .expect("failed to get host port");
+    let ctx = ContainerContext::new(host_port);
+
+    // 1. Provision S3 bucket and SSM parameter
+    let (status, _, _) = ctx
+        .call_s3(
+            reqwest::Method::PUT,
+            "/persist-test-bucket",
+            reqwest::header::HeaderMap::new(),
+            bytes::Bytes::new(),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    let (status, _) = ctx
+        .call_json(
+            "AmazonSSM.PutParameter",
+            json!({
+                "Name": "/persist/test_token",
+                "Value": "snapshotted-secret-val",
+                "Type": "String"
+            }),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    // 2. Dump State Snapshot
+    let (status, dump_val) = ctx
+        .call_rest_json(reqwest::Method::GET, "/_ruststack/state/dump", None)
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(dump_val["version"].as_i64().unwrap(), 1);
+
+    // 3. Reset State (wipes everything)
+    let (status, reset_val) = ctx
+        .call_rest_json(reqwest::Method::POST, "/_ruststack/state/reset", None)
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(reset_val["status"].as_str().unwrap(), "ok");
+
+    // 4. Verify bucket is gone (HEAD returns 404)
+    let (status, _, _) = ctx
+        .call_s3(
+            reqwest::Method::HEAD,
+            "/persist-test-bucket",
+            reqwest::header::HeaderMap::new(),
+            bytes::Bytes::new(),
+        )
+        .await;
+    assert_eq!(status, 404);
+
+    // 5. Restore State from Snapshot
+    let (status, load_val) = ctx
+        .call_rest_json(
+            reqwest::Method::POST,
+            "/_ruststack/state/load",
+            Some(json!({ "snapshot": dump_val })),
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(load_val["status"].as_str().unwrap(), "ok");
+
+    // 6. Verify bucket and SSM parameter are restored!
+    let (status, _, _) = ctx
+        .call_s3(
+            reqwest::Method::HEAD,
+            "/persist-test-bucket",
+            reqwest::header::HeaderMap::new(),
+            bytes::Bytes::new(),
+        )
+        .await;
+    assert_eq!(status, 200);
+
+    let (status, ssm_val) = ctx
+        .call_json(
+            "AmazonSSM.GetParameter",
+            json!({ "Name": "/persist/test_token" }),
+        )
+        .await;
+    assert_eq!(status, 200);
+    assert_eq!(
+        ssm_val["Parameter"]["Value"].as_str().unwrap(),
+        "snapshotted-secret-val"
+    );
 }
