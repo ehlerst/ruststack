@@ -1,6 +1,6 @@
 # ⚡ RustStack
 
-> **Blazing-fast local AWS emulator in Rust: 1.6 MB memory footprint, 500ms cold-start & 20x lighter than MiniStack / LocalStack.**
+> **Blazing-fast local emulator for 37 AWS services in Rust: 1.9 MB idle memory footprint, <1ms native cold start & up to 200x lighter than LocalStack.**
 
 [![CI](https://github.com/ruststack/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/ci.yml)
 [![Performance Benchmarks](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml)
@@ -70,104 +70,202 @@ Automated in-memory performance rating on standard developer hardware:
 
 ---
 
-## 📦 Features Implemented
+## 📦 Features Implemented (37 AWS Services)
 
-### 1. Amazon S3 (`ruststack-s3`)
-- **Bucket Operations**: `CreateBucket`, `DeleteBucket`, `ListBuckets`, `HeadBucket`, `GetBucketLocation`.
-- **Object Operations**: `PutObject`, `GetObject` (with byte-range `Range: bytes=start-end`), `HeadObject`, `DeleteObject`, `DeleteObjects` (multi-delete), `CopyObject`.
-- **Object Listing**: `ListObjectsV2` & `ListObjects` with prefix, delimiter, start-after, and continuation tokens.
-- **Multipart Uploads**: `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts`.
-- **Bucket Notifications**: `PutBucketNotificationConfiguration` and `GetBucketNotificationConfiguration` with instant in-memory event dispatching to SQS queues, SNS topics, and EventBridge default bus on `s3:ObjectCreated:*`, `s3:ObjectCreated:Put`, `s3:ObjectCreated:Copy`, `s3:ObjectCreated:CompleteMultipartUpload`, and `s3:ObjectRemoved:Delete` with key prefix/suffix filtering.
-- **Routing**: Full support for both path-style (`http://localhost:4566/bucket/key`) and virtual-hosted style (`http://bucket.localhost:4566/key`).
+RustStack implements 37 AWS services natively in pure in-memory Rust, organized into high-performance domains:
 
-### 2. Amazon DynamoDB (`ruststack-dynamodb`)
-- **Protocols**: AWS JSON 1.0 protocol (`x-amz-target: DynamoDB_20120810.*`).
-- **Table Operations**: `CreateTable`, `DeleteTable`, `DescribeTable`, `ListTables` (supporting `String`, `Number`, `Binary` Partition & Sort Keys, `PAY_PER_REQUEST` billing mode, GSIs and LSIs).
-- **Item Operations**: `PutItem` (with `ConditionExpression`), `GetItem` (with `ProjectionExpression`), `DeleteItem`, `UpdateItem` (with `SET` / `REMOVE` expressions).
-- **Batch Operations**: `BatchGetItem`, `BatchWriteItem` across multiple tables.
-- **Query & Scan Engine**: `Query` with `KeyConditionExpression` (`=`, `<`, `<=`, `>`, `>=`, `BETWEEN`, `begins_with`), `Scan` with `FilterExpression`.
+### 🗄️ Core Storage, Databases & Analytics
+1. **Amazon S3 (`ruststack-s3`)**:
+   - Bucket lifecycle: `CreateBucket`, `DeleteBucket`, `ListBuckets`, `HeadBucket`, `GetBucketLocation`.
+   - Object lifecycle: `PutObject`, `GetObject` (with byte ranges `Range: bytes=start-end`), `HeadObject`, `DeleteObject`, `DeleteObjects` (multi-delete), `CopyObject`.
+   - Object listing: `ListObjectsV2` & `ListObjects` with prefix, delimiter, start-after, and continuation tokens.
+   - Multipart uploads: `CreateMultipartUpload`, `UploadPart`, `CompleteMultipartUpload`, `AbortMultipartUpload`, `ListParts`.
+   - Bucket notifications: `PutBucketNotificationConfiguration` and `GetBucketNotificationConfiguration` with instant in-memory event dispatching to SQS queues, SNS topics, and EventBridge default bus on `s3:ObjectCreated:*` and `s3:ObjectRemoved:*`.
+   - Dual routing: Full support for both path-style (`http://localhost:4566/bucket/key`) and virtual-hosted style (`http://bucket.localhost:4566/key`).
 
-### 3. Amazon SQS (`ruststack-sqs`)
-- **Protocols**: Dual protocol support — **SQS Query Protocol** (form-urlencoded & query params) and modern AWS SDK **JSON 1.0 Protocol** (`x-amz-target: AmazonSQS.*`).
-- **Dead-Letter Queues (DLQ)**: Automatic redrive policy execution when message receive counts exceed `maxReceiveCount`, plus `ListDeadLetterSourceQueues`.
-- **Queue Operations**: `CreateQueue`, `DeleteQueue`, `GetQueueUrl`, `ListQueues`, `GetQueueAttributes`, `SetQueueAttributes`, `PurgeQueue`.
-- **Message Operations**: `SendMessage`, `SendMessageBatch` (up to 10 messages), `ReceiveMessage` (with `MaxNumberOfMessages`, `VisibilityTimeout`, async long polling), `DeleteMessage`, `DeleteMessageBatch`, `ChangeMessageVisibility`.
-- **Queue Types**: Standard Queues and FIFO Queues (`.fifo` suffix, `MessageGroupId`, `MessageDeduplicationId`, 5-minute deduplication window).
+2. **Amazon DynamoDB & Streams (`ruststack-dynamodb`)**:
+   - Table management: `CreateTable`, `DeleteTable`, `DescribeTable`, `ListTables`, `UpdateTable` (Hash & Range keys, `PAY_PER_REQUEST`, GSIs, LSIs).
+   - Item CRUD: `PutItem` (with `ConditionExpression`), `GetItem` (with `ProjectionExpression`), `DeleteItem`, `UpdateItem` (`SET`, `REMOVE`).
+   - Batch operations: `BatchGetItem`, `BatchWriteItem` across tables.
+   - Query & Scan: `Query` with `KeyConditionExpression` (`=`, `<`, `<=`, `>`, `>=`, `BETWEEN`, `begins_with`), `Scan` with `FilterExpression`.
+   - DynamoDB Streams CDC: Automatic stream provisioning (`NEW_IMAGE`, `OLD_IMAGE`, `NEW_AND_OLD_IMAGES`, `KEYS_ONLY`), `ListStreams`, `DescribeStream`, `GetShardIterator`, `GetRecords` capturing real-time `INSERT`, `MODIFY`, `REMOVE` events.
 
-### 4. Amazon SNS (`ruststack-sns`)
-- **Protocols**: Query Protocol and modern JSON Protocol (`x-amz-target: AmazonSNS.*`).
-- **Topic Management**: `CreateTopic`, `DeleteTopic`, `ListTopics`, `GetTopicAttributes`, `SetTopicAttributes`.
-- **Subscriptions**: `Subscribe`, `Unsubscribe`, `ListSubscriptions`, `ListSubscriptionsByTopic`, `GetSubscriptionAttributes`, `SetSubscriptionAttributes`.
-- **SQS Fanout**: Automatic zero-latency in-memory fanout from SNS topics to multiple subscribed SQS queues.
-- **Message Delivery & Filtering**: Standard AWS JSON Notification envelope or `RawMessageDelivery`, with attribute `FilterPolicy` matching.
+3. **Amazon Relational Database Service - RDS (`ruststack-rds`)**:
+   - DB instances: `CreateDBInstance`, `DescribeDBInstances`, `DeleteDBInstance`, `ModifyDBInstance`, `RebootDBInstance`.
+   - Subnets & parameters: `CreateDBSubnetGroup`, `DescribeDBSubnetGroups`, `DeleteDBSubnetGroup`, `CreateDBParameterGroup`, `DescribeDBParameterGroups`.
+   - Engine emulation: Realistic connection endpoints and configuration for PostgreSQL, MySQL, MariaDB, and Aurora.
 
-### 5. Amazon EventBridge / CloudWatch Events (`ruststack-eventbridge`)
-- **Event Buses**: `CreateEventBus`, `DeleteEventBus`, `ListEventBuses`, `DescribeEventBus` (with pre-provisioned `default` bus).
-- **Rule Engine**: `PutRule`, `DeleteRule`, `ListRules`, `DescribeRule`, `EnableRule`, `DisableRule`.
-- **Pattern Matching**: Content-based JSON rule matching (`source`, `detail-type`, nested `detail`, prefix matching, anything-but, exists).
-- **Target Dispatching**: `PutTargets`, `RemoveTargets`, `ListTargetsByRule` with automated dispatching to SQS queues and SNS topics on `PutEvents`.
+4. **Amazon ElastiCache (`ruststack-elasticache`)**:
+   - Cache clusters: `CreateCacheCluster`, `DescribeCacheClusters`, `DeleteCacheCluster`, `ModifyCacheCluster`.
+   - Replication groups: `CreateReplicationGroup`, `DescribeReplicationGroups`, `DeleteReplicationGroup`.
+   - Engine support: Redis and Memcached cluster topologies with node endpoints and parameter group management.
 
-### 6. Amazon SSM Parameter Store (`ruststack-ssm`)
-- **Parameters**: `PutParameter` (with automatic versioning & overwrite support), `GetParameter` (exact name or version suffix `/key:1`), `GetParameters` (multi-key batch), `DeleteParameter`, `DeleteParameters`, `DescribeParameters`.
-- **Hierarchical Paths**: `GetParametersByPath` supporting prefix scans, recursive and single-level sub-tree traversal.
-- **Types**: `String`, `StringList`, and `SecureString`.
+5. **Amazon Redshift Data Warehouse (`ruststack-redshift`)**:
+   - Cluster lifecycle: `CreateCluster`, `DescribeClusters`, `DeleteCluster`, `ModifyCluster`, `RebootCluster`.
+   - Cluster configuration: Parameter groups, subnet groups, security groups, and simulated database endpoints.
 
-### 7. Amazon Secrets Manager (`ruststack-secretsmanager`)
-- **Secret Lifecycle**: `CreateSecret`, `GetSecretValue`, `PutSecretValue`, `UpdateSecret`, `DeleteSecret` (with force delete), `DescribeSecret`, `ListSecrets`, `GetRandomPassword`.
-- **Versioning & Rotation**: Multi-version tracking with staging labels (`AWSCURRENT`, `AWSPREVIOUS`).
+6. **Amazon OpenSearch Service / Elasticsearch (`ruststack-opensearch`)**:
+   - Domain lifecycle: `CreateDomain`, `DescribeDomain`, `DescribeDomainConfig`, `ListDomainNames`, `DeleteDomain`, `UpdateDomainConfig`.
+   - Cluster state: Simulated search engine endpoints, cluster health status, and node configurations.
 
-### 8. Amazon Security Token Service Mock (`ruststack-sts`)
-- **Protocols**: Query / Form-urlencoded and JSON 1.1 protocols (`x-amz-target: AWSSecurityTokenServiceV20110615.*`).
-- **Operations**: `GetCallerIdentity` (essential for Terraform & AWS SDK init), `AssumeRole`, `GetSessionToken`.
+7. **Amazon Athena Interactive SQL (`ruststack-athena`)**:
+   - Query execution: `StartQueryExecution`, `GetQueryExecution`, `StopQueryExecution`, `GetQueryResults` (with column metadata and row arrays).
+   - Workgroups & queries: `CreateWorkGroup`, `GetWorkGroup`, `ListWorkGroups`, `CreateNamedQuery`, `GetNamedQuery`, `ListNamedQueries`.
 
-### 9. AWS Key Management Service (`ruststack-kms`)
-- **Protocols**: AWS JSON 1.1 protocol (`x-amz-target: TrentService.*`).
-- **Key Operations**: `CreateKey`, `DescribeKey`, `ListKeys`, `EnableKey`, `DisableKey`, `ScheduleKeyDeletion`.
-- **Alias Operations**: `CreateAlias`, `DeleteAlias`, `ListAliases` with automatic identifier resolution (`key-id`, `arn:aws:kms:...`, `alias/name`).
-- **Cryptographic Operations**: `Encrypt`, `Decrypt` with authenticated self-describing ciphertext envelopes, and `GenerateDataKey` (AES-128 & AES-256).
-- **Default Keys**: Pre-configured default managed keys (`alias/aws/s3`, `alias/aws/dynamodb`).
+---
 
-### 10. Amazon CloudWatch Logs (`ruststack-logs`)
-- **Protocols**: AWS JSON 1.1 protocol (`x-amz-target: Logs_20140328.*`).
-- **Log Groups & Streams**: `CreateLogGroup`, `DeleteLogGroup`, `DescribeLogGroups`, `CreateLogStream`, `DeleteLogStream`, `DescribeLogStreams`.
-- **Event Ingestion & Search**: `PutLogEvents` (with sequence token chaining), `GetLogEvents`, and `FilterLogEvents` with pattern matching.
+### 📬 Messaging, Streaming & Event-Driven Architecture
+8. **Amazon SQS (`ruststack-sqs`)**:
+   - Dual protocol: SQS Query Protocol (form-urlencoded & query params) and modern AWS SDK JSON 1.0 (`AmazonSQS.*`).
+   - Dead-Letter Queues (DLQ): Automatic redrive policy execution when receive counts exceed `maxReceiveCount`, plus `ListDeadLetterSourceQueues`.
+   - Queue management: `CreateQueue`, `DeleteQueue`, `GetQueueUrl`, `ListQueues`, `GetQueueAttributes`, `SetQueueAttributes`, `PurgeQueue`.
+   - Message operations: `SendMessage`, `SendMessageBatch` (up to 10 messages), `ReceiveMessage` (with `MaxNumberOfMessages`, `VisibilityTimeout`, async long polling), `DeleteMessage`, `DeleteMessageBatch`, `ChangeMessageVisibility`.
+   - FIFO queues: `.fifo` suffix support, `MessageGroupId`, `MessageDeduplicationId`, 5-minute deduplication window.
 
-### 11. AWS Identity and Access Management (`ruststack-iam`)
-- **Protocols**: AWS Query Protocol (Form URL-encoded & Query params) and JSON protocol.
-- **Roles & Policies**: `CreateRole`, `GetRole`, `DeleteRole`, `ListRoles`, `CreatePolicy`, `GetPolicy`, `DeletePolicy`, `ListPolicies`.
-- **Policy Attachments**: `AttachRolePolicy`, `DetachRolePolicy`, `ListAttachedRolePolicies`, inline policies (`PutRolePolicy`, `GetRolePolicy`, `DeleteRolePolicy`).
-- **Users & Credentials**: `CreateUser`, `GetUser`, `DeleteUser`, `ListUsers`, `CreateAccessKey`, `ListAccessKeys`, `DeleteAccessKey`.
-- **Pre-Configured AWS Policies**: Pre-seeded default AWS managed policies (`AdministratorAccess`, `AmazonS3FullAccess`, `AmazonDynamoDBFullAccess`, `AmazonSQSFullAccess`, `AWSLambdaBasicExecutionRole`).
+9. **Amazon SNS (`ruststack-sns`)**:
+   - Dual protocol: Query Protocol and modern JSON Protocol (`AmazonSNS.*`).
+   - Topic management: `CreateTopic`, `DeleteTopic`, `ListTopics`, `GetTopicAttributes`, `SetTopicAttributes`.
+   - Subscriptions & fanout: `Subscribe`, `Unsubscribe`, `ListSubscriptions`, `ListSubscriptionsByTopic`, `GetSubscriptionAttributes`, `SetSubscriptionAttributes`. Zero-latency in-memory fanout to subscribed SQS queues with `FilterPolicy` matching and raw message delivery.
 
-### 12. Amazon Simple Email Service (`ruststack-ses`)
-- **Protocols**: AWS Query Protocol and JSON Protocols.
-- **Identity Verification**: `VerifyEmailIdentity`, `VerifyDomainIdentity`, `ListIdentities`, `DeleteIdentity`, `GetIdentityVerificationAttributes`.
-- **Email Dispatching**: `SendEmail`, `SendRawEmail` with automatic base64 MIME payload decoding, HTML & Text body capture, and subject extraction.
-- **Local Outbox**: Integrated inspection outbox for testing transactional emails without external network dependencies.
-- **Quota & Statistics**: `GetSendQuota`, `GetSendStatistics`.
+10. **Amazon EventBridge / CloudWatch Events (`ruststack-eventbridge`)**:
+    - Event buses: `CreateEventBus`, `DeleteEventBus`, `ListEventBuses`, `DescribeEventBus` (with pre-provisioned `default` bus).
+    - Rule engine: `PutRule`, `DeleteRule`, `ListRules`, `DescribeRule`, `EnableRule`, `DisableRule`.
+    - Pattern matching & targets: Content-based JSON rule matching (`source`, `detail-type`, nested `detail`, prefix matching, anything-but, exists) with automated target dispatching to SQS and SNS on `PutEvents`.
 
-### 13. Amazon Kinesis Data Streams (`ruststack-kinesis`)
-- **Protocols**: AWS JSON 1.1 protocol (`x-amz-target: Kinesis_20131202.*`).
-- **Stream Lifecycle**: `CreateStream`, `DeleteStream`, `DescribeStream`, `DescribeStreamSummary`, `ListStreams`, `AddTagsToStream`, `ListTagsForStream`.
-- **Record Ingestion**: `PutRecord`, `PutRecords` (atomic multi-record batching) with deterministic MD5 partition key hashing across active shards.
-- **Data Consumption**: `GetShardIterator` (`TRIM_HORIZON`, `LATEST`, `AT_SEQUENCE_NUMBER`, `AFTER_SEQUENCE_NUMBER`, `AT_TIMESTAMP`) and `GetRecords` (with continuation iterators and millisecond behind latest tracking).
+11. **Amazon EventBridge Pipes (`ruststack-pipes`)**:
+    - Pipe management: `CreatePipe`, `DescribePipe`, `ListPipes`, `DeletePipe`, `StartPipe`, `StopPipe`, `UpdatePipe`.
+    - Streaming & queue integration: Point-to-point event pipe routing between sources (DynamoDB Streams, Kinesis, SQS) and targets (SQS, SNS, EventBridge, CloudWatch Logs).
 
-### 14. AWS Lambda Mock & Function Registry (`ruststack-lambda`)
-- **Protocols**: REST / JSON API (`/2015-03-31/functions/*`).
-- **Function Management**: `CreateFunction`, `GetFunction`, `GetFunctionConfiguration`, `ListFunctions`, `DeleteFunction`, `UpdateFunctionCode`, `UpdateFunctionConfiguration`.
-- **Invocation Engine**: `Invoke` supporting synchronous (`RequestResponse`), asynchronous (`Event`), and `DryRun` invocations with mock response payload generation.
-- **Event Source Mappings**: `CreateEventSourceMapping`, `ListEventSourceMappings`, `DeleteEventSourceMapping` for DynamoDB Streams and Kinesis stream trigger bindings.
+12. **Amazon Managed Streaming for Apache Kafka - MSK (`ruststack-msk`)**:
+    - Cluster lifecycle: `CreateCluster`, `DescribeCluster`, `ListClusters`, `DeleteCluster`, `GetBootstrapBrokers`.
+    - Configurations: Multi-broker cluster topologies, plaintext and TLS broker endpoints.
 
-### 15. Amazon CloudWatch Metrics & Alarms (`ruststack-cloudwatch`)
-- **Protocols**: Query Protocol and AWS JSON protocols.
-- **Metric Ingestion**: `PutMetricData` (with high-resolution timestamps, custom dimensions, units, and values/counts).
-- **Metric Retrieval**: `ListMetrics` (namespace/metric filtering), `GetMetricData`, `GetMetricStatistics` (bucketing by `Average`, `Sum`, `SampleCount`, `Minimum`, `Maximum`).
-- **Metric Alarms**: `PutMetricAlarm`, `DescribeAlarms`, `DescribeAlarmsForMetric`, `DeleteAlarms`, `SetAlarmState`.
+13. **Amazon Kinesis Data Streams (`ruststack-kinesis`)**:
+    - Stream lifecycle: `CreateStream`, `DeleteStream`, `DescribeStream`, `DescribeStreamSummary`, `ListStreams`, `AddTagsToStream`, `ListTagsForStream`.
+    - Record ingestion & consumption: `PutRecord`, `PutRecords` (multi-record batching) with deterministic MD5 partition hashing across active shards, `GetShardIterator` (`TRIM_HORIZON`, `LATEST`, `AT_SEQUENCE_NUMBER`), and `GetRecords`.
 
-### 16. Amazon DynamoDB Streams (`ruststack-dynamodb`)
-- **Protocols**: AWS JSON 1.0 protocol (`x-amz-target: DynamoDBStreams_20120810.*`).
-- **Stream Lifecycle**: Automatic stream creation when `StreamSpecification.StreamEnabled = true` with view types (`NEW_IMAGE`, `OLD_IMAGE`, `NEW_AND_OLD_IMAGES`, `KEYS_ONLY`).
-- **CDC Operations**: `ListStreams`, `DescribeStream`, `GetShardIterator`, `GetRecords` with real-time `INSERT`, `MODIFY`, `REMOVE` change data capture records.
+---
+
+### ⚡ Compute, Containers & Workflow Services
+14. **AWS Lambda Mock & Registry (`ruststack-lambda`)**:
+    - Function management: `CreateFunction`, `GetFunction`, `GetFunctionConfiguration`, `ListFunctions`, `DeleteFunction`, `UpdateFunctionCode`, `UpdateFunctionConfiguration`.
+    - Invocation engine: Synchronous (`RequestResponse`), asynchronous (`Event`), and `DryRun` invocations with mock response payload generation.
+    - Event source mappings: `CreateEventSourceMapping`, `ListEventSourceMappings`, `DeleteEventSourceMapping` for DynamoDB Streams and Kinesis stream trigger bindings.
+
+15. **Amazon API Gateway REST API v1 (`ruststack-apigateway`)**:
+    - API lifecycle: `CreateRestApi`, `GetRestApi`, `GetRestApis`, `DeleteRestApi`.
+    - Resources & methods: `CreateResource`, `GetResource`, `GetResources`, `PutMethod`, `GetMethod`, `PutIntegration`, `PutMethodResponse`, `PutIntegrationResponse`.
+    - Deployments & stages: `CreateDeployment`, `GetDeployments`, `CreateStage`, `GetStage`, `GetStages`.
+
+16. **Amazon API Gateway HTTP & WebSocket API v2 (`ruststack-apigatewayv2`)**:
+    - API lifecycle: `CreateApi`, `GetApi`, `GetApis`, `DeleteApi`, `UpdateApi` (HTTP & WEBSOCKET protocols).
+    - Routes & integrations: `CreateRoute`, `GetRoute`, `GetRoutes`, `CreateIntegration`, `GetIntegration`, `GetIntegrations`.
+    - Deployments & stages: `CreateDeployment`, `GetDeployments`, `CreateStage`, `GetStage`, `GetStages`.
+
+17. **AWS AppSync GraphQL API (`ruststack-appsync`)**:
+    - GraphQL APIs: `CreateGraphqlApi`, `GetGraphqlApi`, `ListGraphqlApis`, `DeleteGraphqlApi`.
+    - API keys & schemas: `CreateApiKey`, `ListApiKeys`, `DeleteApiKey`, `StartSchemaCreation`, `GetSchemaCreationStatus`.
+    - Data sources & resolvers: `CreateDataSource`, `GetDataSource`, `ListDataSources`, and built-in interactive GraphQL execution engine.
+
+18. **AWS Step Functions (`ruststack-stepfunctions`)**:
+    - State machines: `CreateStateMachine`, `DescribeStateMachine`, `ListStateMachines`, `DeleteStateMachine`, `UpdateStateMachine`.
+    - Executions: `StartExecution`, `DescribeExecution`, `GetExecutionHistory`, `StopExecution`, `ListExecutions` (Standard and Express workflows).
+
+19. **AWS CloudFormation (`ruststack-cloudformation`)**:
+    - Stack lifecycle: `CreateStack`, `DescribeStacks`, `ListStacks`, `DeleteStack`, `UpdateStack`, `GetTemplate`.
+    - Resources & events: `DescribeStackResources`, `ListStackResources`, `DescribeStackEvents`.
+
+20. **AWS Elastic Beanstalk (`ruststack-elasticbeanstalk`)**:
+    - Application lifecycle: `CreateApplication`, `DescribeApplications`, `DeleteApplication`, `UpdateApplication`.
+    - Environments: `CreateEnvironment`, `DescribeEnvironments`, `TerminateEnvironment`, `RestartAppServer`.
+
+21. **Amazon Elastic Container Registry - ECR (`ruststack-ecr`)**:
+    - Repositories: `CreateRepository`, `DescribeRepositories`, `DeleteRepository`, `GetRepositoryPolicy`, `SetRepositoryPolicy`.
+    - Image management: `PutImage`, `BatchGetImage`, `BatchDeleteImage`, `ListImages`, `DescribeImages`.
+
+22. **Amazon Elastic Container Service - ECS (`ruststack-ecs`)**:
+    - Clusters & tasks: `CreateCluster`, `DescribeClusters`, `ListClusters`, `DeleteCluster`.
+    - Task definitions: `RegisterTaskDefinition`, `DescribeTaskDefinition`, `DeregisterTaskDefinition`, `ListTaskDefinitions`.
+    - Services & running: `CreateService`, `DescribeServices`, `RunTask`, `ListTasks`.
+
+23. **Amazon Elastic Compute Cloud - EC2 (`ruststack-ec2`)**:
+    - Instances: `RunInstances`, `DescribeInstances`, `StartInstances`, `StopInstances`, `TerminateInstances`.
+    - VPC networking: `CreateVpc`, `DescribeVpcs`, `DeleteVpc`, `CreateSubnet`, `DescribeSubnets`, `CreateSecurityGroup`, `DescribeSecurityGroups`.
+
+24. **Elastic Load Balancing v2 - ALB / NLB (`ruststack-elbv2`)**:
+    - Load balancers: `CreateLoadBalancer`, `DescribeLoadBalancers`, `DeleteLoadBalancer`.
+    - Target groups & listeners: `CreateTargetGroup`, `DescribeTargetGroups`, `RegisterTargets`, `DeregisterTargets`, `CreateListener`, `DescribeListeners`.
+
+---
+
+### 🛡️ Security, Identity & Cryptography
+25. **AWS Key Management Service - KMS (`ruststack-kms`)**:
+    - Key management: `CreateKey`, `DescribeKey`, `ListKeys`, `EnableKey`, `DisableKey`, `ScheduleKeyDeletion`.
+    - Aliases: `CreateAlias`, `DeleteAlias`, `ListAliases` with automatic key/alias identifier resolution.
+    - Cryptographic operations: `Encrypt`, `Decrypt` with authenticated self-describing ciphertext envelopes, and `GenerateDataKey` (AES-128 & AES-256). Pre-configured default managed keys (`alias/aws/s3`, `alias/aws/dynamodb`).
+
+26. **AWS Identity and Access Management - IAM (`ruststack-iam`)**:
+    - Roles & policies: `CreateRole`, `GetRole`, `DeleteRole`, `ListRoles`, `CreatePolicy`, `GetPolicy`, `DeletePolicy`, `ListPolicies`.
+    - Attachments: `AttachRolePolicy`, `DetachRolePolicy`, `ListAttachedRolePolicies`, inline policies (`PutRolePolicy`, `GetRolePolicy`, `DeleteRolePolicy`).
+    - Users & access keys: `CreateUser`, `GetUser`, `DeleteUser`, `ListUsers`, `CreateAccessKey`, `ListAccessKeys`, `DeleteAccessKey`.
+    - Pre-seeded AWS managed policies: Instant availability of `AdministratorAccess`, `AmazonS3FullAccess`, `AmazonDynamoDBFullAccess`, `AmazonSQSFullAccess`, `AWSLambdaBasicExecutionRole`.
+
+27. **Amazon Security Token Service - STS (`ruststack-sts`)**:
+    - Identity & credentials: `GetCallerIdentity` (essential for Terraform & AWS SDK init), `AssumeRole`, `GetSessionToken`.
+
+28. **Amazon Cognito Identity Provider (`ruststack-cognito`)**:
+    - User pools: `CreateUserPool`, `DescribeUserPool`, `ListUserPools`, `DeleteUserPool`, `CreateUserPoolClient`, `DescribeUserPoolClient`.
+    - Users & auth: `AdminCreateUser`, `AdminGetUser`, `AdminInitiateAuth`, `AdminDeleteUser`, `ListUsers`.
+
+29. **AWS Certificate Manager - ACM (`ruststack-acm`)**:
+    - Certificates: `RequestCertificate`, `DescribeCertificate`, `ListCertificates`, `DeleteCertificate`, `GetCertificate`, `AddTagsToCertificate`.
+    - Validation: Automated DNS and Email validation record generation.
+
+30. **AWS WAFv2 Web Application Firewall (`ruststack-wafv2`)**:
+    - Web ACLs: `CreateWebACL`, `GetWebACL`, `ListWebACLs`, `DeleteWebACL`, `UpdateWebACL`.
+    - Rule & IP sets: `CreateIPSet`, `GetIPSet`, `ListIPSets`, `CreateRuleGroup`, `GetRuleGroup`.
+
+31. **AWS Organizations (`ruststack-organizations`)**:
+    - Organization hierarchy: `CreateOrganization`, `DescribeOrganization`, `ListRoots`, `CreateOrganizationalUnit`, `ListOrganizationalUnitsForParent`.
+    - Accounts & SCPs: `CreateAccount`, `ListAccounts`, `CreatePolicy`, `AttachPolicy`, `ListPolicies`.
+
+---
+
+### ⚙️ Systems Management, Secrets & AI
+32. **Amazon SSM Parameter Store (`ruststack-ssm`)**:
+    - Parameter operations: `PutParameter` (with automatic versioning & overwrite), `GetParameter`, `GetParameters` (multi-key batch), `DeleteParameter`, `DeleteParameters`, `DescribeParameters`.
+    - Hierarchical paths: `GetParametersByPath` supporting prefix scans, recursive and single-level sub-tree traversal.
+    - Data types: `String`, `StringList`, and `SecureString`.
+
+33. **Amazon Secrets Manager (`ruststack-secretsmanager`)**:
+    - Secret lifecycle: `CreateSecret`, `GetSecretValue`, `PutSecretValue`, `UpdateSecret`, `DeleteSecret` (with force delete), `DescribeSecret`, `ListSecrets`, `GetRandomPassword`.
+    - Versioning & staging: Multi-version tracking with staging labels (`AWSCURRENT`, `AWSPREVIOUS`).
+
+34. **Amazon Bedrock Generative AI (`ruststack-bedrock`)**:
+    - Foundation models: `ListFoundationModels`, `GetFoundationModel`.
+    - Model invocation: `InvokeModel` supporting Claude, Titan, and Llama mock inference responses for rapid local AI agent development.
+
+---
+
+### 📈 Observability, DNS & Communications
+35. **Amazon CloudWatch Metrics & Alarms (`ruststack-cloudwatch`)**:
+    - Metric ingestion: `PutMetricData` (with high-resolution timestamps, custom dimensions, units, and values/counts).
+    - Statistics calculation: `ListMetrics`, `GetMetricData`, `GetMetricStatistics` (bucketing by `Average`, `Sum`, `SampleCount`, `Minimum`, `Maximum`).
+    - Metric alarms: `PutMetricAlarm`, `DescribeAlarms`, `DescribeAlarmsForMetric`, `DeleteAlarms`, `SetAlarmState`.
+
+36. **Amazon CloudWatch Logs (`ruststack-logs`)**:
+    - Groups & streams: `CreateLogGroup`, `DeleteLogGroup`, `DescribeLogGroups`, `CreateLogStream`, `DeleteLogStream`, `DescribeLogStreams`.
+    - Events & search: `PutLogEvents` (with sequence token chaining), `GetLogEvents`, and `FilterLogEvents` with pattern matching.
+
+37. **Amazon Route 53 DNS (`ruststack-route53`)**:
+    - Hosted zones: `CreateHostedZone`, `GetHostedZone`, `ListHostedZones`, `DeleteHostedZone` (public & private hosted zones).
+    - Record sets: `ChangeResourceRecordSets`, `ListResourceRecordSets` supporting `A`, `AAAA`, `CNAME`, `TXT`, `MX`, `SRV` records.
+
+38. **Amazon Simple Email Service - SES (`ruststack-ses`)**:
+    - Identity verification: `VerifyEmailIdentity`, `VerifyDomainIdentity`, `ListIdentities`, `DeleteIdentity`, `GetIdentityVerificationAttributes`.
+    - Email dispatching: `SendEmail`, `SendRawEmail` with automatic base64 MIME payload decoding, HTML & Text body capture, and subject extraction.
+    - Local outbox: Integrated inspection outbox for testing transactional emails without external network dependencies.
+    - Quota & statistics: `GetSendQuota`, `GetSendStatistics`.
 
 ---
 
@@ -235,7 +333,7 @@ RustStack provides instant state control plane endpoints for integration test is
 
 ### 1. Atomic State Reset (`POST /_ruststack/state/reset`)
 ```bash
-# Wipe all 8 services completely
+# Wipe all 37 services completely
 curl -X POST http://localhost:4566/_ruststack/state/reset
 
 # Selectively reset only S3 and SQS
@@ -317,14 +415,27 @@ Native Windows targets are not supported directly. Windows users should use **WS
 
 ## 🖥️ Embedded Web Admin UI & `ruststack` CLI
 
-RustStack comes out of the box with an embedded, zero-dependency dark-mode visual administration console and a powerful companion CLI:
+RustStack comes out of the box with an embedded, zero-dependency dark-mode visual administration console and a companion management CLI:
 
 ### 1. Web Admin UI
 Open `http://localhost:4566/_ruststack/ui/` in any browser (or navigate directly to `http://localhost:4566/`):
-- **Overview & Ratings**: Live dashboard displaying cluster health, region, account ID, and in-memory engine benchmark ratings.
-- **Resource Explorers**: Visual inspection tables for S3 Buckets, DynamoDB Tables & Items, SQS Queues, SNS Topics, SSM Parameters, and SecretsManager Secrets.
-- **Interactive Chaos Studio**: Create, list, delete, and toggle fault injection rules on the fly with live execution counters.
-- **State Snapshot Management**: 1-click JSON snapshot export/copy, import/restore, and atomic selective/full cluster resets.
+- **📊 Overview**: Cluster health status, active region, simulated account ID, in-memory performance grade, and metrics cards covering all 37 active AWS services.
+- **🗄️ DynamoDB**: Interactive table list, partition & sort keys, item inspector, and real-time CDC streams.
+- **🪣 S3**: Bucket creation, object keys, sizes, multipart uploads, and notification targets.
+- **📬 SQS & SNS**: Message counts, FIFO deduplication, DLQs, SNS topics, and subscriber fanout topologies.
+- **🔐 SSM & Secrets**: Hierarchical parameter viewer, secret value reveal, version history, and rotation staging labels.
+- **🔑 KMS**: Master encryption keys, alias routing, and algorithm descriptors.
+- **🪵 CloudWatch Logs**: Log groups, streams, and live structured event log viewers.
+- **👥 IAM**: Roles, policies, users, access keys, and managed policy bindings.
+- **📧 SES**: Domain/email verification identities and full transactional email outbox viewer.
+- **🌊 Kinesis**: Active shards, partition key hashing, and stream iterators.
+- **λ Lambda**: Function registry, runtime configurations, and event source mappings.
+- **📈 CloudWatch**: Ingested metric time series and alarm state monitors.
+- **🗄️ Relational & Cache**: Real-time instance tables for RDS databases, ElastiCache clusters, and Redshift data warehouses.
+- **🛡️ Security & Org**: Certificate Manager (ACM), WAFv2 Web ACL firewalls, and AWS Organizations account hierarchy.
+- **⚡ Streaming & APIs**: EventBridge Pipes point-to-point routes, Kafka MSK brokers, and AppSync GraphQL schemas.
+- **🌪️ Chaos Studio**: Fault injection rule creator, latency/jitter simulator, error status overrides, and live trigger counters.
+- **💾 State Snapshots**: 1-click JSON cluster state export, disk persistence management, and atomic multi-service state wipe.
 
 ### 2. `ruststack` CLI Companion Commands
 The `ruststack` binary doubles as a local management CLI:
@@ -338,7 +449,7 @@ ruststack state dump --output snapshot.json
 # Restore cluster state from a snapshot file
 ruststack state load snapshot.json
 
-# Atomically reset state (all services or selective)
+# Atomically reset state (all 37 services or selective)
 ruststack state reset --services s3,dynamodb
 
 # Manage Chaos Engineering rules
@@ -358,9 +469,9 @@ export AWS_SECRET_ACCESS_KEY=test
 export AWS_DEFAULT_REGION=us-east-1
 ```
 
-### S3 & Bucket Notifications
+### 1. S3 & Bucket Notifications
 ```bash
-# Create bucket and upload
+# Create bucket and upload an object
 aws --endpoint-url=http://localhost:4566 s3 mb s3://my-bucket
 aws --endpoint-url=http://localhost:4566 s3 cp myfile.txt s3://my-bucket/uploads/myfile.txt
 
@@ -385,7 +496,7 @@ aws --endpoint-url=http://localhost:4566 s3api put-bucket-notification-configura
   }'
 ```
 
-### DynamoDB
+### 2. DynamoDB & Querying
 ```bash
 # Create Table
 aws --endpoint-url=http://localhost:4566 dynamodb create-table \
@@ -399,16 +510,85 @@ aws --endpoint-url=http://localhost:4566 dynamodb put-item \
   --table-name Users \
   --item '{"userId": {"S": "u100"}, "timestamp": {"N": "1700000000"}, "email": {"S": "user@example.com"}}'
 
-# Query
+# Query Table
 aws --endpoint-url=http://localhost:4566 dynamodb query \
   --table-name Users \
   --key-condition-expression "userId = :uid" \
   --expression-attribute-values '{":uid": {"S": "u100"}}'
 ```
 
+### 3. KMS Cryptography
+```bash
+# Create Customer Master Key
+KEY_ID=$(aws --endpoint-url=http://localhost:4566 kms create-key \
+  --description "app-encryption-key" \
+  --query "KeyMetadata.KeyId" --output text)
+
+# Encrypt plaintext
+CIPHERTEXT=$(aws --endpoint-url=http://localhost:4566 kms encrypt \
+  --key-id "$KEY_ID" \
+  --plaintext $(echo -n "secret-token" | base64) \
+  --query "CiphertextBlob" --output text)
+
+# Decrypt ciphertext
+aws --endpoint-url=http://localhost:4566 kms decrypt \
+  --ciphertext-blob "$CIPHERTEXT" \
+  --query "Plaintext" --output text | base64 -d
+```
+
+### 4. SSM Parameter Store & Secrets Manager
+```bash
+# Store hierarchical parameter
+aws --endpoint-url=http://localhost:4566 ssm put-parameter \
+  --name "/production/database/host" \
+  --value "db.internal.local" \
+  --type String
+
+# Retrieve parameters by path prefix
+aws --endpoint-url=http://localhost:4566 ssm get-parameters-by-path \
+  --path "/production/database" --recursive
+
+# Create JSON secret in Secrets Manager
+aws --endpoint-url=http://localhost:4566 secretsmanager create-secret \
+  --name "prod/api/credentials" \
+  --secret-string '{"api_key": "sec_12345", "token": "tok_abcdef"}'
+```
+
+### 5. Relational & Cache (RDS & ElastiCache)
+```bash
+# Create PostgreSQL RDS instance
+aws --endpoint-url=http://localhost:4566 rds create-db-instance \
+  --db-instance-identifier "users-db" \
+  --db-instance-class "db.t4g.micro" \
+  --engine "postgres" \
+  --master-username "postgres" \
+  --master-user-password "mypassword"
+
+# Create Redis Cache Cluster
+aws --endpoint-url=http://localhost:4566 elasticache create-cache-cluster \
+  --cache-cluster-id "session-cache" \
+  --cache-node-type "cache.t4g.micro" \
+  --engine "redis" \
+  --num-cache-nodes 1
+```
+
+### 6. Streaming & EventBridge Pipes
+```bash
+# Create EventBridge Pipe routing SQS to SNS
+aws --endpoint-url=http://localhost:4566 pipes create-pipe \
+  --name "queue-to-topic-pipe" \
+  --source "arn:aws:sqs:us-east-1:000000000000:orders-queue" \
+  --target "arn:aws:sns:us-east-1:000000000000:orders-topic"
+
+# List pipes
+aws --endpoint-url=http://localhost:4566 pipes list-pipes
+```
+
 ---
 
 ## 🧪 Testcontainers Integration (Go & Rust)
+
+RustStack is built from the ground up for sub-second, zero-dependency containerized integration tests using [Testcontainers](https://testcontainers.com):
 
 ### Go Testcontainers Example
 Explore [`Testcontainers/go-testcontainers/`](file:///home/tim/git/ruststack/Testcontainers/go-testcontainers/):
@@ -421,7 +601,7 @@ go test -v .
 Explore [`Testcontainers/rust-testcontainers/`](file:///home/tim/git/ruststack/Testcontainers/rust-testcontainers/):
 ```bash
 cd Testcontainers/rust-testcontainers
-cargo test -- --ignored
+cargo test -- --ignored --nocapture
 ```
 
 ---
