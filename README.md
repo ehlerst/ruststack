@@ -1,6 +1,6 @@
 # ⚡ RustStack
 
-> **Blazing-fast local emulator for 37 AWS services in Rust: 1.9 MB idle memory footprint, <1ms native cold start & up to 200x lighter than LocalStack.**
+> **Blazing-fast local emulator for 37 AWS services in Rust: 2.2 MB idle memory footprint, ~230ms container cold start & up to 177x lighter than LocalStack.**
 
 [![CI](https://github.com/ruststack/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/ci.yml)
 [![Performance Benchmarks](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml)
@@ -19,14 +19,14 @@ Continuous automated container startup time, idle memory footprint, and image si
 
 | Local Cloud Stack | Docker Image | Image Size | Avg Startup Time | Min Startup Time | Idle Memory (RSS) | Idle CPU |
 |:---|:---|---:|---:|---:|---:|---:|
-| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **30.7 MB** | **216.2 ms** | **199.3 ms** | **1.9 MiB** | **0.00%** |
+| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **38.0 MB** | **230.5 ms** | **199.3 ms** | **2.2 MiB** | **0.00%** |
 | **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 1,685.8 ms | 1,567.2 ms | 33.7 MiB | 0.00% |
 | **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 2,770.1 ms | 2,668.0 ms | 398.5 MiB | 0.04% |
 
 ### 🚀 RustStack Benchmark Findings
-- **Memory Footprint**: **17.7x less memory** than MiniStack (1.9 MiB vs 33.7 MiB) and **209.7x less memory** than LocalStack (398.5 MiB).
-- **Cold-Start Startup Speed**: **7.8x faster** than MiniStack (216.2 ms vs 1,685.8 ms) and **12.8x faster** than LocalStack (2,770.1 ms).
-- **Docker Image Size**: **5.7x smaller** than MiniStack (30.7 MB vs 175.9 MB) and **39.2x smaller** than LocalStack (1,204.1 MB).
+- **Memory Footprint**: **15.3x less memory** than MiniStack (2.2 MiB vs 33.7 MiB) and **177.9x less memory** than LocalStack (398.5 MiB).
+- **Cold-Start Startup Speed**: **7.3x faster** than MiniStack (230.5 ms vs 1,685.8 ms) and **12.0x faster** than LocalStack (2,770.1 ms).
+- **Docker Image Size**: **4.6x smaller** than MiniStack (38.0 MB vs 175.9 MB) and **31.7x smaller** than LocalStack (1,204.1 MB).
 
 ---
 
