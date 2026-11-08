@@ -2,6 +2,7 @@
 
 > **Blazing-fast local emulator for 37 AWS services in Rust: 2.2 MB idle memory footprint, ~230ms container cold start & up to 177x lighter than LocalStack.**
 
+[![Website](https://img.shields.io/badge/docs-ehlerst.github.io%2Fruststack-orange.svg)](https://ehlerst.github.io/ruststack/)
 [![CI](https://github.com/ehlerst/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ehlerst/ruststack/actions/workflows/ci.yml)
 [![Performance Benchmarks](https://github.com/ehlerst/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ehlerst/ruststack/actions/workflows/benchmarks.yml)
 [![Resource & Startup Benchmark](https://github.com/ehlerst/ruststack/actions/workflows/compare-alternatives.yml/badge.svg)](https://github.com/ehlerst/ruststack/actions/workflows/compare-alternatives.yml)

@@ -1,0 +1,41 @@
+# RustStack: Blazing-Fast Local AWS Cloud Emulator in Rust
+
+> RustStack is a local AWS emulator (S3, DynamoDB, SQS, STS, IAM… 37 services) for integration tests and CI. Single static binary or Docker image; point any SDK at it with `AWS_ENDPOINT_URL=http://localhost:4566`. LocalStack/moto alternative with a 2.2 MB memory footprint, ~230ms cold-start startup, and 177x less memory than LocalStack. What it isn't: not an S3 client or sync tool.
+
+## Quick Facts
+- **Website**: https://ehlerst.github.io/ruststack/
+- **Repository**: https://github.com/ehlerst/ruststack
+- **Memory Footprint**: ~2.2 MiB RSS at idle (15.3x lighter than MiniStack, 177.9x lighter than LocalStack)
+- **Startup Time**: ~230ms container cold start
+- **Docker Image**: `ehlers320/ruststack:latest` (~38.0 MB multi-arch Linux & macOS)
+- **Default Endpoint**: `http://localhost:4566` (Single port multiplexer via `AWS_ENDPOINT_URL=http://localhost:4566`)
+- **AWS Credentials**: Dummy credentials accepted (`AWS_ACCESS_KEY_ID=test`, `AWS_SECRET_ACCESS_KEY=test`, `AWS_DEFAULT_REGION=us-east-1`)
+
+## Supported AWS Services (37 Services)
+1. **Amazon S3 (`s3`)**: Buckets, objects (with byte ranges), multipart uploads, prefix listing, notifications to SQS/SNS/EventBridge.
+2. **Amazon DynamoDB & Streams (`dynamodb`, `dynamodbstreams`)**: Tables (HASH + RANGE keys, GSIs, LSIs), PutItem, GetItem, DeleteItem, UpdateItem, Query with KeyConditionExpression, Scan with FilterExpression, BatchGetItem, BatchWriteItem, CDC Streams.
+3. **Amazon SQS (`sqs`)**: Standard & FIFO queues, dead-letter queue (DLQ) redrive policy, long polling, visibility timeouts, SendMessage, ReceiveMessage, DeleteMessage.
+4. **Amazon SNS (`sns`)**: Topics, subscriptions, SQS zero-latency fanout delivery, filter policies, RawMessageDelivery.
+5. **Amazon EventBridge & Pipes (`events`, `pipes`)**: Event buses, rules, pattern matching (source, detail-type, nested detail), target dispatching to SQS & SNS, point-to-point EventBridge Pipes.
+6. **Amazon SSM Parameter Store (`ssm`)**: String, StringList, SecureString, hierarchical paths (`GetParametersByPath`), versioning.
+7. **Amazon Secrets Manager (`secretsmanager`)**: Secret creation, version staging (`AWSCURRENT`, `AWSPREVIOUS`), GetSecretValue.
+8. **Amazon STS (`sts`)**: `GetCallerIdentity`, `AssumeRole`, `GetSessionToken`.
+9. **AWS Key Management Service (`kms`)**: `CreateKey`, `DescribeKey`, `ListKeys`, `CreateAlias`, `ListAliases`, `Encrypt`, `Decrypt`, `GenerateDataKey` (AES-128 & AES-256).
+10. **Amazon CloudWatch Logs & Metrics (`logs`, `cloudwatch`)**: LogGroups, LogStreams, PutLogEvents, FilterLogEvents, PutMetricData, GetMetricStatistics, Alarms.
+11. **AWS Identity and Access Management (`iam`)**: Roles, Policies, Users, AccessKeys, AttachRolePolicy, pre-seeded AWS managed policies.
+12. **Amazon Simple Email Service (`ses`)**: `VerifyEmailIdentity`, `ListIdentities`, `SendEmail`, `SendRawEmail`, local email outbox.
+13. **Amazon Kinesis Data Streams (`kinesis`)**: `CreateStream`, `DescribeStream`, `PutRecord`, `PutRecords`, `GetShardIterator`, `GetRecords`.
+14. **AWS Lambda (`lambda`)**: `CreateFunction`, `GetFunction`, `ListFunctions`, `DeleteFunction`, `Invoke` (sync/async/dryrun), `CreateEventSourceMapping`.
+15. **Additional Services**: API Gateway v1 & v2, AppSync, Step Functions, CloudFormation, Route 53, ECR, ECS, EC2, ELBv2, RDS, ElastiCache, Redshift, OpenSearch, Athena, Bedrock, MSK, Cognito IDP, ACM, WAFv2, Organizations.
+
+## Control Plane & Extensions
+- **Web Admin UI**: `GET /_ruststack/ui/` (Zero-dependency embedded dark-mode console)
+- **Health Check**: `GET /_ruststack/health` or `GET /health` -> `{"status": "running", "engine": "ruststack"}`
+- **State Snapshots**:
+  - Dump: `GET /_ruststack/state/dump`
+  - Load / Restore: `POST /_ruststack/state/load`
+  - Atomic Reset: `POST /_ruststack/state/reset` (supports `{"services": ["s3", "dynamodb", "sqs"]}`)
+- **Chaos Engineering**:
+  - Register Rule: `POST /_ruststack/chaos/rules` (configurable service, action, probability 0.0-1.0, error_status, error_code, latency_ms, limit_times)
+  - List Rules: `GET /_ruststack/chaos/rules`
+  - Reset Rules: `POST /_ruststack/chaos/reset`

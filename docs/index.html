@@ -1,0 +1,1260 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RustStack — Blazing-Fast Local AWS Emulator in Rust | LocalStack &amp; Moto Alternative</title>
+  <meta name="description" content="RustStack is an ultra-fast local AWS emulator (S3, DynamoDB, SQS, SNS, STS, IAM, KMS, EventBridge — 37 services) for integration tests and CI. Single static Rust binary or 38 MB Docker image. 2.2 MiB RAM, 230ms cold start, 177x lighter than LocalStack." />
+  <meta name="keywords" content="RustStack, local AWS emulator, LocalStack alternative, Moto alternative, S3 mock, DynamoDB local alternative, SQS mock, AWS_ENDPOINT_URL, GitHub Actions AWS mock, Testcontainers AWS, Rust cloud emulator, static binary AWS mock" />
+  <meta name="author" content="RustStack Contributors" />
+  <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
+  <link rel="canonical" href="https://ehlerst.github.io/ruststack/" />
+
+  <!-- Open Graph / Social -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://ehlerst.github.io/ruststack/" />
+  <meta property="og:title" content="RustStack — Local AWS Emulator for 37 Services in Pure Rust" />
+  <meta property="og:description" content="2.2 MiB idle memory, ~230ms cold start, 177x lighter than LocalStack. Single static binary or Docker image. Point any SDK at it with AWS_ENDPOINT_URL=http://localhost:4566." />
+  <meta property="og:site_name" content="RustStack" />
+
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="RustStack — Blazing-Fast Local AWS Emulator in Rust" />
+  <meta name="twitter:description" content="Local AWS emulator (S3, DynamoDB, SQS, STS, IAM… 37 services) for integration tests &amp; CI. 2.2 MiB RAM, 230ms startup, 177x lighter than LocalStack." />
+
+  <!-- Structured Data (JSON-LD) for Google Rich Results & AI Search -->
+  <script type="application/ld+json">
+  [
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "RustStack",
+      "headline": "Local AWS Emulator (37 Services) for Integration Tests and CI/CD",
+      "description": "Local AWS cloud emulator written in 100% pure Rust supporting 37 AWS services including S3, DynamoDB, SQS, SNS, EventBridge, IAM, STS, KMS, SSM, and Secrets Manager. Delivered as a single zero-dependency static binary or 38 MB multi-arch Docker image. Drop-in LocalStack and Moto alternative using AWS_ENDPOINT_URL=http://localhost:4566.",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Linux, macOS, Windows (WSL2), Docker",
+      "softwareVersion": "0.5.0",
+      "license": "https://opensource.org/licenses/Apache-2.0",
+      "url": "https://ehlerst.github.io/ruststack/",
+      "codeRepository": "https://github.com/ehlerst/ruststack",
+      "downloadUrl": "https://github.com/ehlerst/ruststack/releases/latest",
+      "programmingLanguage": "Rust",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      }
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is RustStack and how does it compare to LocalStack and Moto?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "RustStack is a local AWS cloud emulator written in pure Rust that implements 37 AWS services (including S3, DynamoDB, SQS, SNS, STS, IAM, KMS, EventBridge, SSM, and Secrets Manager) on a single port (4566). Compared to LocalStack (398.5 MiB idle RAM, 2.77s startup, 1.2 GB image), RustStack uses 2.2 MiB of idle RAM (177x lighter), starts in ~230ms (12x faster), and ships as a 38 MB Docker image or a single zero-dependency static binary."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I use RustStack in GitHub Actions or CI?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You can run RustStack as a GitHub Actions service container using image ehlers320/ruststack:latest on port 4566, or download the prebuilt static musl binary from GitHub Releases in under a second. Then set AWS_ENDPOINT_URL=http://localhost:4566 along with dummy credentials (AWS_ACCESS_KEY_ID=test, AWS_SECRET_ACCESS_KEY=test) to point any AWS SDK or CLI at RustStack."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is RustStack an S3 client or file sync CLI tool?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. RustStack is a local AWS server and cloud emulator for integration testing and local development (a LocalStack/Moto alternative), not an S3 client or sync tool like s5cmd or rclone."
+          }
+        }
+      ]
+    }
+  ]
+  </script>
+
+  <style>
+    :root {
+      --bg: #090d16;
+      --bg-elevated: #0f1624;
+      --bg-card: #131c2e;
+      --bg-code: #0b101b;
+      --border: #1e293b;
+      --border-highlight: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --accent: #f97316;
+      --accent-glow: rgba(249, 115, 22, 0.18);
+      --cyan: #38bdf8;
+      --green: #22c55e;
+      --purple: #a855f7;
+      --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      line-height: 1.6;
+    }
+
+    body {
+      overflow-x: hidden;
+      background-image:
+        radial-gradient(circle at 15% 10%, rgba(249, 115, 22, 0.10), transparent 35%),
+        radial-gradient(circle at 85% 15%, rgba(56, 189, 248, 0.08), transparent 35%);
+    }
+
+    a {
+      color: var(--cyan);
+      text-decoration: none;
+      transition: color 0.15s ease;
+    }
+    a:hover {
+      color: #7dd3fc;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 1.5rem;
+    }
+
+    /* Navbar */
+    header.navbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      backdrop-filter: blur(12px);
+      background: rgba(9, 13, 22, 0.82);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 4rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      font-weight: 800;
+      font-size: 1.25rem;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .brand-badge {
+      font-size: 0.72rem;
+      font-family: var(--font-mono);
+      background: rgba(249, 115, 22, 0.15);
+      color: var(--accent);
+      border: 1px solid rgba(249, 115, 22, 0.35);
+      padding: 0.1rem 0.45rem;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      font-size: 0.92rem;
+    }
+    .nav-links a {
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .nav-links a:hover {
+      color: var(--text);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.55rem 1.1rem;
+      border-radius: 0.5rem;
+      font-weight: 600;
+      font-size: 0.9rem;
+      transition: all 0.15s ease;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: #fff !important;
+      box-shadow: 0 4px 20px rgba(249, 115, 22, 0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(249, 115, 22, 0.45);
+    }
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text) !important;
+      border-color: var(--border-highlight);
+    }
+    .btn-secondary:hover {
+      border-color: var(--text-muted);
+      background: #1a263d;
+    }
+
+    /* Hero */
+    .hero {
+      padding: 5rem 0 3.5rem;
+      text-align: center;
+    }
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.1);
+      border: 1px solid rgba(56, 189, 248, 0.28);
+      color: var(--cyan);
+      font-size: 0.82rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+    }
+    .hero h1 {
+      font-size: clamp(2.25rem, 5vw, 3.75rem);
+      font-weight: 800;
+      line-height: 1.12;
+      letter-spacing: -0.03em;
+      max-width: 920px;
+      margin: 0 auto 1.25rem;
+    }
+    .hero h1 span.gradient {
+      background: linear-gradient(90deg, #f97316, #fbbf24, #38bdf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero p.lead {
+      font-size: clamp(1.05rem, 2vw, 1.25rem);
+      color: var(--text-muted);
+      max-width: 780px;
+      margin: 0 auto 1.5rem;
+    }
+    .not-callout {
+      display: inline-block;
+      font-size: 0.86rem;
+      color: #cbd5e1;
+      background: rgba(30, 41, 59, 0.65);
+      border: 1px solid var(--border);
+      padding: 0.45rem 1rem;
+      border-radius: 0.5rem;
+      margin-bottom: 2rem;
+    }
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.85rem;
+      margin-bottom: 3rem;
+    }
+
+    /* Metric Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1rem;
+      margin-bottom: 4rem;
+    }
+    .metric-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.35rem;
+      text-align: left;
+      position: relative;
+      overflow: hidden;
+    }
+    .metric-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--cyan));
+    }
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 800;
+      font-family: var(--font-mono);
+      color: var(--text);
+      line-height: 1.15;
+    }
+    .metric-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--cyan);
+      margin-top: 0.25rem;
+    }
+    .metric-sub {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+    }
+
+    /* Section Styling */
+    section {
+      padding: 4rem 0;
+      border-top: 1px solid var(--border);
+    }
+    .section-header {
+      margin-bottom: 2.5rem;
+    }
+    .section-tag {
+      font-family: var(--font-mono);
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--accent);
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .section-title {
+      font-size: clamp(1.65rem, 3vw, 2.25rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 0.6rem;
+    }
+    .section-desc {
+      color: var(--text-muted);
+      max-width: 720px;
+      font-size: 1.02rem;
+    }
+
+    /* Concept Architecture Grid */
+    .concept-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .concept-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.6rem;
+    }
+    .concept-card h3 {
+      font-size: 1.15rem;
+      margin-bottom: 0.6rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .concept-card p {
+      color: var(--text-muted);
+      font-size: 0.93rem;
+      margin-bottom: 0.85rem;
+    }
+    .concept-card ul {
+      list-style: none;
+      font-size: 0.88rem;
+      color: #cbd5e1;
+    }
+    .concept-card ul li {
+      padding: 0.25rem 0;
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+    }
+    .concept-card ul li::before {
+      content: "→";
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+
+    /* Architecture Diagram Box */
+    .arch-diagram {
+      background: var(--bg-code);
+      border: 1px solid var(--border-highlight);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.82rem;
+      line-height: 1.55;
+      color: #e2e8f0;
+    }
+
+    /* Benchmark Comparison Bars */
+    .bench-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+      gap: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .bench-box {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.5rem;
+    }
+    .bench-box h3 {
+      font-size: 1.05rem;
+      margin-bottom: 1.1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .bench-winner-pill {
+      font-size: 0.75rem;
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--green);
+      border: 1px solid rgba(34, 197, 94, 0.35);
+      padding: 0.15rem 0.55rem;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+    }
+    .bar-row {
+      margin-bottom: 0.95rem;
+    }
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 0.3rem;
+      font-family: var(--font-mono);
+    }
+    .bar-track {
+      width: 100%;
+      height: 0.65rem;
+      background: var(--bg-code);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+    }
+    .bar-ruststack {
+      background: linear-gradient(90deg, var(--green), #4ade80);
+    }
+    .bar-ministack {
+      background: #64748b;
+    }
+    .bar-localstack {
+      background: #ef4444;
+    }
+
+    /* Tabs & Code Blocks */
+    .tabs-header {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .tab-btn {
+      background: var(--bg-card);
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 0.55rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .tab-btn.active, .tab-btn:hover {
+      color: var(--text);
+      border-color: var(--accent);
+      background: rgba(249, 115, 22, 0.12);
+    }
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+    .code-window {
+      background: var(--bg-code);
+      border: 1px solid var(--border-highlight);
+      border-radius: 0.75rem;
+      overflow: hidden;
+    }
+    .code-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 1rem;
+      background: #111827;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    .copy-btn {
+      background: var(--bg-card);
+      color: var(--text);
+      border: 1px solid var(--border-highlight);
+      border-radius: 0.35rem;
+      padding: 0.2rem 0.6rem;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      cursor: pointer;
+    }
+    .copy-btn:hover {
+      border-color: var(--cyan);
+    }
+    pre {
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      line-height: 1.6;
+      color: #e2e8f0;
+    }
+
+    /* Services Explorer */
+    .service-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+      align-items: center;
+    }
+    .search-input {
+      flex: 1;
+      min-width: 240px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-highlight);
+      color: var(--text);
+      padding: 0.65rem 1rem;
+      border-radius: 0.5rem;
+      font-size: 0.92rem;
+    }
+    .search-input:focus {
+      outline: none;
+      border-color: var(--cyan);
+    }
+    .services-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+      gap: 0.9rem;
+    }
+    .service-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.65rem;
+      padding: 1.1rem;
+      transition: border-color 0.15s ease;
+    }
+    .service-card:hover {
+      border-color: var(--border-highlight);
+    }
+    .service-card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.4rem;
+    }
+    .service-name {
+      font-weight: 700;
+      font-size: 0.98rem;
+      color: var(--text);
+    }
+    .service-crate {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--cyan);
+      background: rgba(56, 189, 248, 0.1);
+      padding: 0.1rem 0.45rem;
+      border-radius: 0.3rem;
+    }
+    .service-ops {
+      font-size: 0.82rem;
+      color: var(--text-muted);
+    }
+
+    /* FAQ */
+    .faq-list {
+      display: grid;
+      gap: 1rem;
+    }
+    .faq-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 0.75rem;
+      padding: 1.35rem 1.5rem;
+    }
+    .faq-item h3 {
+      font-size: 1.05rem;
+      margin-bottom: 0.45rem;
+      color: var(--text);
+    }
+    .faq-item p {
+      font-size: 0.93rem;
+      color: var(--text-muted);
+    }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 3rem 0;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+    }
+
+    @media (max-width: 720px) {
+      .nav-links {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Navigation -->
+  <header class="navbar">
+    <div class="container nav-inner">
+      <a href="#" class="brand">
+        <span>⚡ RustStack</span>
+        <span class="brand-badge">v0.5.0</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#concept">How It Works</a>
+        <a href="#benchmarks">Benchmarks</a>
+        <a href="#quickstart">GitHub Actions &amp; CI</a>
+        <a href="#services">37 AWS Services</a>
+        <a href="#chaos">Chaos &amp; State API</a>
+        <a href="#faq">FAQ</a>
+      </nav>
+      <div>
+        <a href="https://github.com/ehlerst/ruststack" class="btn btn-secondary" target="_blank" rel="noopener">
+          ★ GitHub Repo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <!-- Hero Section -->
+    <section class="hero" style="border-top: none;">
+      <div class="eyebrow">
+        <span>🦀 100% Pure In-Memory Rust</span>
+        <span>•</span>
+        <span>Drop-in LocalStack &amp; Moto Alternative</span>
+      </div>
+      <h1>
+        Local AWS Emulator for <span class="gradient">37 Services</span> with a 2.2 MiB Footprint
+      </h1>
+      <p class="lead">
+        Run S3, DynamoDB, SQS, SNS, STS, IAM, KMS, EventBridge, Secrets Manager, and 28 more AWS services locally or in CI. Delivered as a <strong>single zero-dependency static binary</strong> or <strong>38 MB multi-arch Docker image</strong>. Point any AWS SDK or CLI at <code>AWS_ENDPOINT_URL=http://localhost:4566</code>.
+      </p>
+      <div class="not-callout">
+        <strong>What it is &amp; isn't:</strong> RustStack is a local AWS cloud emulator for integration tests and CI — <em>not</em> an S3 client or file sync tool (like <code>s5cmd</code> or <code>rclone</code>).
+      </div>
+
+      <div class="hero-actions">
+        <a href="#quickstart" class="btn btn-primary">⚡ Use in GitHub Actions &amp; Docker</a>
+        <a href="https://github.com/ehlerst/ruststack/releases/latest" class="btn btn-secondary" target="_blank" rel="noopener">Download Static Binary</a>
+        <a href="https://hub.docker.com/r/ehlers320/ruststack" class="btn btn-secondary" target="_blank" rel="noopener">Docker Hub (ehlers320/ruststack)</a>
+      </div>
+
+      <!-- Key Metrics -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-value">2.2 MiB</div>
+          <div class="metric-label">Idle Memory (RSS)</div>
+          <div class="metric-sub">177.9x lighter than LocalStack (398.5 MiB)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">230 ms</div>
+          <div class="metric-label">Container Cold Start</div>
+          <div class="metric-sub">12.0x faster startup than LocalStack (2.77s)</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">~1.4 µs</div>
+          <div class="metric-label">In-Memory p50 Latency</div>
+          <div class="metric-sub">390,000+ ops/s on S3, DynamoDB, STS &amp; SSM</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-value">38.0 MB</div>
+          <div class="metric-label">Docker Image Size</div>
+          <div class="metric-sub">31.7x smaller than LocalStack (1,204 MB)</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- The RustStack Concept -->
+    <section id="concept">
+      <div class="section-header">
+        <div class="section-tag">Architecture &amp; Concept</div>
+        <h2 class="section-title">Why We Built RustStack: Zero-JVM, Zero-Python Cloud Emulation</h2>
+        <p class="section-desc">
+          Traditional AWS emulators bundle Python interpreters, JVM runtimes, Node.js processes, and gigabytes of dependencies inside a heavy container. RustStack rethinks local cloud emulation from first principles as a single, lock-free async Rust binary.
+        </p>
+      </div>
+
+      <div class="concept-grid">
+        <div class="concept-card">
+          <h3>🔌 Single-Port AWS Protocol Multiplexer</h3>
+          <p>
+            Every AWS service uses slightly different wire conventions. RustStack inspects incoming HTTP headers, <code>X-Amz-Target</code>, query parameters, and hostnames on port <code>4566</code> to route requests in sub-microseconds:
+          </p>
+          <ul>
+            <li><strong>REST-XML &amp; Virtual-Host/Path Routing:</strong> Amazon S3, Route 53</li>
+            <li><strong>AWS JSON 1.0 / 1.1:</strong> DynamoDB, KMS, EventBridge, SSM, Secrets Manager, Logs</li>
+            <li><strong>AWS Query (form-urlencoded):</strong> STS, IAM, SQS, SNS, RDS, ElastiCache, EC2</li>
+            <li><strong>REST-JSON:</strong> Lambda, API Gateway v1/v2, AppSync, Bedrock, Pipes</li>
+          </ul>
+        </div>
+
+        <div class="concept-card">
+          <h3>⚡ Cross-Service Reactive Event Bus</h3>
+          <p>
+            Cloud-native integration tests don't test services in isolation — they test event-driven pipelines. RustStack wires all 37 crates together in memory with zero network hops:
+          </p>
+          <ul>
+            <li><strong>S3 Bucket Notifications:</strong> <code>PutObject</code> triggers instant delivery to SQS queues, SNS topics, and EventBridge buses.</li>
+            <li><strong>SNS → SQS Fanout:</strong> FilterPolicy matching and raw message delivery across subscribed queues.</li>
+            <li><strong>DynamoDB Streams CDC:</strong> Real-time <code>INSERT</code> / <code>MODIFY</code> / <code>REMOVE</code> shard capture.</li>
+            <li><strong>EventBridge &amp; Pipes:</strong> Content-based JSON rule matching routed directly to target services.</li>
+          </ul>
+        </div>
+
+        <div class="concept-card">
+          <h3>🧪 Built for Deterministic CI &amp; Chaos Testing</h3>
+          <p>
+            Instead of restarting containers between tests, RustStack exposes an instant HTTP control plane on <code>/_ruststack/*</code> and an embedded dark-mode Web Admin UI:
+          </p>
+          <ul>
+            <li><strong>Atomic State Reset (<code>&lt;1ms</code>):</strong> Wipe all 37 services or selected services between test cases via <code>POST /_ruststack/state/reset</code>.</li>
+            <li><strong>State Snapshots:</strong> Export and restore entire multi-service cluster state as JSON.</li>
+            <li><strong>Chaos Fault Injection:</strong> Inject <code>ProvisionedThroughputExceededException</code>, <code>503 SlowDown</code>, or latency jitter per service/action.</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="arch-diagram" aria-label="RustStack Architecture Diagram">
+Your Test Suite / Application (boto3, aws-sdk-rust, aws-sdk-go-v2, @aws-sdk/client-*, Terraform, AWS CLI)
+                                      │
+                        AWS_ENDPOINT_URL=http://localhost:4566
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│ ⚡ RustStack Single Static Binary (`ruststack-server` — Tokio + Axum + DashMap)          │
+│                                                                                         │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Chaos &amp; Fault Injection Middleware (Latency/Jitter, HTTP 503/400 Error Overrides) │  │
+│  └─────────────────────────────────────────┬─────────────────────────────────────────┘  │
+│                                            ▼                                            │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Multi-Protocol Router (X-Amz-Target | Action= Query | S3 Host/Path | REST-JSON)   │  │
+│  └──────┬──────────────────────┬───────────────────────┬──────────────────────┬──────┘  │
+│         ▼                      ▼                       ▼                      ▼         │
+│  ┌─────────────┐        ┌─────────────┐         ┌─────────────┐        ┌─────────────┐  │
+│  │ Storage/DB  │        │  Messaging  │         │ Security/ID │        │ Compute/Ops │  │
+│  │ • S3        │───────▶│ • SQS + DLQ │◀────────│ • STS       │        │ • Lambda    │  │
+│  │ • DynamoDB  │ CDC    │ • SNS Fanout│         │ • IAM       │        │ •SSM/Secrets│  │
+│  │ • RDS/Redis │───────▶│ •EventBridge│         │ • KMS (AES) │        │ •Logs/Metrics│ │
+│  │ • Athena/OS │        │ • Kinesis   │         │ • Cognito   │        │ •37 Services│  │
+│  └─────────────┘        └─────────────┘         └─────────────┘        └─────────────┘  │
+│                                                                                         │
+│  ┌───────────────────────────────────────────────────────────────────────────────────┐  │
+│  │ Control Plane: `/_ruststack/ui/` | `/_ruststack/state/{dump,load,reset}` | Health │  │
+│  └───────────────────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────────────────┘</div>
+    </section>
+
+    <!-- Benchmarks -->
+    <section id="benchmarks">
+      <div class="section-header">
+        <div class="section-tag">Verified Performance</div>
+        <h2 class="section-title">Resource &amp; Cold-Start Benchmark: RustStack vs. LocalStack vs. MiniStack</h2>
+        <p class="section-desc">
+          Continuously measured on GitHub Actions runners via automated Testcontainers benchmarks (<code>Testcontainers/rust-measure-alternatives</code>).
+        </p>
+      </div>
+
+      <div class="bench-grid">
+        <div class="bench-box">
+          <h3>
+            <span>Idle Memory Footprint (RSS)</span>
+            <span class="bench-winner-pill">177.9x Lighter</span>
+          </h3>
+          <div class="bar-row">
+            <div class="bar-label"><span>⚡ RustStack</span><strong>2.2 MiB</strong></div>
+            <div class="bar-track"><div class="bar-fill bar-ruststack" style="width: 1.5%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>MiniStack</span><span>33.7 MiB</span></div>
+            <div class="bar-track"><div class="bar-fill bar-ministack" style="width: 12%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>LocalStack 3.8</span><span>398.5 MiB</span></div>
+            <div class="bar-track"><div class="bar-fill bar-localstack" style="width: 100%;"></div></div>
+          </div>
+        </div>
+
+        <div class="bench-box">
+          <h3>
+            <span>Container Cold-Start Time</span>
+            <span class="bench-winner-pill">12.0x Faster</span>
+          </h3>
+          <div class="bar-row">
+            <div class="bar-label"><span>⚡ RustStack</span><strong>230.5 ms</strong></div>
+            <div class="bar-track"><div class="bar-fill bar-ruststack" style="width: 8.3%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>MiniStack</span><span>1,685.8 ms</span></div>
+            <div class="bar-track"><div class="bar-fill bar-ministack" style="width: 60.8%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>LocalStack 3.8</span><span>2,770.1 ms</span></div>
+            <div class="bar-track"><div class="bar-fill bar-localstack" style="width: 100%;"></div></div>
+          </div>
+        </div>
+
+        <div class="bench-box">
+          <h3>
+            <span>Docker Image Size</span>
+            <span class="bench-winner-pill">31.7x Smaller</span>
+          </h3>
+          <div class="bar-row">
+            <div class="bar-label"><span>⚡ RustStack</span><strong>38.0 MB</strong></div>
+            <div class="bar-track"><div class="bar-fill bar-ruststack" style="width: 3.2%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>MiniStack</span><span>175.9 MB</span></div>
+            <div class="bar-track"><div class="bar-fill bar-ministack" style="width: 14.6%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>LocalStack 3.8</span><span>1,204.1 MB</span></div>
+            <div class="bar-track"><div class="bar-fill bar-localstack" style="width: 100%;"></div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Start & GitHub Actions -->
+    <section id="quickstart">
+      <div class="section-header">
+        <div class="section-tag">Drop-In Integration</div>
+        <h2 class="section-title">Use RustStack in GitHub Actions, Docker, or Testcontainers</h2>
+        <p class="section-desc">
+          Point any AWS SDK (Python <code>boto3</code>, Go <code>aws-sdk-go-v2</code>, JS/TS <code>@aws-sdk/*</code>, Rust <code>aws-sdk-*</code>) or the AWS CLI at RustStack by setting <code>AWS_ENDPOINT_URL=http://localhost:4566</code>.
+        </p>
+      </div>
+
+      <div class="tabs-header" role="tablist">
+        <button class="tab-btn active" onclick="switchTab('gha-service', this)">GitHub Actions (Service Container)</button>
+        <button class="tab-btn" onclick="switchTab('gha-binary', this)">GitHub Actions (Static Binary)</button>
+        <button class="tab-btn" onclick="switchTab('docker-cli', this)">Docker &amp; AWS CLI</button>
+        <button class="tab-btn" onclick="switchTab('testcontainers', this)">Testcontainers (Go / Python / Rust)</button>
+        <button class="tab-btn" onclick="switchTab('chaos-api', this)">Chaos &amp; State Reset API</button>
+      </div>
+
+      <!-- Tab 1: GitHub Actions Service Container -->
+      <div id="tab-gha-service" class="tab-panel active">
+        <div class="code-window">
+          <div class="code-topbar">
+            <span>.github/workflows/integration.yml — Service Container</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code>jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    services:
+      ruststack:
+        image: ehlers320/ruststack:latest
+        ports:
+          - 4566:4566
+        options: >-
+          --health-cmd "wget -qO- http://localhost:4566/_ruststack/health || exit 1"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 5
+    env:
+      AWS_ENDPOINT_URL: http://localhost:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integration tests against local AWS emulator
+        run: |
+          aws s3 mb s3://my-ci-bucket
+          pytest</code></pre>
+        </div>
+      </div>
+
+      <!-- Tab 2: GitHub Actions Static Binary -->
+      <div id="tab-gha-binary" class="tab-panel">
+        <div class="code-window">
+          <div class="code-topbar">
+            <span>.github/workflows/integration.yml — Zero-Docker Static musl Binary (~10ms start)</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code>jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ENDPOINT_URL: http://localhost:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start RustStack static binary
+        run: |
+          curl -fsSL https://github.com/ehlerst/ruststack/releases/latest/download/ruststack-x86_64-unknown-linux-musl.tar.gz \
+            | sudo tar xz -C /usr/local/bin
+          ruststack start --port 4566 &amp;
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:4566/_ruststack/health &amp;&amp; break
+            sleep 0.1
+          done
+
+      - name: Run test suite
+        run: cargo test</code></pre>
+        </div>
+      </div>
+
+      <!-- Tab 3: Docker & AWS CLI -->
+      <div id="tab-docker-cli" class="tab-panel">
+        <div class="code-window">
+          <div class="code-topbar">
+            <span>Terminal — Docker &amp; AWS CLI</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code># 1. Start RustStack container (or run static binary `ruststack start --port 4566`)
+docker run -d --name ruststack -p 4566:4566 ehlers320/ruststack:latest
+
+# 2. Point AWS CLI &amp; SDKs at localhost:4566
+export AWS_ENDPOINT_URL=http://localhost:4566
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+export AWS_DEFAULT_REGION=us-east-1
+
+# 3. Use S3, DynamoDB, SQS, KMS, Secrets Manager immediately
+aws s3 mb s3://my-bucket
+aws s3 cp README.md s3://my-bucket/README.md
+aws sqs create-queue --queue-name orders-queue
+aws dynamodb list-tables
+
+# 4. Open Embedded Dark-Mode Web Admin UI
+open http://localhost:4566/_ruststack/ui/</code></pre>
+        </div>
+      </div>
+
+      <!-- Tab 4: Testcontainers -->
+      <div id="tab-testcontainers" class="tab-panel">
+        <div class="code-window">
+          <div class="code-topbar">
+            <span>Testcontainers — Python (boto3) &amp; Go</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code># Python Testcontainers + boto3
+import boto3
+from testcontainers.core.container import DockerContainer
+from testcontainers.core.waiting_utils import wait_for_logs
+
+with DockerContainer("ehlers320/ruststack:latest").with_exposed_ports(4566) as container:
+    endpoint = f"http://{container.get_container_host_ip()}:{container.get_exposed_port(4566)}"
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=endpoint,
+        aws_access_key_id="test",
+        aws_secret_access_key="test",
+        region_name="us-east-1",
+    )
+    s3.create_bucket(Bucket="test-bucket")</code></pre>
+        </div>
+      </div>
+
+      <!-- Tab 5: Chaos & State Reset API -->
+      <div id="tab-chaos-api" class="tab-panel" id="chaos">
+        <div class="code-window">
+          <div class="code-topbar">
+            <span>Deterministic State Reset &amp; Chaos Engineering Fault Injection</span>
+            <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+          </div>
+          <pre><code># Atomically reset all 37 services (or specific services) between tests in &lt;1ms
+curl -X POST http://localhost:4566/_ruststack/state/reset \
+  -H "Content-Type: application/json" \
+  -d '{"services": ["s3", "dynamodb", "sqs"]}'
+
+# Export / Restore full cluster state snapshot
+curl http://localhost:4566/_ruststack/state/dump &gt; cluster-snapshot.json
+curl -X POST http://localhost:4566/_ruststack/state/load -d @cluster-snapshot.json
+
+# Inject 50% DynamoDB ProvisionedThroughputExceededException to test SDK retry backoff
+curl -X POST http://localhost:4566/_ruststack/chaos/rules \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service": "dynamodb",
+    "action": "PutItem",
+    "probability": 0.5,
+    "error_status": 400,
+    "error_code": "ProvisionedThroughputExceededException"
+  }'</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <!-- 37 AWS Services Explorer -->
+    <section id="services">
+      <div class="section-header">
+        <div class="section-tag">Complete Coverage</div>
+        <h2 class="section-title">All 37 Emulated AWS Services</h2>
+        <p class="section-desc">
+          Every service is implemented natively in memory-safe Rust and multiplexed on port <code>4566</code>. Filter by service name, crate, or API operation below:
+        </p>
+      </div>
+
+      <div class="service-controls">
+        <input
+          type="search"
+          id="serviceSearch"
+          class="search-input"
+          placeholder="Search 37 services or operations (e.g. s3, dynamodb, kms, AssumeRole, PutEvents)..."
+          oninput="filterServices()"
+          aria-label="Search AWS services"
+        />
+      </div>
+
+      <div class="services-grid" id="servicesGrid">
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon S3</span><span class="service-crate">ruststack-s3</span></div>
+          <div class="service-ops">Create/Delete/ListBuckets, Put/Get/Head/Copy/DeleteObject, Multipart Uploads, Range Requests, Bucket Notifications (→ SQS/SNS/EventBridge), Path &amp; Virtual-Host routing.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon DynamoDB &amp; Streams</span><span class="service-crate">ruststack-dynamodb</span></div>
+          <div class="service-ops">Create/Update/DescribeTable, GSIs/LSIs, Put/Get/Update/DeleteItem, Condition/Projection/FilterExpressions, Query, Scan, BatchGet/WriteItem, DynamoDB Streams CDC.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon SQS</span><span class="service-crate">ruststack-sqs</span></div>
+          <div class="service-ops">Query &amp; JSON 1.0 protocols, Standard &amp; FIFO queues (.fifo), Dead-Letter Queue (DLQ) redrive, SendMessageBatch, ReceiveMessage long polling, VisibilityTimeout.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon SNS</span><span class="service-crate">ruststack-sns</span></div>
+          <div class="service-ops">Create/Delete/ListTopics, Subscribe/Unsubscribe, Publish &amp; PublishBatch, instant in-memory SQS fanout with FilterPolicy &amp; RawMessageDelivery.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon EventBridge</span><span class="service-crate">ruststack-eventbridge</span></div>
+          <div class="service-ops">CreateEventBus, PutRule, content-based JSON pattern matching (prefix, anything-but, exists), PutEvents with automated SQS &amp; SNS target dispatching.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon STS</span><span class="service-crate">ruststack-sts</span></div>
+          <div class="service-ops">GetCallerIdentity (Terraform &amp; SDK bootstrap), AssumeRole, GetSessionToken.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS IAM</span><span class="service-crate">ruststack-iam</span></div>
+          <div class="service-ops">Roles, Policies, Users, AccessKeys, AttachRolePolicy, PutRolePolicy, pre-seeded AWS managed policies (AdministratorAccess, AmazonS3FullAccess, etc.).</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS KMS</span><span class="service-crate">ruststack-kms</span></div>
+          <div class="service-ops">CreateKey, DescribeKey, Aliases (alias/aws/s3, alias/aws/dynamodb), authenticated Encrypt, Decrypt, GenerateDataKey (AES-128 &amp; AES-256).</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">SSM Parameter Store</span><span class="service-crate">ruststack-ssm</span></div>
+          <div class="service-ops">PutParameter (versioned), GetParameter, GetParameters, DeleteParameters, hierarchical GetParametersByPath (recursive String, StringList, SecureString).</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS Secrets Manager</span><span class="service-crate">ruststack-secretsmanager</span></div>
+          <div class="service-ops">CreateSecret, GetSecretValue, PutSecretValue, UpdateSecret, DeleteSecret, multi-version staging (AWSCURRENT, AWSPREVIOUS), GetRandomPassword.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS Lambda</span><span class="service-crate">ruststack-lambda</span></div>
+          <div class="service-ops">Create/Get/List/Update/DeleteFunction, Invoke (RequestResponse, Event, DryRun), CreateEventSourceMapping for DynamoDB &amp; Kinesis streams.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon Kinesis Streams</span><span class="service-crate">ruststack-kinesis</span></div>
+          <div class="service-ops">Create/Delete/DescribeStream, PutRecord, PutRecords with deterministic MD5 shard hashing, GetShardIterator, GetRecords.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">CloudWatch Logs</span><span class="service-crate">ruststack-logs</span></div>
+          <div class="service-ops">Create/Delete/DescribeLogGroups &amp; LogStreams, PutLogEvents, GetLogEvents, FilterLogEvents with pattern matching.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">CloudWatch Metrics &amp; Alarms</span><span class="service-crate">ruststack-cloudwatch</span></div>
+          <div class="service-ops">PutMetricData, ListMetrics, GetMetricData, GetMetricStatistics (Average, Sum, Min, Max), PutMetricAlarm, DescribeAlarms, SetAlarmState.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon SES</span><span class="service-crate">ruststack-ses</span></div>
+          <div class="service-ops">VerifyEmailIdentity, VerifyDomainIdentity, SendEmail, SendRawEmail (MIME parsing), local inspection outbox, GetSendQuota.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon Cognito IDP</span><span class="service-crate">ruststack-cognito</span></div>
+          <div class="service-ops">Create/Describe/ListUserPools, CreateUserPoolClient, AdminCreateUser, AdminGetUser, AdminInitiateAuth, ListUsers.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">API Gateway REST (v1)</span><span class="service-crate">ruststack-apigateway</span></div>
+          <div class="service-ops">CreateRestApi, CreateResource, PutMethod, PutIntegration, CreateDeployment, CreateStage.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">API Gateway HTTP/WS (v2)</span><span class="service-crate">ruststack-apigatewayv2</span></div>
+          <div class="service-ops">CreateApi (HTTP &amp; WEBSOCKET), CreateRoute, CreateIntegration, CreateDeployment, CreateStage.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS Step Functions</span><span class="service-crate">ruststack-stepfunctions</span></div>
+          <div class="service-ops">Create/Describe/Update/DeleteStateMachine, StartExecution, DescribeExecution, GetExecutionHistory.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS CloudFormation</span><span class="service-crate">ruststack-cloudformation</span></div>
+          <div class="service-ops">Create/Update/Delete/DescribeStacks, GetTemplate, DescribeStackResources, DescribeStackEvents.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon Route 53</span><span class="service-crate">ruststack-route53</span></div>
+          <div class="service-ops">Create/Get/List/DeleteHostedZone, ChangeResourceRecordSets, ListResourceRecordSets (A, AAAA, CNAME, TXT, MX, SRV).</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon ECR</span><span class="service-crate">ruststack-ecr</span></div>
+          <div class="service-ops">Create/Describe/DeleteRepository, RepositoryPolicy, PutImage, BatchGetImage, DescribeImages.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon ECS</span><span class="service-crate">ruststack-ecs</span></div>
+          <div class="service-ops">Create/DescribeCluster, RegisterTaskDefinition, CreateService, RunTask, ListTasks.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon EC2 &amp; VPC</span><span class="service-crate">ruststack-ec2</span></div>
+          <div class="service-ops">Run/Describe/Start/Stop/TerminateInstances, Create/DescribeVpc, CreateSubnet, CreateSecurityGroup.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Elastic Load Balancing v2</span><span class="service-crate">ruststack-elbv2</span></div>
+          <div class="service-ops">Create/Describe/DeleteLoadBalancer (ALB/NLB), CreateTargetGroup, RegisterTargets, CreateListener.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon RDS</span><span class="service-crate">ruststack-rds</span></div>
+          <div class="service-ops">Create/Describe/Modify/DeleteDBInstance (Postgres, MySQL, Aurora), DBSubnetGroups, DBParameterGroups.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon ElastiCache</span><span class="service-crate">ruststack-elasticache</span></div>
+          <div class="service-ops">Create/Describe/ModifyCacheCluster (Redis &amp; Memcached), CreateReplicationGroup.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon Redshift</span><span class="service-crate">ruststack-redshift</span></div>
+          <div class="service-ops">Create/Describe/Modify/Reboot/DeleteCluster, warehouse endpoints &amp; parameter groups.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon OpenSearch</span><span class="service-crate">ruststack-opensearch</span></div>
+          <div class="service-ops">Create/Describe/Update/DeleteDomain, DescribeDomainConfig, ListDomainNames.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon Athena</span><span class="service-crate">ruststack-athena</span></div>
+          <div class="service-ops">Start/Get/StopQueryExecution, GetQueryResults, WorkGroups, NamedQueries.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon Bedrock</span><span class="service-crate">ruststack-bedrock</span></div>
+          <div class="service-ops">ListFoundationModels, GetFoundationModel, InvokeModel (Claude, Titan, Llama mock inference responses).</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">EventBridge Pipes</span><span class="service-crate">ruststack-pipes</span></div>
+          <div class="service-ops">Create/Describe/List/Start/Stop/Update/DeletePipe routing between SQS, DynamoDB Streams, Kinesis &amp; SNS.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">Amazon MSK (Kafka)</span><span class="service-crate">ruststack-msk</span></div>
+          <div class="service-ops">Create/Describe/List/DeleteCluster, GetBootstrapBrokers.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS AppSync</span><span class="service-crate">ruststack-appsync</span></div>
+          <div class="service-ops">CreateGraphqlApi, CreateApiKey, StartSchemaCreation, CreateDataSource, GraphQL execution engine.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS Certificate Manager</span><span class="service-crate">ruststack-acm</span></div>
+          <div class="service-ops">Request/Describe/List/Get/DeleteCertificate, automated DNS &amp; Email validation records.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS WAFv2</span><span class="service-crate">ruststack-wafv2</span></div>
+          <div class="service-ops">Create/Get/List/Update/DeleteWebACL, CreateIPSet, CreateRuleGroup.</div>
+        </div>
+        <div class="service-card">
+          <div class="service-card-top"><span class="service-name">AWS Organizations</span><span class="service-crate">ruststack-organizations</span></div>
+          <div class="service-ops">Create/DescribeOrganization, ListRoots, CreateOrganizationalUnit, CreateAccount, Service Control Policies (SCPs).</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ Section for Search Indexing -->
+    <section id="faq">
+      <div class="section-header">
+        <div class="section-tag">Frequently Asked Questions</div>
+        <h2 class="section-title">Everything You Need to Know About RustStack</h2>
+      </div>
+
+      <div class="faq-list">
+        <div class="faq-item">
+          <h3>What is RustStack and how does it compare to LocalStack and Moto?</h3>
+          <p>
+            RustStack is a single-binary local AWS cloud emulator written in 100% pure Rust. Unlike LocalStack (which requires a heavy Python/JVM container using ~398.5 MiB idle memory and ~2.77s startup) or Moto (Python-based), RustStack starts in <strong>~230ms</strong>, consumes <strong>2.2 MiB of idle RAM (177x lighter)</strong>, and ships as a <strong>38 MB Docker image</strong> or standalone static binary.
+          </p>
+        </div>
+        <div class="faq-item">
+          <h3>How do I point my AWS SDK or Terraform at RustStack?</h3>
+          <p>
+            Set the standard environment variable <code>AWS_ENDPOINT_URL=http://localhost:4566</code> along with dummy credentials (<code>AWS_ACCESS_KEY_ID=test</code>, <code>AWS_SECRET_ACCESS_KEY=test</code>, <code>AWS_DEFAULT_REGION=us-east-1</code>). All modern AWS SDKs (Python <code>boto3</code>, Go <code>aws-sdk-go-v2</code>, Node.js <code>@aws-sdk/*</code>, Rust <code>aws-sdk-*</code>, and the AWS CLI v2) natively honor <code>AWS_ENDPOINT_URL</code>.
+          </p>
+        </div>
+        <div class="faq-item">
+          <h3>Is RustStack an S3 client or file sync CLI tool?</h3>
+          <p>
+            <strong>No.</strong> RustStack is an AWS server/cloud emulator for local development and integration tests (like LocalStack or Moto) — not an S3 transfer/sync CLI client like <code>s5cmd</code> or <code>rclone</code>.
+          </p>
+        </div>
+        <div class="faq-item">
+          <h3>Does RustStack persist data across restarts or support resetting state between tests?</h3>
+          <p>
+            Yes! By default, RustStack runs purely in memory for maximum speed and lets you reset state between tests in under 1 millisecond via <code>POST http://localhost:4566/_ruststack/state/reset</code>. If you want persistence across restarts, pass <code>--data-dir ./data</code> or set <code>RUSTSTACK_DATA_DIR=/data</code> to automatically load and save state snapshots.
+          </p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>
+        <strong>⚡ RustStack</strong> — Open-source under MIT / Apache-2.0 License.
+        <a href="https://github.com/ehlerst/ruststack">GitHub Repository</a> •
+        <a href="https://github.com/ehlerst/ruststack/releases">Releases</a> •
+        <a href="https://hub.docker.com/r/ehlers320/ruststack">Docker Hub</a> •
+        <a href="llms.txt">llms.txt</a>
+      </p>
+    </div>
+  </footer>
+
+  <script>
+    function switchTab(tabId, btn) {
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('tab-' + tabId).classList.add('active');
+      btn.classList.add('active');
+    }
+
+    function copyCode(btn) {
+      const code = btn.closest('.code-window').querySelector('code').innerText;
+      navigator.clipboard.writeText(code).then(() => {
+        const prev = btn.innerText;
+        btn.innerText = 'Copied!';
+        setTimeout(() => { btn.innerText = prev; }, 1500);
+      });
+    }
+
+    function filterServices() {
+      const q = document.getElementById('serviceSearch').value.toLowerCase();
+      document.querySelectorAll('#servicesGrid .service-card').forEach(card => {
+        const text = card.innerText.toLowerCase();
+        card.style.display = text.includes(q) ? '' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>
