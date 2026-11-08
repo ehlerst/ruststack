@@ -1,6 +1,6 @@
 # RustStack: Blazing-Fast Local AWS Cloud Emulator in Rust
 
-> RustStack is an ultra-fast, lightweight, single-binary local AWS cloud emulator written in 100% pure Rust. It serves as a drop-in replacement for LocalStack and MiniStack with sub-microsecond latency, a 1.6 MB memory footprint, and 500ms cold-start startup.
+> RustStack is a local AWS emulator (S3, DynamoDB, SQS, STS, IAM… 37 services) for integration tests and CI. Single static binary or Docker image; point any SDK at it with `AWS_ENDPOINT_URL=http://localhost:4566`. LocalStack/moto alternative with a 2.2 MB memory footprint, ~230ms cold-start startup, and 177x less memory than LocalStack. What it isn't: not an S3 client or sync tool.
 
 ## Quick Facts
 - **Memory Footprint**: ~1.9 MiB RSS at idle (17.7x lighter than MiniStack, 209x lighter than LocalStack)

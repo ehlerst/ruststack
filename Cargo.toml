@@ -47,7 +47,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["RustStack Contributors"]
 license = "Apache-2.0 OR MIT"
-repository = "https://github.com/ruststack/ruststack"
+repository = "https://github.com/ehlerst/ruststack"
 readme = "README.md"
 
 [workspace.dependencies]

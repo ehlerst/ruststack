@@ -150,7 +150,7 @@ jobs:
           password: ${{ secrets.DOCKER_TOKEN }}
           repository: ehlers320/ruststack
           readme-filepath: ./DOCKERHUB.md
-          short-description: "⚡ Ultra-fast local AWS emulator in Rust: 1.6MB memory, 500ms startup & 20x lighter than LocalStack"
+          short-description: "Local AWS emulator (37 services) for integration tests and CI. 2.2 MB RAM, ~230ms startup, 177x lighter than LocalStack."
 
   release:
     name: Create GitHub Release

@@ -2,20 +2,22 @@
 
 > **Blazing-fast local emulator for 37 AWS services in Rust: 2.2 MB idle memory footprint, ~230ms container cold start & up to 177x lighter than LocalStack.**
 
-[![CI](https://github.com/ruststack/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/ci.yml)
-[![Performance Benchmarks](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/benchmarks.yml)
-[![Resource & Startup Benchmark](https://github.com/ruststack/ruststack/actions/workflows/compare-alternatives.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/compare-alternatives.yml)
-[![Release](https://github.com/ruststack/ruststack/actions/workflows/release.yml/badge.svg)](https://github.com/ruststack/ruststack/actions/workflows/release.yml)
+[![CI](https://github.com/ehlerst/ruststack/actions/workflows/ci.yml/badge.svg)](https://github.com/ehlerst/ruststack/actions/workflows/ci.yml)
+[![Performance Benchmarks](https://github.com/ehlerst/ruststack/actions/workflows/benchmarks.yml/badge.svg)](https://github.com/ehlerst/ruststack/actions/workflows/benchmarks.yml)
+[![Resource & Startup Benchmark](https://github.com/ehlerst/ruststack/actions/workflows/compare-alternatives.yml/badge.svg)](https://github.com/ehlerst/ruststack/actions/workflows/compare-alternatives.yml)
+[![Release](https://github.com/ehlerst/ruststack/actions/workflows/release.yml/badge.svg)](https://github.com/ehlerst/ruststack/actions/workflows/release.yml)
 [![Docker Image](https://img.shields.io/badge/docker-ehlers320%2Fruststack-blue.svg)](https://hub.docker.com/r/ehlers320/ruststack)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](LICENSE)
 
-RustStack is an ultra-fast, lightweight local AWS cloud emulator designed for instant local development, automated integration testing, and sub-second CI/CD test runners. It is delivered as a single zero-dependency static binary with official multi-arch Docker images.
+RustStack is an ultra-fast, lightweight local AWS cloud emulator (LocalStack / Moto alternative) designed for instant local development, automated integration testing, and sub-second CI/CD test runners. It is delivered as a single zero-dependency static binary or multi-arch Docker image — point any AWS SDK or CLI at it with `AWS_ENDPOINT_URL=http://localhost:4566`.
+
+> **What it isn't:** RustStack is a local AWS cloud emulator — **not** an S3 client or sync tool (like `s5cmd` or `rclone`).
 
 ---
 
 ## ⚡ Resource & Startup Benchmark (RustStack vs MiniStack vs LocalStack)
 
-Continuous automated container startup time, idle memory footprint, and image size measured on GitHub Actions runners via [`Testcontainers/rust-measure-alternatives/`](file:///home/tim/git/ruststack/Testcontainers/rust-measure-alternatives/):
+Continuous automated container startup time, idle memory footprint, and image size measured on GitHub Actions runners via [`Testcontainers/rust-measure-alternatives/`](Testcontainers/rust-measure-alternatives/):
 
 | Local Cloud Stack | Docker Image | Image Size | Avg Startup Time | Min Startup Time | Idle Memory (RSS) | Idle CPU |
 |:---|:---|---:|---:|---:|---:|---:|
@@ -395,7 +397,11 @@ docker run -d --name ruststack -p 4566:4566 ehlers320/ruststack:latest
 
 ### Run Native Binary (Linux & macOS)
 ```bash
-# Build and run directly with cargo
+# Download static musl binary from GitHub Releases (Linux x86_64)
+curl -fsSL https://github.com/ehlerst/ruststack/releases/latest/download/ruststack-x86_64-unknown-linux-musl.tar.gz | tar xz
+./ruststack start --port 4566
+
+# Or build and run directly with cargo
 cargo run --release -p ruststack-server -- --port 4566
 ```
 
@@ -410,6 +416,68 @@ Native Windows targets are not supported directly. Windows users should use **WS
    cargo run --release -p ruststack-server -- --port 4566
    ```
 3. RustStack is immediately accessible from both WSL and Windows host at `http://localhost:4566`.
+
+---
+
+## 🤖 Use in GitHub Actions
+
+Point any AWS SDK (`boto3`, `aws-sdk-go-v2`, `@aws-sdk/client-*`, `aws-sdk-rust`) or the AWS CLI at RustStack by setting `AWS_ENDPOINT_URL=http://localhost:4566`.
+
+### Option 1: GitHub Actions Service Container
+```yaml
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    services:
+      ruststack:
+        image: ehlers320/ruststack:latest
+        ports:
+          - 4566:4566
+        options: >-
+          --health-cmd "wget -qO- http://localhost:4566/_ruststack/health || exit 1"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 5
+    env:
+      AWS_ENDPOINT_URL: http://localhost:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run integration tests against local AWS emulator
+        run: |
+          aws s3 mb s3://test-bucket
+          pytest
+```
+
+### Option 2: Single Static `musl` Binary (Zero Docker Overhead)
+Download the prebuilt static binary directly from [GitHub Releases](https://github.com/ehlerst/ruststack/releases) and start it in the background in ~10ms:
+```yaml
+jobs:
+  integration-test:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ENDPOINT_URL: http://localhost:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start RustStack static binary
+        run: |
+          curl -fsSL https://github.com/ehlerst/ruststack/releases/latest/download/ruststack-x86_64-unknown-linux-musl.tar.gz \
+            | sudo tar xz -C /usr/local/bin
+          ruststack start --port 4566 &
+          for i in $(seq 1 20); do
+            curl -sf http://localhost:4566/_ruststack/health && break
+            sleep 0.1
+          done
+
+      - name: Run integration tests
+        run: cargo test
+```
 
 ---
 
@@ -591,14 +659,14 @@ aws --endpoint-url=http://localhost:4566 pipes list-pipes
 RustStack is built from the ground up for sub-second, zero-dependency containerized integration tests using [Testcontainers](https://testcontainers.com):
 
 ### Go Testcontainers Example
-Explore [`Testcontainers/go-testcontainers/`](file:///home/tim/git/ruststack/Testcontainers/go-testcontainers/):
+Explore [`Testcontainers/go-testcontainers/`](Testcontainers/go-testcontainers/):
 ```bash
 cd Testcontainers/go-testcontainers
 go test -v .
 ```
 
 ### Rust Testcontainers Example
-Explore [`Testcontainers/rust-testcontainers/`](file:///home/tim/git/ruststack/Testcontainers/rust-testcontainers/):
+Explore [`Testcontainers/rust-testcontainers/`](Testcontainers/rust-testcontainers/):
 ```bash
 cd Testcontainers/rust-testcontainers
 cargo test -- --ignored --nocapture
