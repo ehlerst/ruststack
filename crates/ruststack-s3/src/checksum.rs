@@ -7,6 +7,7 @@ use sha2::Digest;
 pub enum ChecksumAlgorithm {
     Crc32,
     Crc32c,
+    Crc64nvme,
     Sha1,
     Sha256,
 }
@@ -17,6 +18,8 @@ impl ChecksumAlgorithm {
             Some(Self::Crc32)
         } else if s.eq_ignore_ascii_case("CRC32C") {
             Some(Self::Crc32c)
+        } else if s.eq_ignore_ascii_case("CRC64NVME") {
+            Some(Self::Crc64nvme)
         } else if s.eq_ignore_ascii_case("SHA1") || s.eq_ignore_ascii_case("SHA-1") {
             Some(Self::Sha1)
         } else if s.eq_ignore_ascii_case("SHA256") || s.eq_ignore_ascii_case("SHA-256") {
@@ -30,6 +33,7 @@ impl ChecksumAlgorithm {
         match self {
             Self::Crc32 => "CRC32",
             Self::Crc32c => "CRC32C",
+            Self::Crc64nvme => "CRC64NVME",
             Self::Sha1 => "SHA1",
             Self::Sha256 => "SHA256",
         }
@@ -39,9 +43,23 @@ impl ChecksumAlgorithm {
         match self {
             Self::Crc32 => "x-amz-checksum-crc32",
             Self::Crc32c => "x-amz-checksum-crc32c",
+            Self::Crc64nvme => "x-amz-checksum-crc64nvme",
             Self::Sha1 => "x-amz-checksum-sha1",
             Self::Sha256 => "x-amz-checksum-sha256",
         }
+    }
+
+    /// Resolve a trailer/header name such as `x-amz-checksum-crc64nvme` back to
+    /// its algorithm.
+    pub fn from_header_name(name: &str) -> Option<Self> {
+        let lower = name.to_ascii_lowercase();
+        Self::from_str_opt(
+            lower
+                .strip_prefix("x-amz-checksum-")
+                .unwrap_or(&lower)
+                .to_ascii_uppercase()
+                .as_str(),
+        )
     }
 }
 
@@ -111,6 +129,45 @@ pub fn compute_crc32c(data: &[u8]) -> u32 {
         crc = (crc >> 8) ^ CRC32C_TABLE[idx];
     }
     crc ^ 0xFFFF_FFFFu32
+}
+
+// -----------------------------------------------------------------------------
+// CRC-64/NVME (AWS CRT "CRC64NVME", NVM Express CRC-64)
+// -----------------------------------------------------------------------------
+// Reflected polynomial 0x9A6C9329AC4BC9B5 (normal form 0xAD93D23594C93659),
+// init/xorout all-ones, as implemented by the AWS CLI/SDK default integrity
+// uploads. Check value for b"123456789" is 0xAE8B14860A799888 (matches the
+// AWS CRT reference implementation `aws_checksums_crc64nvme`).
+const fn make_crc64nvme_table() -> [u64; 256] {
+    const REFLECTED_POLY: u64 = 0x9A6C_9329_AC4B_C9B5;
+    let mut table = [0u64; 256];
+    let mut i = 0;
+    while i < 256 {
+        let mut crc = i as u64;
+        let mut j = 0;
+        while j < 8 {
+            if (crc & 1) != 0 {
+                crc = (crc >> 1) ^ REFLECTED_POLY;
+            } else {
+                crc >>= 1;
+            }
+            j += 1;
+        }
+        table[i] = crc;
+        i += 1;
+    }
+    table
+}
+
+const CRC64NVME_TABLE: [u64; 256] = make_crc64nvme_table();
+
+pub fn compute_crc64nvme(data: &[u8]) -> u64 {
+    let mut crc = 0xFFFF_FFFF_FFFF_FFFFu64;
+    for &b in data {
+        let idx = ((crc ^ (b as u64)) & 0xFF) as usize;
+        crc = (crc >> 8) ^ CRC64NVME_TABLE[idx];
+    }
+    crc ^ 0xFFFF_FFFF_FFFF_FFFF
 }
 
 // -----------------------------------------------------------------------------
@@ -207,6 +264,7 @@ pub fn calculate_checksum(algorithm: ChecksumAlgorithm, data: &[u8]) -> String {
     match algorithm {
         ChecksumAlgorithm::Crc32 => engine.encode(compute_crc32(data).to_be_bytes()),
         ChecksumAlgorithm::Crc32c => engine.encode(compute_crc32c(data).to_be_bytes()),
+        ChecksumAlgorithm::Crc64nvme => engine.encode(compute_crc64nvme(data).to_be_bytes()),
         ChecksumAlgorithm::Sha1 => engine.encode(compute_sha1(data)),
         ChecksumAlgorithm::Sha256 => engine.encode(compute_sha256(data)),
     }
@@ -278,6 +336,27 @@ mod tests {
         assert_eq!(
             calculate_checksum(ChecksumAlgorithm::Crc32c, b"Hello world"),
             "crUfeA=="
+        );
+    }
+
+    #[test]
+    fn test_crc64nvme() {
+        // Check value from the CRC-64/NVME catalogue entry; also matches the
+        // AWS CRT reference (`awscrt.checksums.crc64nvme`).
+        assert_eq!(compute_crc64nvme(b"123456789"), 0xAE8B_1486_0A79_9888);
+        assert_eq!(compute_crc64nvme(b""), 0);
+        // Vector captured from an AWS CLI 2.x default integrity upload trailer.
+        assert_eq!(
+            calculate_checksum(ChecksumAlgorithm::Crc64nvme, b"Hello world"),
+            "OOJZ0D8xKts="
+        );
+        assert_eq!(
+            ChecksumAlgorithm::from_header_name("x-amz-checksum-crc64nvme"),
+            Some(ChecksumAlgorithm::Crc64nvme)
+        );
+        assert_eq!(
+            ChecksumAlgorithm::from_header_name("x-amz-meta-other"),
+            None
         );
     }
 

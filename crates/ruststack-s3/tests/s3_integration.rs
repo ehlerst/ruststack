@@ -504,3 +504,91 @@ async fn test_bucket_lifecycle_cors_policy_tagging() {
     let xml = String::from_utf8(body.to_vec()).unwrap();
     assert!(xml.contains("<Key>Environment</Key><Value>Development</Value>"));
 }
+
+// AWS CLI/SDK default integrity uploads (`aws s3 cp` on CLI >= 2.x) send the
+// payload with `aws-chunked` framing and a CRC64NVME trailer. These tests pin
+// the decoding seam at the handler level.
+async fn create_bucket(storage: Arc<dyn S3Storage>, name: &str) {
+    let req = Request::builder()
+        .method(Method::PUT)
+        .uri(format!("/{name}"))
+        .body(Body::empty())
+        .unwrap();
+    let resp = handle_s3_request(storage, req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn test_aws_chunked_put_stores_decoded_payload() {
+    let storage = setup_s3();
+    create_bucket(storage.clone(), "chunked-bucket").await;
+
+    // Framing exactly as sent by `aws s3 cp` (CLI 2.38, default integrity):
+    // 0x14-byte chunk + terminal chunk + CRC64NVME trailer of the payload.
+    let payload = b"model:\n  name: demo\n";
+    let framed: &[u8] =
+        b"14\r\nmodel:\n  name: demo\n\r\n0\r\nx-amz-checksum-crc64nvme:CawThgtYr8k=\r\n\r\n";
+    let req = Request::builder()
+        .method(Method::PUT)
+        .uri("/chunked-bucket/app-config.yaml")
+        .header("content-encoding", "aws-chunked")
+        .header("x-amz-content-sha256", "STREAMING-UNSIGNED-PAYLOAD-TRAILER")
+        .header("x-amz-decoded-content-length", payload.len().to_string())
+        .body(Body::from(framed.to_vec()))
+        .unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // The stored object must be the decoded payload, not the framing.
+    let req = Request::builder()
+        .method(Method::GET)
+        .uri("/chunked-bucket/app-config.yaml")
+        .body(Body::empty())
+        .unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = resp.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body.as_ref(), payload);
+}
+
+#[tokio::test]
+async fn test_aws_chunked_put_rejects_bad_trailer_checksum() {
+    let storage = setup_s3();
+    create_bucket(storage.clone(), "chunked-bucket-2").await;
+
+    let framed: &[u8] = b"5\r\nHello\r\n0\r\nx-amz-checksum-crc64nvme:AAAAAAAAAAA=\r\n\r\n";
+    let req = Request::builder()
+        .method(Method::PUT)
+        .uri("/chunked-bucket-2/bad.yaml")
+        .header("content-encoding", "aws-chunked")
+        .body(Body::from(framed.to_vec()))
+        .unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+
+    // The object must not have been stored.
+    let req = Request::builder()
+        .method(Method::HEAD)
+        .uri("/chunked-bucket-2/bad.yaml")
+        .body(Body::empty())
+        .unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_aws_chunked_put_rejects_decoded_length_mismatch() {
+    let storage = setup_s3();
+    create_bucket(storage.clone(), "chunked-bucket-3").await;
+
+    let framed: &[u8] = b"5\r\nHello\r\n0\r\n";
+    let req = Request::builder()
+        .method(Method::PUT)
+        .uri("/chunked-bucket-3/len.yaml")
+        .header("content-encoding", "aws-chunked")
+        .header("x-amz-decoded-content-length", "99")
+        .body(Body::from(framed.to_vec()))
+        .unwrap();
+    let resp = handle_s3_request(storage.clone(), req).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+}

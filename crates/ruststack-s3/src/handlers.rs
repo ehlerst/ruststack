@@ -1,3 +1,4 @@
+use crate::chunked::{decode_aws_chunked, verify_trailer_checksums};
 use crate::storage::S3Storage;
 use crate::types::ByteRange;
 use crate::xml;
@@ -21,6 +22,16 @@ pub async fn handle_s3_request(storage: Arc<dyn S3Storage>, req: Request<Body>) 
         Err(e) => {
             return make_s3_error_response(&RustStackError::BadRequest(e.to_string()), &request_id);
         }
+    };
+
+    // AWS CLI/SDK uploads with default integrity protection send the payload
+    // with `aws-chunked` framing (`Content-Encoding: aws-chunked` or a
+    // `STREAMING-*-PAYLOAD*` content hash). Decode the framing and verify the
+    // trailing checksums before the body reaches storage, otherwise the
+    // framing and trailer would be stored as object data.
+    let body_bytes = match maybe_decode_aws_chunked(&headers, body_bytes) {
+        Ok(bytes) => bytes,
+        Err(err) => return make_s3_error_response(&err, &request_id),
     };
 
     let (bucket_opt, key_opt) = extract_bucket_and_key(&uri, &headers);
@@ -88,6 +99,57 @@ fn parse_query(query_opt: Option<&str>) -> HashMap<String, String> {
         }
     }
     map
+}
+
+/// Decodes `aws-chunked` request bodies when the request indicates a
+/// streaming upload (`Content-Encoding: aws-chunked` or an
+/// `x-amz-content-sha256: STREAMING-*` payload hash). Plain bodies are
+/// returned unchanged.
+fn maybe_decode_aws_chunked(headers: &HeaderMap, body: Bytes) -> Result<Bytes, RustStackError> {
+    let content_encoding = headers
+        .get("content-encoding")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+    let content_sha256 = headers
+        .get("x-amz-content-sha256")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    let is_aws_chunked = content_encoding
+        .split(',')
+        .any(|token| token.trim().eq_ignore_ascii_case("aws-chunked"))
+        || content_sha256.starts_with("STREAMING-");
+    if !is_aws_chunked {
+        return Ok(body);
+    }
+
+    let (payload, trailers) = decode_aws_chunked(&body)?;
+
+    if let Some(decoded_len) = headers
+        .get("x-amz-decoded-content-length")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.parse::<u64>().ok())
+    {
+        if decoded_len != payload.len() as u64 {
+            return Err(RustStackError::s3_bad_request(
+                "InvalidRequest",
+                format!(
+                    "x-amz-decoded-content-length ({decoded_len}) does not match the decoded payload size ({})",
+                    payload.len()
+                ),
+            ));
+        }
+    }
+
+    verify_trailer_checksums(&payload, &trailers)?;
+
+    if let Some((name, _)) = trailers.first() {
+        if name.starts_with("x-amz-checksum-") {
+            tracing::debug!(algorithm = %name, "verified aws-chunked trailer checksum");
+        }
+    }
+
+    Ok(payload)
 }
 
 #[allow(clippy::too_many_arguments)]
