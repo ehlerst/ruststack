@@ -13,7 +13,7 @@ fn sqs_send_receive_bench(c: &mut Criterion) {
         "000000000000".to_string(),
         "us-east-1".to_string(),
     ));
-    let queue_url = engine.create_queue("bench-queue", None).unwrap();
+    let queue_url = engine.create_queue("bench-queue", None, None).unwrap();
 
     // 1. Single SendMessage
     group.throughput(Throughput::Elements(1));
@@ -70,7 +70,7 @@ fn sqs_send_receive_bench(c: &mut Criterion) {
     });
 
     // 4. FIFO Send with Deduplication
-    let fifo_url = engine.create_queue("bench-fifo.fifo", None).unwrap();
+    let fifo_url = engine.create_queue("bench-fifo.fifo", None, None).unwrap();
 
     group.throughput(Throughput::Elements(1));
     group.bench_function("send_message_fifo", |b| {

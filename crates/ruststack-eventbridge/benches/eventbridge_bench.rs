@@ -21,7 +21,7 @@ fn eventbridge_put_events_benchmark(c: &mut Criterion) {
         "us-east-1".to_string(),
     );
 
-    let queue_url = sqs.create_queue("target-queue", None).unwrap();
+    let queue_url = sqs.create_queue("target-queue", None, None).unwrap();
     let queue_attrs = sqs
         .get_queue_attributes(&queue_url, &["QueueArn".to_string()])
         .unwrap();

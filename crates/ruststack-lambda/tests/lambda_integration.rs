@@ -94,7 +94,7 @@ async fn test_lambda_active_sqs_event_source_poller() {
     state.create_function(create_req).unwrap();
 
     // 2. Create SQS Queue
-    let queue_url = sqs.create_queue("work-items", None).unwrap();
+    let queue_url = sqs.create_queue("work-items", None, None).unwrap();
     let queue_arn = "arn:aws:sqs:us-east-1:000000000000:work-items";
 
     // 3. Create EventSourceMapping

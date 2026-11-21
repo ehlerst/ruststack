@@ -9,6 +9,47 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 
+/// Queue-URL host as the requesting client sees the emulator (Host
+/// header), so CreateQueue/GetQueueUrl return URLs usable from inside
+/// containers and non-default ports instead of a hardcoded
+/// localhost:4566.
+fn url_base_from_headers(headers: &HeaderMap) -> Option<String> {
+    let host = headers
+        .get("host")
+        .and_then(|v| v.to_str().ok())
+        .filter(|h| !h.is_empty())?;
+    Some(format!("http://{}", host))
+}
+
+/// MessageAttributes member of a SendMessage(SendMessageBatch) JSON
+/// request entry.
+fn parse_json_message_attributes(item: &Value) -> HashMap<String, MessageAttributeValue> {
+    let mut msg_attrs = HashMap::new();
+    if let Some(obj) = item.get("MessageAttributes").and_then(|v| v.as_object()) {
+        for (k, v) in obj {
+            if let Some(data_type) = v.get("DataType").and_then(|d| d.as_str()) {
+                let str_val = v
+                    .get("StringValue")
+                    .and_then(|s| s.as_str())
+                    .map(|s| s.to_string());
+                let bin_val = v
+                    .get("BinaryValue")
+                    .and_then(|b| b.as_str())
+                    .map(|s| s.to_string());
+                msg_attrs.insert(
+                    k.clone(),
+                    MessageAttributeValue {
+                        data_type: data_type.to_string(),
+                        string_value: str_val,
+                        binary_value: bin_val,
+                    },
+                );
+            }
+        }
+    }
+    msg_attrs
+}
+
 pub async fn handle_sqs_request(engine: Arc<SqsEngine>, req: Request<Body>) -> Response<Body> {
     let request_id = uuid::Uuid::new_v4().to_string();
     let (parts, body) = req.into_parts();
@@ -79,6 +120,7 @@ async fn handle_sqs_json(
         .and_then(|v| v.to_str().ok())
         .unwrap_or("");
     let action = target.strip_prefix("AmazonSQS.").unwrap_or(target);
+    let url_base = url_base_from_headers(headers);
 
     let json_val: Value = if body.is_empty() {
         serde_json::json!({})
@@ -106,7 +148,7 @@ async fn handle_sqs_json(
                 }
             }
 
-            let queue_url = engine.create_queue(name, Some(attrs))?;
+            let queue_url = engine.create_queue(name, Some(attrs), url_base.as_deref())?;
             let resp_json = codec::json_create_queue_response(&queue_url);
             make_json_response(resp_json, StatusCode::OK)
         }
@@ -121,14 +163,14 @@ async fn handle_sqs_json(
                         "The request must contain the parameter QueueName.",
                     )
                 })?;
-            let queue_url = engine.get_queue_url(name)?;
+            let queue_url = engine.get_queue_url(name, url_base.as_deref())?;
             let resp_json = codec::json_get_queue_url_response(&queue_url);
             make_json_response(resp_json, StatusCode::OK)
         }
 
         "ListQueues" => {
             let prefix = json_val.get("QueueNamePrefix").and_then(|v| v.as_str());
-            let list = engine.list_queues(prefix)?;
+            let list = engine.list_queues(prefix, url_base.as_deref())?;
             let resp_json = codec::json_list_queues_response(&list);
             make_json_response(resp_json, StatusCode::OK)
         }
@@ -254,42 +296,24 @@ async fn handle_sqs_json(
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string());
 
-            let mut msg_attrs = HashMap::new();
-            if let Some(obj) = json_val
-                .get("MessageAttributes")
-                .and_then(|v| v.as_object())
-            {
-                for (k, v) in obj {
-                    if let Some(data_type) = v.get("DataType").and_then(|d| d.as_str()) {
-                        let str_val = v
-                            .get("StringValue")
-                            .and_then(|s| s.as_str())
-                            .map(|s| s.to_string());
-                        let bin_val = v
-                            .get("BinaryValue")
-                            .and_then(|b| b.as_str())
-                            .map(|s| s.to_string());
-                        msg_attrs.insert(
-                            k.clone(),
-                            MessageAttributeValue {
-                                data_type: data_type.to_string(),
-                                string_value: str_val,
-                                binary_value: bin_val,
-                            },
-                        );
-                    }
-                }
-            }
+            let msg_attrs = parse_json_message_attributes(&json_val);
 
             let (msg_id, md5, seq) = engine.send_message(
                 queue_url,
                 body,
                 delay_seconds,
-                Some(msg_attrs),
+                Some(msg_attrs.clone()),
                 msg_group_id,
                 msg_dedup_id,
             )?;
-            let resp_json = codec::json_send_message_response(&msg_id, &md5, seq.as_deref());
+            let attrs_md5 = (!msg_attrs.is_empty())
+                .then(|| SqsEngine::calculate_message_attributes_md5(&msg_attrs));
+            let resp_json = codec::json_send_message_response(
+                &msg_id,
+                &md5,
+                seq.as_deref(),
+                attrs_md5.as_deref(),
+            );
             make_json_response(resp_json, StatusCode::OK)
         }
 
@@ -328,12 +352,13 @@ async fn handle_sqs_json(
                         .get("MessageDeduplicationId")
                         .and_then(|v| v.as_str())
                         .map(|s| s.to_string());
+                    let msg_attrs = parse_json_message_attributes(item);
 
                     entries.push(SendMessageBatchEntry {
                         id,
                         message_body: msg_body,
                         delay_seconds: delay,
-                        message_attributes: None,
+                        message_attributes: (!msg_attrs.is_empty()).then_some(msg_attrs),
                         message_group_id: group,
                         message_deduplication_id: dedup,
                     });
@@ -526,10 +551,11 @@ async fn handle_sqs_query(
     engine: &SqsEngine,
     _method: &Method,
     uri: &Uri,
-    _headers: &HeaderMap,
+    headers: &HeaderMap,
     body: &[u8],
     request_id: &str,
 ) -> Result<Response<Body>, RustStackError> {
+    let url_base = url_base_from_headers(headers);
     let mut params = HashMap::new();
 
     // Parse query string
@@ -584,7 +610,7 @@ async fn handle_sqs_query(
                 }
             }
 
-            let created_url = engine.create_queue(name, Some(attrs))?;
+            let created_url = engine.create_queue(name, Some(attrs), url_base.as_deref())?;
             let xml_body = codec::xml_create_queue_response(&created_url, request_id);
             make_xml_response(xml_body, StatusCode::OK, request_id)
         }
@@ -596,14 +622,14 @@ async fn handle_sqs_query(
                     "The request must contain the parameter QueueName.",
                 )
             })?;
-            let q_url = engine.get_queue_url(name)?;
+            let q_url = engine.get_queue_url(name, url_base.as_deref())?;
             let xml_body = codec::xml_get_queue_url_response(&q_url, request_id);
             make_xml_response(xml_body, StatusCode::OK, request_id)
         }
 
         "ListQueues" => {
             let prefix = params.get("QueueNamePrefix").map(|s| s.as_str());
-            let list = engine.list_queues(prefix)?;
+            let list = engine.list_queues(prefix, url_base.as_deref())?;
             let xml_body = codec::xml_list_queues_response(&list, request_id);
             make_xml_response(xml_body, StatusCode::OK, request_id)
         }
@@ -694,13 +720,20 @@ async fn handle_sqs_query(
                 &queue_url,
                 body_str,
                 delay_seconds,
-                Some(msg_attrs),
+                Some(msg_attrs.clone()),
                 msg_group_id,
                 msg_dedup_id,
             )?;
+            let attrs_md5 = (!msg_attrs.is_empty())
+                .then(|| SqsEngine::calculate_message_attributes_md5(&msg_attrs));
 
-            let xml_body =
-                codec::xml_send_message_response(&msg_id, &md5, seq.as_deref(), request_id);
+            let xml_body = codec::xml_send_message_response(
+                &msg_id,
+                &md5,
+                seq.as_deref(),
+                attrs_md5.as_deref(),
+                request_id,
+            );
             make_xml_response(xml_body, StatusCode::OK, request_id)
         }
 
@@ -719,11 +752,40 @@ async fn handle_sqs_query(
                     let group = params.get(&group_key).cloned();
                     let dedup = params.get(&dedup_key).cloned();
 
+                    let mut msg_attrs = HashMap::new();
+                    for j in 1..=10 {
+                        let attr_name_key = format!(
+                            "SendMessageBatchRequestEntry.{}.MessageAttribute.{}.Name",
+                            i, j
+                        );
+                        let attr_dt_key = format!(
+                            "SendMessageBatchRequestEntry.{}.MessageAttribute.{}.Value.DataType",
+                            i, j
+                        );
+                        let attr_str_key = format!(
+                            "SendMessageBatchRequestEntry.{}.MessageAttribute.{}.Value.StringValue",
+                            i, j
+                        );
+                        if let (Some(k), Some(dt)) =
+                            (params.get(&attr_name_key), params.get(&attr_dt_key))
+                        {
+                            let str_val = params.get(&attr_str_key).cloned();
+                            msg_attrs.insert(
+                                k.clone(),
+                                MessageAttributeValue {
+                                    data_type: dt.clone(),
+                                    string_value: str_val,
+                                    binary_value: None,
+                                },
+                            );
+                        }
+                    }
+
                     entries.push(SendMessageBatchEntry {
                         id: id.clone(),
                         message_body: msg_body.clone(),
                         delay_seconds: delay,
-                        message_attributes: None,
+                        message_attributes: (!msg_attrs.is_empty()).then_some(msg_attrs),
                         message_group_id: group,
                         message_deduplication_id: dedup,
                     });

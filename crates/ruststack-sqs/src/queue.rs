@@ -3,6 +3,7 @@ use crate::types::{
     MessageAttributeValue, QueueAttributes, QueueSnapshot, SendMessageBatchEntry,
     SendMessageBatchResultEntry, SqsMessage, SqsMessageSnapshot, SqsSnapshot,
 };
+use base64::Engine;
 use chrono::Utc;
 use dashmap::DashMap;
 use md5::{Digest, Md5};
@@ -27,8 +28,13 @@ pub struct QueueState {
 }
 
 impl QueueState {
-    pub fn new(name: String, account_id: &str, region: &str, attributes: QueueAttributes) -> Self {
-        let url = format!("http://localhost:4566/{}/{}", account_id, name);
+    pub fn new(
+        name: String,
+        account_id: &str,
+        region: &str,
+        attributes: QueueAttributes,
+        url: String,
+    ) -> Self {
         let arn = format!("arn:aws:sqs:{}:{}:{}", region, account_id, name);
         Self {
             name,
@@ -66,10 +72,58 @@ impl SqsEngine {
         }
     }
 
+    const DEFAULT_URL_BASE: &str = "http://localhost:4566";
+
     fn calculate_md5(data: &str) -> String {
         let mut hasher = Md5::new();
         hasher.update(data.as_bytes());
         hex::encode(hasher.finalize())
+    }
+
+    /// MD5OfMessageAttributes: SQS's canonical message-attribute digest
+    /// (attributes sorted by name; for each, 4-byte big-endian length +
+    /// name, then length + DataType, then transport type 1 = String /
+    /// 2 = Binary, then length + value bytes). Returned by SendMessage /
+    /// SendMessageBatch whenever the message carries attributes.
+    pub fn calculate_message_attributes_md5(
+        attrs: &HashMap<String, MessageAttributeValue>,
+    ) -> String {
+        let mut hasher = Md5::new();
+        let mut names: Vec<&String> = attrs.keys().collect();
+        names.sort();
+        for name in names {
+            let value = &attrs[name];
+            hasher.update((name.len() as u32).to_be_bytes());
+            hasher.update(name.as_bytes());
+            hasher.update((value.data_type.len() as u32).to_be_bytes());
+            hasher.update(value.data_type.as_bytes());
+            if let Some(s) = &value.string_value {
+                hasher.update([1u8]);
+                hasher.update((s.len() as u32).to_be_bytes());
+                hasher.update(s.as_bytes());
+            } else if let Some(b) = &value.binary_value {
+                hasher.update([2u8]);
+                let bytes = base64::engine::general_purpose::STANDARD
+                    .decode(b)
+                    .unwrap_or_default();
+                hasher.update((bytes.len() as u32).to_be_bytes());
+                hasher.update(&bytes);
+            }
+        }
+        hex::encode(hasher.finalize())
+    }
+
+    /// Queue URL for `name` as seen from `url_base` (the requesting
+    /// client's Host header), so SDKs pointed at any emulator host/port
+    /// keep working against the URLs CreateQueue/GetQueueUrl return.
+    fn url_for(&self, url_base: Option<&str>, name: &str) -> String {
+        let base = url_base.unwrap_or(Self::DEFAULT_URL_BASE);
+        format!(
+            "{}/{}/{}",
+            base.trim_end_matches('/'),
+            self.account_id,
+            name
+        )
     }
 
     pub fn resolve_queue_name(&self, queue_identifier: &str) -> String {
@@ -139,6 +193,7 @@ impl SqsEngine {
         &self,
         name: &str,
         attributes: Option<HashMap<String, String>>,
+        url_base: Option<&str>,
     ) -> Result<String, RustStackError> {
         let mut queue_attrs = QueueAttributes::default();
         if name.ends_with(".fifo") {
@@ -180,14 +235,16 @@ impl SqsEngine {
         if self.queues.contains_key(name) {
             let q = self.queues.get(name).unwrap();
             let state = q.lock();
-            return Ok(state.url.clone());
+            return Ok(self.url_for(url_base, &state.name));
         }
 
+        let url = self.url_for(url_base, name);
         let state = QueueState::new(
             name.to_string(),
             &self.account_id,
             &self.region,
             queue_attrs,
+            url.clone(),
         );
         let url = state.url.clone();
         self.queues
@@ -207,7 +264,11 @@ impl SqsEngine {
         Ok(())
     }
 
-    pub fn get_queue_url(&self, queue_name: &str) -> Result<String, RustStackError> {
+    pub fn get_queue_url(
+        &self,
+        queue_name: &str,
+        url_base: Option<&str>,
+    ) -> Result<String, RustStackError> {
         let name = self.resolve_queue_name(queue_name);
         let q = self.queues.get(&name).ok_or_else(|| {
             RustStackError::sqs_not_found(
@@ -216,19 +277,23 @@ impl SqsEngine {
             )
         })?;
         let state = q.lock();
-        Ok(state.url.clone())
+        Ok(self.url_for(url_base, &state.name))
     }
 
-    pub fn list_queues(&self, prefix: Option<&str>) -> Result<Vec<String>, RustStackError> {
+    pub fn list_queues(
+        &self,
+        prefix: Option<&str>,
+        url_base: Option<&str>,
+    ) -> Result<Vec<String>, RustStackError> {
         let mut urls = Vec::new();
         for item in self.queues.iter() {
             let state = item.value().lock();
             if let Some(p) = prefix {
                 if state.name.starts_with(p) {
-                    urls.push(state.url.clone());
+                    urls.push(self.url_for(url_base, &state.name));
                 }
             } else {
-                urls.push(state.url.clone());
+                urls.push(self.url_for(url_base, &state.name));
             }
         }
         urls.sort();
@@ -527,6 +592,9 @@ impl SqsEngine {
         let errors = Vec::new();
 
         for entry in entries {
+            let attrs_md5 = entry.message_attributes.as_ref().and_then(|attrs| {
+                (!attrs.is_empty()).then(|| Self::calculate_message_attributes_md5(attrs))
+            });
             if let Ok((msg_id, md5, seq)) = self.send_message(
                 queue_id,
                 entry.message_body,
@@ -539,6 +607,7 @@ impl SqsEngine {
                     id: entry.id,
                     message_id: msg_id,
                     md5_of_message_body: md5,
+                    md5_of_message_attributes: attrs_md5,
                     sequence_number: seq,
                 });
             }
@@ -570,9 +639,13 @@ impl SqsEngine {
 
         let max_msgs = max_number_of_messages.clamp(1, 10) as usize;
         let start = Instant::now();
+        let deadline = start + wait_time;
 
         loop {
-            {
+            // Delayed messages become visible mid-poll (e.g. queue-level
+            // DelaySeconds + a long-poll ReceiveMessage): wake at the
+            // earliest such message, not only on new sends.
+            let next_visible: Option<Instant> = {
                 let mut state = q.lock();
                 self.process_expired_in_flight(&mut state);
 
@@ -614,16 +687,28 @@ impl SqsEngine {
                 if !result.is_empty() {
                     return Ok(result);
                 }
-            }
 
-            if wait_time.is_zero() || start.elapsed() >= wait_time {
+                state
+                    .messages
+                    .iter()
+                    .filter(|m| m.visible_at > now)
+                    .map(|m| m.visible_at)
+                    .min()
+            };
+
+            if wait_time.is_zero() || Instant::now() >= deadline {
                 break;
             }
 
-            let remaining = wait_time.saturating_sub(start.elapsed());
+            let wake_at = next_visible.unwrap_or(deadline).min(deadline);
+            let sleep_for = wake_at.saturating_duration_since(Instant::now());
+            if sleep_for.is_zero() {
+                continue;
+            }
+
             tokio::select! {
                 _ = notify.notified() => {},
-                _ = tokio::time::sleep(remaining) => break,
+                _ = tokio::time::sleep(sleep_for) => {},
             }
         }
 
@@ -819,5 +904,73 @@ impl SqsEngine {
             self.queues
                 .insert(q_snap.name.clone(), Arc::new(Mutex::new(state)));
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolve_queue_name_accepts_aws_queue_url_shapes() {
+        let engine = SqsEngine::new("000000000000".to_string(), "us-east-1".to_string());
+        assert_eq!(
+            engine.resolve_queue_name(
+                "https://sqs.us-west-2.amazonaws.com/123456789012/example-orders-queue"
+            ),
+            "example-orders-queue"
+        );
+        assert_eq!(
+            engine.resolve_queue_name("http://localhost:4566/000000000000/example-orders-queue"),
+            "example-orders-queue"
+        );
+        assert_eq!(
+            engine.resolve_queue_name("arn:aws:sqs:us-east-1:000000000000:example-orders-queue"),
+            "example-orders-queue"
+        );
+    }
+
+    #[test]
+    fn message_attributes_md5_matches_the_aws_canonical_digest() {
+        // Reference digests computed with an independent implementation of
+        // the AWS algorithm: attributes sorted by name; per attribute
+        // 4-byte big-endian length + name, then length + DataType, then
+        // transport byte (0x01 String / 0x02 Binary) + length + value.
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "traceId".to_string(),
+            MessageAttributeValue {
+                data_type: "String".to_string(),
+                string_value: Some("11111111-2222-3333-4444-555555555555".to_string()),
+                binary_value: None,
+            },
+        );
+        assert_eq!(
+            SqsEngine::calculate_message_attributes_md5(&attrs),
+            "eb46854758ae9fa2188a8b4300fecb6a"
+        );
+
+        // Sorted-name order matters: {a,b} vs {b,a} must digest the same.
+        let mut attrs = HashMap::new();
+        attrs.insert(
+            "b".to_string(),
+            MessageAttributeValue {
+                data_type: "String".to_string(),
+                string_value: Some("two".to_string()),
+                binary_value: None,
+            },
+        );
+        attrs.insert(
+            "a".to_string(),
+            MessageAttributeValue {
+                data_type: "String".to_string(),
+                string_value: Some("one".to_string()),
+                binary_value: None,
+            },
+        );
+        assert_eq!(
+            SqsEngine::calculate_message_attributes_md5(&attrs),
+            "dbe5cf7779eae4bb2d740e3abd1670b1"
+        );
     }
 }

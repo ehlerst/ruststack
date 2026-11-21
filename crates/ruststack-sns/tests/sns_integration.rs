@@ -168,8 +168,8 @@ async fn test_sns_raw_message_delivery_and_filter_policy() {
     let (sns, sqs) = setup_sns_and_sqs();
 
     // Create 2 queues: queue_eu and queue_us
-    let q_eu = sqs.create_queue("queue-eu", None).unwrap();
-    let q_us = sqs.create_queue("queue-us", None).unwrap();
+    let q_eu = sqs.create_queue("queue-eu", None, None).unwrap();
+    let q_us = sqs.create_queue("queue-us", None, None).unwrap();
 
     let topic_arn = sns.create_topic("regional-events", None).unwrap();
 

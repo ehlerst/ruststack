@@ -99,6 +99,7 @@ pub fn xml_send_message_response(
     message_id: &str,
     md5: &str,
     seq: Option<&str>,
+    attrs_md5: Option<&str>,
     request_id: &str,
 ) -> String {
     let seq_tag = if let Some(s) = seq {
@@ -109,12 +110,20 @@ pub fn xml_send_message_response(
     } else {
         String::new()
     };
+    let attrs_md5_tag = attrs_md5
+        .map(|m| {
+            format!(
+                "\n        <MD5OfMessageAttributes>{}</MD5OfMessageAttributes>",
+                quick_xml::escape::escape(m)
+            )
+        })
+        .unwrap_or_default();
 
     format!(
         r#"<?xml version="1.0"?>
 <SendMessageResponse xmlns="http://queue.amazonaws.com/doc/2012-11-05/">
     <SendMessageResult>
-        <MD5OfMessageBody>{}</MD5OfMessageBody>
+        <MD5OfMessageBody>{}</MD5OfMessageBody>{}
         <MessageId>{}</MessageId>{}
     </SendMessageResult>
     <ResponseMetadata>
@@ -122,6 +131,7 @@ pub fn xml_send_message_response(
     </ResponseMetadata>
 </SendMessageResponse>"#,
         quick_xml::escape::escape(md5),
+        attrs_md5_tag,
         quick_xml::escape::escape(message_id),
         seq_tag,
         quick_xml::escape::escape(request_id)
@@ -147,17 +157,28 @@ pub fn xml_send_message_batch_response(
         } else {
             String::new()
         };
+        let attrs_md5_tag = s
+            .md5_of_message_attributes
+            .as_deref()
+            .map(|m| {
+                format!(
+                    "\n            <MD5OfMessageAttributes>{}</MD5OfMessageAttributes>",
+                    quick_xml::escape::escape(m)
+                )
+            })
+            .unwrap_or_default();
 
         xml.push_str(&format!(
             r#"
         <SendMessageBatchResultEntry>
             <Id>{}</Id>
             <MessageId>{}</MessageId>
-            <MD5OfMessageBody>{}</MD5OfMessageBody>{}
+            <MD5OfMessageBody>{}</MD5OfMessageBody>{}{}
         </SendMessageBatchResultEntry>"#,
             quick_xml::escape::escape(&s.id),
             quick_xml::escape::escape(&s.message_id),
             quick_xml::escape::escape(&s.md5_of_message_body),
+            attrs_md5_tag,
             seq_tag
         ));
     }
@@ -378,11 +399,17 @@ pub fn json_send_message_response(
     message_id: &str,
     md5: &str,
     seq: Option<&str>,
+    attrs_md5: Option<&str>,
 ) -> serde_json::Value {
     let mut val = json!({
         "MessageId": message_id,
         "MD5OfMessageBody": md5
     });
+    if let Some(m) = attrs_md5 {
+        val.as_object_mut()
+            .unwrap()
+            .insert("MD5OfMessageAttributes".to_string(), json!(m));
+    }
     if let Some(s) = seq {
         val.as_object_mut()
             .unwrap()
@@ -403,6 +430,11 @@ pub fn json_send_message_batch_response(
                 "MessageId": s.message_id,
                 "MD5OfMessageBody": s.md5_of_message_body
             });
+            if let Some(ref m) = s.md5_of_message_attributes {
+                o.as_object_mut()
+                    .unwrap()
+                    .insert("MD5OfMessageAttributes".to_string(), json!(m));
+            }
             if let Some(ref seq) = s.sequence_number {
                 o.as_object_mut()
                     .unwrap()

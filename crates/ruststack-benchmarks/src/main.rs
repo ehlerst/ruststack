@@ -278,7 +278,7 @@ pub fn run_sqs_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
         "000000000000".to_string(),
         "us-east-1".to_string(),
     ));
-    let queue_url = engine.create_queue("bench-queue", None).unwrap();
+    let queue_url = engine.create_queue("bench-queue", None, None).unwrap();
 
     // 1. SendMessage Single
     let mut latencies = Vec::with_capacity(iterations);
@@ -363,7 +363,7 @@ pub fn run_sqs_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     ));
 
     // 4. FIFO Send with Deduplication
-    let fifo_url = engine.create_queue("bench-fifo.fifo", None).unwrap();
+    let fifo_url = engine.create_queue("bench-fifo.fifo", None, None).unwrap();
     let mut latencies = Vec::with_capacity(iterations);
     let start_total = Instant::now();
     for i in 0..iterations {
@@ -436,7 +436,9 @@ pub fn run_sns_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
     // 2. Publish with 5 SQS Queues Fanout
     let fanout_topic = sns.create_topic("fanout-topic", None).unwrap();
     for i in 0..5 {
-        let q = sqs.create_queue(&format!("fanout-q-{}", i), None).unwrap();
+        let q = sqs
+            .create_queue(&format!("fanout-q-{}", i), None, None)
+            .unwrap();
         sns.subscribe(&fanout_topic, "sqs", &q, None).unwrap();
     }
 
@@ -487,7 +489,7 @@ pub fn run_eventbridge_benchmarks(iterations: usize) -> Vec<BenchmarkResult> {
         "us-east-1".to_string(),
     );
 
-    let queue_url = sqs.create_queue("eb-target-queue", None).unwrap();
+    let queue_url = sqs.create_queue("eb-target-queue", None, None).unwrap();
     let queue_attrs = sqs
         .get_queue_attributes(&queue_url, &["QueueArn".to_string()])
         .unwrap();

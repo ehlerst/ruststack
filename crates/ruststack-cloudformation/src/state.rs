@@ -187,7 +187,7 @@ impl CloudFormationState {
                             .map(String::from)
                             .unwrap_or_else(|| format!("{}-{}", stack_name, logical_id));
                         if let Some(sqs) = self.sqs_engine.read().clone() {
-                            let _ = sqs.create_queue(&q_name, Some(HashMap::new()));
+                            let _ = sqs.create_queue(&q_name, Some(HashMap::new()), None);
                         }
                         format!(
                             "https://sqs.{}.amazonaws.com/{}/{}",

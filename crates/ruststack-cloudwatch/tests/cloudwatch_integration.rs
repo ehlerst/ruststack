@@ -122,7 +122,7 @@ async fn test_cloudwatch_alarm_action_sns_notification() {
     cw_state.set_sns_engine(sns.clone());
 
     // 1. Create SQS Queue and SNS Topic, and subscribe
-    let queue_url = sqs.create_queue("alarm-notifications", None).unwrap();
+    let queue_url = sqs.create_queue("alarm-notifications", None, None).unwrap();
     let topic_arn = sns.create_topic("ops-alerts", None).unwrap();
     sns.subscribe(&topic_arn, "sqs", &queue_url, None).unwrap();
 

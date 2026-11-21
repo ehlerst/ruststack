@@ -15,7 +15,7 @@ fn sns_publish_benchmark(c: &mut Criterion) {
     );
 
     let topic_arn = sns.create_topic("bench-topic", None).unwrap();
-    let queue_url = sqs.create_queue("bench-queue", None).unwrap();
+    let queue_url = sqs.create_queue("bench-queue", None, None).unwrap();
     sns.subscribe(&topic_arn, "sqs", &queue_url, None).unwrap();
 
     let mut group = c.benchmark_group("sns_operations");

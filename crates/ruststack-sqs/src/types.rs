@@ -73,6 +73,8 @@ pub struct SendMessageBatchResultEntry {
     pub id: String,
     pub message_id: String,
     pub md5_of_message_body: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub md5_of_message_attributes: Option<String>,
     pub sequence_number: Option<String>,
 }
 
