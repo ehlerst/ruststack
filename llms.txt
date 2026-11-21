@@ -3,11 +3,12 @@
 > RustStack is a local AWS emulator (S3, DynamoDB, SQS, STS, IAM… 37 services) for integration tests and CI. Single static binary or Docker image; point any SDK at it with `AWS_ENDPOINT_URL=http://localhost:4566`. LocalStack/moto alternative with a 2.2 MB memory footprint, ~230ms cold-start startup, and 177x less memory than LocalStack. What it isn't: not an S3 client or sync tool.
 
 ## Quick Facts
-- **Memory Footprint**: ~1.9 MiB RSS at idle (17.7x lighter than MiniStack, 209x lighter than LocalStack)
-- **Startup Time**: ~200ms cold start
-- **Docker Image**: `ehlers320/ruststack:latest` (~30.7 MB multi-arch Linux & macOS)
-- **Default Endpoint**: `http://localhost:4566` (Single port multiplexer)
+- **Binary & Image Size**: **6.4 MB** compressed `.tar.gz` (**16 MB** extracted static binary — **~62x smaller** than `aws/aws-emulator`'s ~996 MB extracted binary), or **38.0 MB** multi-arch Docker image (`ehlers320/ruststack:latest`, 31.7x smaller than LocalStack)
+- **Memory Footprint**: ~2.2 MiB RSS at idle (15.3x lighter than MiniStack, 177.9x lighter than LocalStack)
+- **Startup Time**: ~230ms container cold start (~10ms native static binary)
+- **Default Endpoint**: `http://localhost:4566` (Single-port HTTP multiplexer; drop-in LocalStack parity with zero self-signed TLS cert setup)
 - **AWS Credentials**: Dummy credentials accepted (`AWS_ACCESS_KEY_ID=test`, `AWS_SECRET_ACCESS_KEY=test`, `AWS_DEFAULT_REGION=us-east-1`)
+- **CI / GitHub Actions Advantage vs `aws/aws-emulator`**: Downloads in <1s (`6.4 MB` vs `~163 MB` `.deb` extracting to `996 MB`), ships prebuilt multi-arch Docker images and native Linux + macOS binaries, requires no `dpkg`/root install or local TLS cert/profile wiring, and includes `<1ms` state reset, Chaos fault injection, and an embedded Web Admin UI.
 
 ## Supported AWS Services
 1. **Amazon S3 (`s3`)**: Buckets, objects (with byte ranges), multipart uploads, prefix listing, notifications to SQS/SNS/EventBridge.

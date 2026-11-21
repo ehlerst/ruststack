@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>RustStack — Blazing-Fast Local AWS Emulator in Rust | LocalStack &amp; Moto Alternative</title>
   <meta name="description" content="RustStack is an ultra-fast local AWS emulator (S3, DynamoDB, SQS, SNS, STS, IAM, KMS, EventBridge — 37 services) for integration tests and CI. Single static Rust binary or 38 MB Docker image. 2.2 MiB RAM, 230ms cold start, 177x lighter than LocalStack." />
-  <meta name="keywords" content="RustStack, local AWS emulator, LocalStack alternative, Moto alternative, S3 mock, DynamoDB local alternative, SQS mock, AWS_ENDPOINT_URL, GitHub Actions AWS mock, Testcontainers AWS, Rust cloud emulator, static binary AWS mock" />
+  <meta name="keywords" content="RustStack, local AWS emulator, aws-emulator alternative, LocalStack alternative, Moto alternative, S3 mock, DynamoDB local alternative, SQS mock, AWS_ENDPOINT_URL, GitHub Actions AWS mock, Testcontainers AWS, Rust cloud emulator, static binary AWS mock" />
   <meta name="author" content="RustStack Contributors" />
   <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large" />
   <link rel="canonical" href="https://ehlerst.github.io/ruststack/" />
@@ -55,6 +55,14 @@
           "acceptedAnswer": {
             "@type": "Answer",
             "text": "RustStack is a local AWS cloud emulator written in pure Rust that implements 37 AWS services (including S3, DynamoDB, SQS, SNS, STS, IAM, KMS, EventBridge, SSM, and Secrets Manager) on a single port (4566). Compared to LocalStack (398.5 MiB idle RAM, 2.77s startup, 1.2 GB image), RustStack uses 2.2 MiB of idle RAM (177x lighter), starts in ~230ms (12x faster), and ships as a 38 MB Docker image or a single zero-dependency static binary."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does RustStack compare to AWS's official aws-emulator in GitHub Actions?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Both are written in Rust, but RustStack is purpose-built to be tiny and instant in CI/CD and GitHub Actions. While aws/aws-emulator downloads as a ~163 MB package and extracts to ~996 MB on disk (with HTTPS cert/config wiring on port 9297 and no native macOS binary), RustStack downloads as a 6.4 MB static tarball (16 MB extracted — ~62x smaller) or a 38 MB prebuilt multi-arch Docker image, runs over plain HTTP on port 4566 with zero TLS cert setup, supports native Linux and macOS binaries, and adds sub-millisecond state reset, Chaos fault injection, and an embedded Web Admin UI."
           }
         },
         {
@@ -397,7 +405,7 @@
     /* Benchmark Comparison Bars */
     .bench-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(min(440px, 100%), 1fr));
       gap: 1.25rem;
       margin-bottom: 2rem;
     }
@@ -777,7 +785,7 @@ Your Test Suite / Application (boto3, aws-sdk-rust, aws-sdk-go-v2, @aws-sdk/clie
     <section id="benchmarks">
       <div class="section-header">
         <div class="section-tag">Verified Performance</div>
-        <h2 class="section-title">Resource &amp; Cold-Start Benchmark: RustStack vs. LocalStack vs. MiniStack</h2>
+        <h2 class="section-title">Benchmark &amp; Footprint: RustStack vs. aws-emulator, LocalStack &amp; MiniStack</h2>
         <p class="section-desc">
           Continuously measured on GitHub Actions runners via automated Testcontainers benchmarks (<code>Testcontainers/rust-measure-alternatives</code>).
         </p>
@@ -837,6 +845,25 @@ Your Test Suite / Application (boto3, aws-sdk-rust, aws-sdk-go-v2, @aws-sdk/clie
           </div>
           <div class="bar-row">
             <div class="bar-label"><span>LocalStack 3.8</span><span>1,204.1 MB</span></div>
+            <div class="bar-track"><div class="bar-fill bar-localstack" style="width: 100%;"></div></div>
+          </div>
+        </div>
+
+        <div class="bench-box">
+          <h3>
+            <span>Extracted Binary Footprint (CI &amp; GitHub Actions)</span>
+            <span class="bench-winner-pill">~62x Smaller</span>
+          </h3>
+          <div class="bar-row">
+            <div class="bar-label"><span>⚡ RustStack Static Binary (6.4 MB .tar.gz)</span><strong>16 MB</strong></div>
+            <div class="bar-track"><div class="bar-fill bar-ruststack" style="width: 1.6%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>RustStack Docker Image (multi-arch)</span><span>38.0 MB</span></div>
+            <div class="bar-track"><div class="bar-fill bar-ministack" style="width: 3.8%;"></div></div>
+          </div>
+          <div class="bar-row">
+            <div class="bar-label"><span>aws/aws-emulator (~163 MB .deb)</span><span>996 MB</span></div>
             <div class="bar-track"><div class="bar-fill bar-localstack" style="width: 100%;"></div></div>
           </div>
         </div>
@@ -1195,6 +1222,12 @@ curl -X POST http://localhost:4566/_ruststack/chaos/rules \
           <h3>What is RustStack and how does it compare to LocalStack and Moto?</h3>
           <p>
             RustStack is a single-binary local AWS cloud emulator written in 100% pure Rust. Unlike LocalStack (which requires a heavy Python/JVM container using ~398.5 MiB idle memory and ~2.77s startup) or Moto (Python-based), RustStack starts in <strong>~230ms</strong>, consumes <strong>2.2 MiB of idle RAM (177x lighter)</strong>, and ships as a <strong>38 MB Docker image</strong> or standalone static binary.
+          </p>
+        </div>
+        <div class="faq-item">
+          <h3>How does RustStack compare to AWS's official <code>aws/aws-emulator</code> in GitHub Actions?</h3>
+          <p>
+            Both are written in Rust, but RustStack is engineered for <strong>fast, tiny GitHub Actions &amp; CI pipelines</strong>. AWS's <code>aws-emulator</code> bundles 200+ generated Smithy models into a ~163 MB package that extracts to <strong>~996 MB</strong> on disk, uses HTTPS on port <code>9297</code> with generated CA certs/config files, and ships Linux <code>.deb</code>/<code>.rpm</code> packages (requiring Docker on macOS). RustStack downloads in milliseconds as a <strong>6.4 MB tarball (16 MB extracted — ~62x smaller)</strong> or a <strong>38 MB prebuilt multi-arch Docker image</strong>, runs natively on Linux &amp; macOS over plain HTTP on standard port <code>4566</code> (zero TLS cert setup), and adds <code>&lt;1ms</code> atomic state reset, Chaos fault injection, and an embedded Web Admin UI.
           </p>
         </div>
         <div class="faq-item">

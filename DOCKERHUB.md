@@ -16,14 +16,16 @@ Measured on standard GitHub Actions runners (`ubuntu-latest`):
 
 | Local Cloud Stack | Docker Image | Image Size | Avg Startup Time | Min Startup Time | Idle Memory (RSS) | Idle CPU |
 |:---|:---|---:|---:|---:|---:|---:|
-| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **30.7 MB** | **216.2 ms** | **199.3 ms** | **1.9 MiB** | **0.00%** |
+| **⚡ RustStack (Winner)** | `ehlers320/ruststack:latest` | **38.0 MB** | **230.5 ms** | **199.3 ms** | **2.2 MiB** | **0.00%** |
 | **MiniStack** | `ministackorg/ministack:latest` | 175.9 MB | 1,685.8 ms | 1,567.2 ms | 33.7 MiB | 0.00% |
 | **LocalStack** | `localstack/localstack:3.8.1` | 1,204.1 MB | 2,770.1 ms | 2,668.0 ms | 398.5 MiB | 0.04% |
 
 ### 🚀 Key Advantages
-- **Memory Footprint**: **17.7x lighter** than MiniStack (`1.9 MiB` vs `33.7 MiB`) and **209.7x lighter** than LocalStack (`398.5 MiB`).
-- **Cold-Start Readiness**: **7.8x faster** startup (`216.2 ms` vs `1,685.8 ms`).
-- **Image Size**: **30.7 MB** (down from 92.9 MB, **5.7x smaller** than MiniStack and **39.2x smaller** than LocalStack).
+- **~62x Smaller than `aws/aws-emulator` on Disk**: RustStack's standalone binary is **16 MB extracted** (**6.4 MB** compressed, **38 MB** Docker image) vs **~996 MB extracted** (~163 MB `.deb`) for AWS's `aws/aws-emulator` — dramatically faster to download, extract, and boot in GitHub Actions and CI pipelines.
+- **Zero-Ceremony Drop-In (`http://localhost:4566`)**: Prebuilt multi-arch Docker image (`amd64`/`arm64`) plus native Linux & macOS binaries, with plain HTTP on port `4566` (no self-signed HTTPS CA setup or `.deb` installs required).
+- **Memory Footprint**: **15.3x lighter** than MiniStack (`2.2 MiB` vs `33.7 MiB`) and **177.9x lighter** than LocalStack (`398.5 MiB`).
+- **Cold-Start Readiness**: **7.3x faster** startup than MiniStack (`230.5 ms` vs `1,685.8 ms`) and **12.0x faster** than LocalStack (`2,770.1 ms`).
+- **Deterministic CI Tooling Built In**: Sub-millisecond atomic state reset (`/_ruststack/state/reset`), JSON state snapshots, Chaos fault injection, and an embedded Web Admin UI (`/_ruststack/ui/`).
 
 ---
 

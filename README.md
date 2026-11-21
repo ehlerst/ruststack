@@ -33,6 +33,27 @@ Continuous automated container startup time, idle memory footprint, and image si
 
 ---
 
+## 🆚 RustStack vs. `aws/aws-emulator` (Built for Fast GitHub Actions & CI)
+
+Both RustStack and AWS's official `aws/aws-emulator` are written in Rust, but they optimize for very different goals (`aws/aws-emulator` generates 200+ Smithy API models into a massive binary; RustStack is hand-crafted for ultra-fast CI/CD, Testcontainers, and GitHub Actions):
+
+| Dimension | ⚡ RustStack | `aws/aws-emulator` | LocalStack |
+|:---|:---|:---|:---|
+| **Download / Package Size** | **6.4 MB** static `.tar.gz` (or **38 MB** Docker image) | ~163 MB `.deb`/`.rpm` | ~1,204 MB Docker image |
+| **Extracted Footprint on Disk** | **16 MB** single binary (**~62x smaller**) | **~996 MB** extracted | ~1.8–2.0 GB+ uncompressed |
+| **GitHub Actions Setup** | **<1s** `curl \| tar xz` or `services:` container — zero `dpkg`/root install | Download + unpack ~996 MB `.deb` or build from source (~100 GB build disk) | Slow multi-GB image pull + ~2.8s cold start |
+| **Native OS Binaries** | **Linux (x86_64/arm64 gnu+musl) + macOS (Apple Silicon & Intel)** + Docker Hub multi-arch | Linux `.deb`/`.rpm` (Docker required on macOS/Windows) | Docker only |
+| **SDK / Endpoint Setup** | `AWS_ENDPOINT_URL=http://localhost:4566` (drop-in LocalStack parity, **no self-signed TLS certs**) | HTTPS on port `9297` + generated credentials/config/CA cert files | `http://localhost:4566` (Auth token required for commercial use) |
+| **Deterministic CI Tooling** | **`<1ms` atomic state reset**, JSON snapshots, **Chaos/Fault Injection**, **Web Admin UI** | Isolated per-process instances | Snapshots/Chaos mostly Pro-tier |
+| **Service Scope** | **37 core AWS services** with deep cross-service wiring (S3→SQS/SNS/EB, DynamoDB Streams, DLQs) | 200+ generated Smithy API models (varying data-plane depth) | Broad core + Pro services |
+
+**Why teams pick RustStack in GitHub Actions:**
+- **~62x smaller on disk (`16 MB` vs `996 MB`) & ~25x smaller download (`6.4 MB` vs `~163 MB`)**: Pulls and extracts in milliseconds on ephemeral CI runners without blowing runner disk budgets or cache quotas.
+- **Zero-ceremony drop-in**: Works directly as a GitHub Actions `services:` container (`ehlers320/ruststack:latest`) or single `curl | tar xz` static `musl` binary — no `.deb`/`.rpm` install, no self-signed HTTPS truststore configuration across JVM/Go/Node/Python SDKs, and 100% compatible with existing `localhost:4566` LocalStack configs.
+- **Test isolation & resilience built in**: Wipe state between tests in `<1 ms` (`POST /_ruststack/state/reset`), inject `503 SlowDown` / DynamoDB throttling via Chaos rules, and debug locally in the embedded Web Admin UI (`/_ruststack/ui/`).
+
+---
+
 ## ⚡ Performance Highlights
 
 Automated in-memory performance rating on standard developer hardware:
